@@ -46,12 +46,14 @@
     <aside id="lobby" hidden>
       <section id="entry">
         <h1>던지고.<br /> 피하고.<br /> <em>또 한 판.</em></h1>
-        <p class="intro">멀리 있는 친구도, 같은 경기장에서.<br />링크 하나로 시작하는 3D 식칼 피구.</p>
+        <p class="intro">중앙 와드를 사이에 두고, 각자의 반원에서.<br />무빙으로 피하고 식칼로 맞혀요.</p>
         <form id="entry-form">
           <label for="nickname">내 닉네임</label>
           <input id="nickname" name="nickname" maxlength="12" placeholder="오늘의 식칼 장인" autocomplete="nickname" required />
+          <label for="map">경기장</label>
+          <select id="map"><option value="ward">원형 · 중앙 와드</option><option value="arena">기존 맵 · 사각형 장애물</option></select>
           <label for="mode">게임 방식</label>
-          <select id="mode"><option value="ffa">개인전 · 마지막 생존자 승리</option><option value="teams">팀전 · 민트 vs 코랄</option></select>
+          <select id="mode"><option value="duel">1:1 · 각자의 반원에서 대결</option><option value="teams">팀전 · 최대 3:3 · 민트 vs 코랄</option></select>
           <button class="primary" id="create" type="submit">친구 초대할 방 만들기 <span aria-hidden="true">↗</span></button>
         </form>
         <div class="join-row"><label class="sr-only" for="room-code">초대받은 방 코드</label><input id="room-code" maxlength="6" placeholder="방 코드 6자리" autocomplete="off" /><button id="join">입장</button></div>
@@ -62,9 +64,9 @@
         <p class="room-caption">우리만의 경기장</p>
         <h1 class="room-title">친구를<br /><em>불러볼까?</em></h1>
         <div class="invite"><span>방 코드</span><strong id="code">—</strong><button id="copy">초대 링크 복사</button></div>
-        <div class="roster-heading"><strong id="room-mode">개인전</strong><span id="count">1 / 6명</span></div>
+        <div class="roster-heading"><strong id="room-mode">1:1 · 반원 대결</strong><span id="count">1 / 2명</span></div>
         <ul id="players"></ul>
-        <p id="ready-help" class="help">2명 이상 모여 모두 준비하면 시작해요.</p>
+        <p id="ready-help" class="help">둘 다 준비하면 시작해요. 중앙 와드를 넘지 않고 식칼을 던져요.</p>
         <button id="ready" class="primary">준비하기</button>
         <button id="leave" class="text-button">방 나가기</button>
       </section>

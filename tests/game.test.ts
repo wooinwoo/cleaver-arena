@@ -12,15 +12,15 @@ test('input validation, speed limit, arena bounds and obstacle collision', () =>
   const input = parseInput({ x: 20, z: 20, yaw: 100, fire: true })!;
   assert.ok(Math.abs(Math.hypot(input.x, input.z) - 1) < 1e-8);
   const player = { x: 11.4, z: 0 };
-  move(player, 1, 0, 1);
+  move(player, 1, 0, 1, 0, 'arena');
   assert.equal(player.x, 11.5);
   const stuck = { x: 4.5, z: 2.8 };
-  move(stuck, 0, 0, 0);
+  move(stuck, 0, 0, 0, 0, 'arena');
   assert.ok(Math.abs(stuck.x - 4.5) >= 1.5);
 });
 
 function duel(mode: Game['mode'] = 'ffa') {
-  const game = createGame('ABCDEF', mode);
+  const game = createGame('ABCDEF', mode, 'arena');
   const a = addPlayer(game, 'a', '첫째'), b = addPlayer(game, 'b', '둘째');
   a.ready = b.ready = true;
   assert.equal(startRound(game), true);
@@ -69,7 +69,7 @@ test('projectiles pass through disconnected players and hit connected opponents'
 });
 
 test('bots aim at connected opponents instead of disconnected players', () => {
-  const game = createGame('ABCDEF');
+  const game = createGame('ABCDEF', 'ffa', 'arena');
   const bot = addPlayer(game, 'bot', '로봇', true);
   const offline = addPlayer(game, 'offline', '접속 종료');
   const opponent = addPlayer(game, 'opponent', '상대');
@@ -94,7 +94,7 @@ test('projectiles preserve friendly fire protection after their owner leaves', (
 });
 
 test('six seats, balanced team start, readiness and disconnect victory', () => {
-  const game = createGame('ABCDEF', 'teams');
+  const game = createGame('ABCDEF', 'teams', 'arena');
   for (let i = 0; i < 6; i++) addPlayer(game, String(i), '플레이어').ready = true;
   assert.throws(() => addPlayer(game, 'extra', '넘침'));
   game.players[0].connected = false;
@@ -111,7 +111,7 @@ test('six seats, balanced team start, readiness and disconnect victory', () => {
 });
 
 test('shots hit the first player along their path, before later players, obstacles or the arena edge', () => {
-  const order = createGame('ABCDEF');
+  const order = createGame('ABCDEF', 'ffa', 'arena');
   const shooter = addPlayer(order, 'a', '발사자');
   const far = addPlayer(order, 'far', '뒤 상대'), near = addPlayer(order, 'near', '앞 상대');
   order.phase = 'playing';
@@ -171,8 +171,8 @@ test('real WebSockets join, start, synchronize, isolate rooms, validate, reconne
     await a.wait(m => m.type === 'state' && m.game.phase === 'playing');
     await b.wait(m => m.type === 'state' && m.game.phase === 'playing');
     a.send({ type: 'input', input: { x: 100, z: 0, yaw: 0, fire: false } });
-    const moved = await b.wait(m => m.type === 'state' && m.game.players.some(p => p.id === joinedA.id && p.x > 8.1));
-    assert.ok(moved.game.players.find(p => p.id === joinedA.id)!.x < 10);
+    const moved = await b.wait(m => m.type === 'state' && m.game.players.some(p => p.id === joinedA.id && p.x > -4.9));
+    assert.ok(moved.game.players.find(p => p.id === joinedA.id)!.x < -3);
     const other = await c.wait(m => m.type === 'state');
     assert.equal(other.game.players.length, 1);
     const busy = await client();
@@ -202,19 +202,20 @@ test('real WebSockets join, start, synchronize, isolate rooms, validate, reconne
     assert.match(malformed, /^HTTP\/1.1 400/);
     assert.equal((await fetch(`http://127.0.0.1:${address.port}/health`)).status, 200);
 
-    for (const mode of ['ffa', 'teams'] as const) {
+    for (const [map, mode] of [['ward', 'duel'], ['ward', 'teams'], ['arena', 'ffa'], ['arena', 'teams']] as const) {
       const host = await client();
-      host.send({ type: 'create', name: '방장', mode });
+      host.send({ type: 'create', name: '방장', mode, map });
       const room = await host.wait(m => m.type === 'joined');
       const guests = [];
       for (let i = 0; i < (mode === 'teams' ? 3 : 1); i++) {
         const guest = await client();
-        guest.send({ type: 'join', name: '친구', code: room.code });
+        guest.send({ type: 'join', name: '친구', code: room.code, map: map === 'arena' ? 'ward' : 'arena' });
         await guest.wait(m => m.type === 'joined');
         guests.push(guest);
       }
       host.send({ type: 'ready' }); guests.forEach(guest => guest.send({ type: 'ready' }));
-      await host.wait(m => m.type === 'state' && m.game.phase === 'countdown');
+      const started = await host.wait(m => m.type === 'state' && m.game.phase === 'countdown');
+      assert.equal(started.game.map, map); assert.equal(started.game.mode, mode);
       guests.pop()!.send({ type: 'leave' });
       const remaining = await host.wait(m => m.type === 'state' && m.game.round === 1 && m.game.players.length === guests.length + 1);
       assert.equal(remaining.game.phase, 'lobby');
@@ -224,7 +225,8 @@ test('real WebSockets join, start, synchronize, isolate rooms, validate, reconne
       await replacement.wait(m => m.type === 'joined');
       host.send({ type: 'ready' });
       [...guests, replacement].forEach(guest => guest.send({ type: 'ready' }));
-      await host.wait(m => m.type === 'state' && m.game.phase === 'countdown' && m.game.round === 2);
+      const rematch = await host.wait(m => m.type === 'state' && m.game.phase === 'countdown' && m.game.round === 2);
+      assert.equal(rematch.game.map, map);
     }
   } finally {
     sockets.forEach(ws => ws.terminate());

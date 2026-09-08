@@ -156,3 +156,5 @@ body.has-touch.in-match .view-switch button span, body.has-touch.in-match #contr
   body.has-touch.in-match .health-panel { width: 100px; padding: 8px; font-size: 11px; }
   body.in-match #announcement { top: calc(var(--safe-top) + 62px); left: calc(var(--safe-left) + 112px); right: calc(var(--safe-right) + 74px); width: auto; transform: none; font-size: clamp(11px, 2.5vw, 14px); line-height: 1.3; }
 }
+
+@media(min-width:481px) and (orientation:landscape){body.has-touch.in-match .view-dock{bottom:var(--safe-bottom)}}

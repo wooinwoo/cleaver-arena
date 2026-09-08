@@ -88,11 +88,14 @@ export function createArenaServer() {
           if (rooms.size >= 60) { send(ws, { type: 'error', message: '현재 방이 많아요. 잠시 후 다시 시도해 주세요.' }); return; }
           let code: string;
           do { code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase(); } while (rooms.has(code));
-          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : 'ffa'), tokens: new Map(), disconnected: new Map() };
+          const map = data.map === 'arena' ? 'arena' : 'ward';
+          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map), tokens: new Map(), disconnected: new Map() };
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room) { send(ws, { type: 'error', message: '방을 찾을 수 없어요. 코드를 확인해 주세요.' }); return; }
         if (room.game.phase !== 'lobby' && room.game.phase !== 'finished') { send(ws, { type: 'error', message: '경기 중인 방이에요. 경기 종료 후 입장해 주세요.' }); return; }
+        const capacity = room.game.mode === 'duel' ? 2 : 6;
+        if (room.game.players.length >= capacity) { send(ws, { type: 'error', message: `방 정원 ${capacity}명이 찼어요.` }); return; }
         const id = randomUUID(), token = randomUUID();
         addPlayer(room.game, id, name);
         room.tokens.set(token, id);

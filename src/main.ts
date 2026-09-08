@@ -3,7 +3,7 @@ import type { World } from './world.ts';
 import { COLORS } from './palette.ts';
 import { isTableId } from '../shared/catalog.ts';
 import { initTabletop } from './tabletop.ts';
-import type { Game, Input } from '../shared/game.ts';
+import type { ArenaMap, Game, Input } from '../shared/game.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
@@ -11,6 +11,7 @@ const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTou
 document.body.classList.toggle('has-touch', touch);
 const nameInput = $<HTMLInputElement>('nickname');
 const codeInput = $<HTMLInputElement>('room-code');
+const mapInput = $<HTMLSelectElement>('map');
 const error = $('error');
 const sessionKey = 'cleaver-session';
 let world: World;
@@ -197,17 +198,17 @@ function renderState() {
       const row = document.createElement('li');
       const dot = document.createElement('span');
       dot.className = 'dot'; dot.textContent = String(p.slot + 1);
-      dot.style.setProperty('--player-color', COLORS[state!.mode === 'teams' ? p.team : p.slot]);
+      dot.style.setProperty('--player-color', COLORS[state!.mode === 'ffa' ? p.slot : p.team]);
       const name = document.createElement('span'); name.className = 'player-name';
       name.textContent = `${p.name}${p.id === myId ? ' (나)' : ''}${state!.mode === 'teams' ? (p.team === 0 ? ' · 민트' : ' · 코랄') : ''}`;
       const ready = document.createElement('span'); ready.className = 'ready-state';
       ready.textContent = !p.connected ? '재접속 대기' : p.ready ? '준비 완료' : '준비 중';
       row.append(dot, name, ready); return row;
     }));
-    $('count').textContent = `${state.players.length} / 6명`;
-    $('room-mode').textContent = state.mode === 'teams' ? '팀전 · 아군 피해 없음' : '개인전';
+    $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
+    $('room-mode').textContent = `${state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : '2명 이상 모여 모두 준비하면 시작해요.';
+    if (state.phase === 'lobby') $('ready-help').textContent = (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map === 'ward' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
   }
 }
 
@@ -221,8 +222,15 @@ function nickname() {
 function enter(practice = false) {
   if (connecting) return;
   const name = nickname();
-  if (name) connect({ type: 'create', name, mode: $<HTMLSelectElement>('mode').value, practice });
+  if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, practice });
 }
+
+mapInput.onchange = () => {
+  const ward = mapInput.value === 'ward', mode = $<HTMLSelectElement>('mode');
+  mode.options[0].value = ward ? 'duel' : 'ffa';
+  mode.options[0].textContent = ward ? '1:1 · 각자의 반원에서 대결' : '개인전 · 마지막 생존자 승리';
+  world.setMap(mapInput.value as ArenaMap);
+};
 
 $('entry-form').addEventListener('submit', event => { event.preventDefault(); enter(); });
 $('practice').onclick = () => { if (!nameInput.value.trim()) nameInput.value = '연습생'; enter(true); };

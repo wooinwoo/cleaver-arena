@@ -11,7 +11,7 @@ import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
 import '@babylonjs/core/Culling/ray.js';
-import { HALF_X, HALF_Z, OBSTACLES, move, type Game, type Input, type Player } from '../shared/game.ts';
+import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, move, type ArenaMap, type Game, type Input } from '../shared/game.ts';
 
 import { COLORS } from './palette.ts';
 type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; hp: number; color: string };
@@ -30,6 +30,8 @@ export class World {
   private materials = new Map<string, StandardMaterial>();
   private hand: TransformNode;
   private preview: Avatar[] = [];
+  private arena?: TransformNode;
+  private map: ArenaMap = 'ward';
   private elapsed = 0;
   private priorShot = -1;
   onShot = () => {};
@@ -60,10 +62,10 @@ export class World {
     this.hand.rotation.set(-.2, .2, -.25);
     this.cleaver(this.hand, .65);
     this.hand.setEnabled(false);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const avatar = this.avatar('preview-' + i, COLORS[i]);
-      avatar.root.position.set((i - 1) * 4, 0, i === 1 ? 1 : -2);
-      avatar.root.rotation.y = Math.PI - .3;
+      avatar.root.position.set(i === 0 ? -5 : 5, 0, 0);
+      avatar.root.rotation.y = i === 0 ? Math.PI / 2 : -Math.PI / 2;
       this.preview.push(avatar);
     }
     this.engine.runRenderLoop(() => {
@@ -111,7 +113,48 @@ export class World {
     return mesh;
   }
 
+  setMap(map: ArenaMap) {
+    if (this.map === map) return;
+    this.map = map;
+    this.buildArena();
+  }
+
   private buildArena() {
+    this.arena?.dispose();
+    this.arena = new TransformNode('arena', this.scene);
+    const firstMesh = this.scene.meshes.length;
+    if (this.map === 'arena') this.buildOriginalArena();
+    else this.buildWardArena();
+    for (const mesh of this.scene.meshes.slice(firstMesh)) mesh.parent = this.arena;
+  }
+
+  private buildWardArena() {
+    const base = MeshBuilder.CreateCylinder('round-court', { diameter: ARENA_RADIUS * 2 + .5, height: .8, tessellation: 96 }, this.scene);
+    base.position.y = -.42; base.material = this.material('#355a5c');
+    for (const team of [0, 1]) {
+      const half = MeshBuilder.CreateDisc('half-court-' + team, { radius: ARENA_RADIUS, tessellation: 64, arc: .5, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+      half.rotation.set(Math.PI / 2, team === 0 ? -Math.PI / 2 : Math.PI / 2, 0);
+      half.position.y = .01;
+      half.material = this.material(team === 0 ? '#88b5a1' : '#c6aa96');
+    }
+    const edge = MeshBuilder.CreateTorus('court-boundary', { diameter: ARENA_RADIUS * 2, thickness: .09, tessellation: 96 }, this.scene);
+    edge.position.y = .05; edge.material = this.material('#e9edcc');
+    this.box('ward-line', [.08, .025, ARENA_RADIUS * 2], [0, .045, 0], '#e9edcc');
+    // Wards mark the movement boundary. Cleavers pass over them without colliding.
+    for (let z = -9; z <= 9; z += 1.5) {
+      this.cylinder('ward-base', .48, .18, [0, .1, z], '#456c61');
+      this.cylinder('ward-stem', .16, .55, [0, .4, z], '#b4b582');
+      for (const side of [-1, 1]) {
+        const wing = this.sphere('ward-wing', [.18, .5, .22], [side * .17, .67, z], '#638b6a');
+        wing.rotation.z = side * -.45;
+      }
+      const eye = this.sphere('ward-eye', [.32, .32, .32], [0, .88, z], '#e1f69b');
+      eye.material = this.material('#e1f69b', true);
+    }
+    this.box('distant-floor', [200, .2, 200], [0, -3, 0], '#173d46');
+  }
+
+  private buildOriginalArena() {
     this.box('floating-base', [26, 1.2, 20], [0, -.75, 0], '#254d55');
     this.box('court', [24, .18, 18], [0, -.08, 0], '#79a59b');
     for (let x = -10; x <= 10; x += 2) for (let z = -8; z <= 8; z += 2) {
@@ -209,12 +252,13 @@ export class World {
 
   applyState(game: Game, id: string) {
     const reset = !this.state || this.state.round !== game.round;
+    this.setMap(game.map);
     this.state = game;
     this.id = id;
     this.preview.forEach(p => p.root.setEnabled(false));
     for (const player of game.players) {
       let avatar = this.avatars.get(player.id);
-      const color = COLORS[game.mode === 'teams' ? player.team : player.slot];
+      const color = COLORS[game.mode === 'teams' || game.map === 'ward' ? player.team : player.slot];
       if (avatar && avatar.color !== color) { avatar.root.dispose(); avatar = undefined; }
       if (!avatar) { avatar = this.avatar(player.id, color); this.avatars.set(player.id, avatar); }
       avatar.ring.material = this.material(player.id === id ? '#fff8dc' : color, true);
@@ -256,7 +300,7 @@ export class World {
       const avatar = this.avatars.get(player.id)!;
       const local = player.id === this.id;
       const position = avatar.root.position;
-      if (local && game?.phase === 'playing' && player.hp > 0) move(position, this.input.x, this.input.z, dt);
+      if (local && game?.phase === 'playing' && player.hp > 0) move(position, this.input.x, this.input.z, dt, player.team, game.map);
       if (!local) {
         position.x += (player.x - position.x) * Math.min(1, dt * 18);
         position.z += (player.z - position.z) * Math.min(1, dt * 18);

@@ -1,3 +1,5 @@
+export const ARENA_RADIUS = 10;
+export type ArenaMap = 'ward' | 'arena';
 export const HALF_X = 12;
 export const HALF_Z = 9;
 export const SPEED = 5.5;
@@ -16,32 +18,36 @@ export type Player = {
 };
 export type Shot = { id: number; owner: string; team: number; x: number; z: number; vx: number; vz: number };
 export type Game = {
-  code: string; mode: 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
+  code: string; map: ArenaMap; mode: 'duel' | 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
   players: Player[]; shots: Shot[]; time: number; countdown: number;
   winner: string; nextShot: number; round: number;
 };
 
-export function createGame(code: string, mode: Game['mode'] = 'ffa'): Game {
-  return { code, mode, phase: 'lobby', players: [], shots: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
+export function createGame(code: string, mode: Game['mode'] = 'duel', map: ArenaMap = 'ward'): Game {
+  return { code, map, mode: map === 'ward' && mode === 'ffa' ? 'duel' : mode, phase: 'lobby', players: [], shots: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
 }
 
 export function addPlayer(game: Game, id: string, name: string, bot = false): Player {
-  const slot = [0, 1, 2, 3, 4, 5].find(n => !game.players.some(p => p.slot === n));
+  const slot = Array.from({ length: game.mode === 'duel' ? 2 : 6 }, (_, n) => n).find(n => !game.players.some(p => p.slot === n));
   if (slot === undefined) throw new Error('방 정원이 찼어요.');
   const player: Player = {
     id, name, slot, team: slot % 2, x: 0, z: 0, yaw: 0, hp: 100,
     cooldown: 0, ready: bot, connected: true, bot, input: { x: 0, z: 0, yaw: 0, fire: false },
   };
   game.players.push(player);
-  spawn(player);
+  spawn(player, game.map);
   return player;
 }
 
-function spawn(player: Player) {
-  const angle = Math.PI * 2 * player.slot / 6;
-  player.x = Math.cos(angle) * 8;
-  player.z = Math.sin(angle) * 6;
-  player.yaw = Math.atan2(-player.x, -player.z);
+function spawn(player: Player, map: ArenaMap, lane = Math.floor(player.slot / 2)) {
+  player.x = player.team === 0 ? -5 : 5;
+  player.z = [0, -3, 3][lane];
+  player.yaw = player.team === 0 ? Math.PI / 2 : -Math.PI / 2;
+  if (map === 'arena') {
+    const angle = Math.PI * 2 * player.slot / 6;
+    player.x = Math.cos(angle) * 8; player.z = Math.sin(angle) * 6;
+    player.yaw = Math.atan2(-player.x, -player.z);
+  }
   player.input = { x: 0, z: 0, yaw: player.yaw, fire: false };
   player.hp = 100;
   player.cooldown = 0;
@@ -51,7 +57,7 @@ export function startRound(game: Game): boolean {
   if (!['lobby', 'finished'].includes(game.phase) || game.players.length < 2 ||
       game.players.some(p => !p.ready || !p.connected)) return false;
   if (game.mode === 'teams' && game.players.length % 2 !== 0) return false;
-  game.players.forEach((player, index) => { player.team = index % 2; spawn(player); });
+  game.players.forEach((player, index) => { player.team = index % 2; spawn(player, game.map, Math.floor(index / 2)); });
   game.shots = [];
   game.phase = 'countdown';
   game.countdown = 3;
@@ -70,17 +76,28 @@ export function parseInput(value: unknown): Input | null {
     yaw: (v.yaw as number) % (Math.PI * 2), fire: v.fire };
 }
 
-export function move(player: { x: number; z: number }, x: number, z: number, dt: number) {
-  player.x = Math.max(-HALF_X + RADIUS, Math.min(HALF_X - RADIUS, player.x + x * SPEED * dt));
-  player.z = Math.max(-HALF_Z + RADIUS, Math.min(HALF_Z - RADIUS, player.z + z * SPEED * dt));
-  for (const obstacle of OBSTACLES) {
-    const dx = player.x - obstacle.x, dz = player.z - obstacle.z;
-    const distance = Math.hypot(dx, dz), limit = RADIUS + obstacle.radius;
-    if (distance < limit) {
-      player.x = obstacle.x + (distance ? dx / distance : 1) * limit;
-      player.z = obstacle.z + (distance ? dz / distance : 0) * limit;
+export function move(player: { x: number; z: number }, x: number, z: number, dt: number, team: number, map: ArenaMap) {
+  if (map === 'arena') {
+    player.x = Math.max(-HALF_X + RADIUS, Math.min(HALF_X - RADIUS, player.x + x * SPEED * dt));
+    player.z = Math.max(-HALF_Z + RADIUS, Math.min(HALF_Z - RADIUS, player.z + z * SPEED * dt));
+    for (const obstacle of OBSTACLES) {
+      const dx = player.x - obstacle.x, dz = player.z - obstacle.z;
+      const distance = Math.hypot(dx, dz), limit = RADIUS + obstacle.radius;
+      if (distance < limit) {
+        player.x = obstacle.x + (distance ? dx / distance : 1) * limit;
+        player.z = obstacle.z + (distance ? dz / distance : 0) * limit;
+      }
     }
+    return;
   }
+  const side = team === 0 ? -1 : 1, limit = ARENA_RADIUS - RADIUS;
+  player.x = side * Math.max(RADIUS, side * (player.x + x * SPEED * dt));
+  player.z += z * SPEED * dt;
+  const distance = Math.hypot(player.x, player.z);
+  if (distance > limit) { player.x *= limit / distance; player.z *= limit / distance; }
+  player.x = side * Math.max(RADIUS, side * player.x);
+  const maxZ = Math.sqrt(Math.max(0, limit * limit - player.x * player.x));
+  player.z = Math.max(-maxZ, Math.min(maxZ, player.z));
 }
 
 function hitTime(x: number, z: number, ax: number, az: number, bx: number, bz: number, radius: number) {
@@ -105,11 +122,11 @@ export function tick(game: Game, dt: number) {
   for (const player of game.players) {
     if (!player.connected || player.hp <= 0) continue;
     if (player.bot) {
-      const enemy = game.players.find(p => p.connected && p.id !== player.id && p.hp > 0 && (game.mode === 'ffa' || p.team !== player.team));
+      const enemy = game.players.find(p => p.connected && p.hp > 0 && p.id !== player.id && (game.mode === 'ffa' || p.team !== player.team));
       if (enemy) player.input = { x: Math.cos(game.time * 1.2) * 0.5, z: Math.sin(game.time * 0.8) * 0.5,
         yaw: Math.atan2(enemy.x - player.x, enemy.z - player.z) + Math.sin(game.time * 2) * 0.18, fire: true };
     }
-    move(player, player.input.x, player.input.z, dt);
+    move(player, player.input.x, player.input.z, dt, player.team, game.map);
     player.yaw = player.input.yaw;
     player.cooldown = Math.max(0, player.cooldown - dt);
     if (player.input.fire && player.cooldown <= 0) {
@@ -121,18 +138,21 @@ export function tick(game: Game, dt: number) {
   }
   game.shots = game.shots.filter(shot => {
     const oldX = shot.x, oldZ = shot.z;
-    if (Math.abs(oldX) > HALF_X || Math.abs(oldZ) > HALF_Z) return false;
+    if (game.map === 'ward' ? Math.hypot(oldX, oldZ) > ARENA_RADIUS : Math.abs(oldX) > HALF_X || Math.abs(oldZ) > HALF_Z) return false;
     shot.x += shot.vx * dt;
     shot.z += shot.vz * dt;
     const dx = shot.x - oldX, dz = shot.z - oldZ;
-    let first = Math.min(
+    const a = dx * dx + dz * dz, b = oldX * dx + oldZ * dz;
+    const c = oldX * oldX + oldZ * oldZ - ARENA_RADIUS * ARENA_RADIUS;
+    let first = a ? (-b + Math.sqrt(Math.max(0, b * b - a * c))) / a : Infinity;
+    if (game.map === 'arena') first = Math.min(
       dx ? (Math.sign(dx) * HALF_X - oldX) / dx : Infinity,
       dz ? (Math.sign(dz) * HALF_Z - oldZ) / dz : Infinity,
       ...OBSTACLES.map(o => hitTime(o.x, o.z, oldX, oldZ, shot.x, shot.z, o.radius + .15)),
     );
     let target: Player | undefined;
     for (const player of game.players) {
-      if (!player.connected || player.hp <= 0 || player.id === shot.owner || (game.mode === 'teams' && player.team === shot.team)) continue;
+      if (!player.connected || player.hp <= 0 || player.id === shot.owner || (game.mode !== 'ffa' && player.team === shot.team)) continue;
       const time = hitTime(player.x, player.z, oldX, oldZ, shot.x, shot.z, RADIUS + .15);
       if (time < first) { first = time; target = player; }
     }
