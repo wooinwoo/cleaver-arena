@@ -55,6 +55,7 @@ export function createArenaServer() {
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('message', raw => {
+      if (ws.readyState !== WebSocket.OPEN) return;
       const now = Date.now();
       if (now - client.window > 1000) { client.count = 0; client.window = now; }
       if (++client.count > 90) { ws.close(1008, 'Too many messages'); return; }
@@ -92,7 +93,6 @@ export function createArenaServer() {
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room) { send(ws, { type: 'error', message: '방을 찾을 수 없어요. 코드를 확인해 주세요.' }); return; }
         if (room.game.phase !== 'lobby' && room.game.phase !== 'finished') { send(ws, { type: 'error', message: '경기 중인 방이에요. 경기 종료 후 입장해 주세요.' }); return; }
-        if (room.game.players.length >= 6) { send(ws, { type: 'error', message: '방 정원 6명이 찼어요.' }); return; }
         const id = randomUUID(), token = randomUUID();
         addPlayer(room.game, id, name);
         room.tokens.set(token, id);
@@ -111,7 +111,10 @@ export function createArenaServer() {
         player.ready = !player.ready;
         startRound(game);
       } else if (data.type === 'leave') {
+        player.connected = false; player.ready = false;
+        player.input = { x: 0, z: 0, yaw: player.yaw, fire: false };
         client.room.disconnected.set(player.id, 0);
+        client.room = undefined; client.id = undefined;
         ws.close(1000);
       }
     });
@@ -143,6 +146,7 @@ export function createArenaServer() {
         room.game.players = room.game.players.filter(p => p.id !== id);
         room.disconnected.delete(id);
         for (const [token, owner] of room.tokens) if (owner === id) room.tokens.delete(token);
+        startRound(room.game);
       }
       if (room.game.players.every(p => p.bot)) { rooms.delete(code); continue; }
       tick(room.game, 1 / 30);

@@ -43,6 +43,12 @@ export function attachTabletop(server: Server) {
     room.result = room.match?.state.draw ? '무승부' : `${room.players.find(p => p.seat === room.match?.state.winner)?.name ?? '상대'} 승리`;
     room.players.forEach(p => { p.ready = false; });
   }
+  function start(room: Room) {
+    if (room.phase === 'playing' || room.players.length < TABLE_GAMES[room.kind].min || !room.players.every(p => p.ready && p.connected)) return;
+    room.players.forEach((p, index) => { p.seat = index; });
+    room.match = definitions[room.kind](room.players.length, room.variant);
+    room.phase = 'playing'; room.round++; room.result = '';
+  }
   server.on('upgrade', (req, socket, head) => {
     if (req.url !== '/table-ws') return;
     if (clients.size >= 120) { socket.destroy(); return; }
@@ -58,6 +64,7 @@ export function attachTabletop(server: Server) {
     ws.on('pong', () => { client.alive = true; });
     ws.on('error', () => ws.terminate());
     ws.on('message', raw => {
+      if (ws.readyState !== WebSocket.OPEN) return;
       const fail = (message: string, type = 'error') => send(ws, { type, message });
       if (Date.now() - client.window > 1000) { client.count = 0; client.window = Date.now(); }
       if (++client.count > 30) { ws.close(1008); return; }
@@ -105,11 +112,7 @@ export function attachTabletop(server: Server) {
       const room = client.room, member = client.member!;
       if (data.type === 'ready' && room.phase !== 'playing') {
         member.ready = !member.ready;
-        if (room.players.length >= TABLE_GAMES[room.kind].min && room.players.every(p => p.ready && p.connected)) {
-          room.players.forEach((p, index) => { p.seat = index; });
-          room.match = definitions[room.kind](room.players.length, room.variant);
-          room.phase = 'playing'; room.round++; room.result = '';
-        }
+        start(room);
         broadcast(room);
       } else if (data.type === 'action' && room.phase === 'playing' && room.match) {
         if (room.players.some(p => !p.connected)) { fail('상대의 재접속을 기다리고 있어요.'); return; }
@@ -118,7 +121,11 @@ export function attachTabletop(server: Server) {
         if (problem) { fail(problem); return; }
         if (finished(room.match.state)) end(room);
         broadcast(room);
-      } else if (data.type === 'leave') { member.leftAt = 1; ws.close(1000); }
+      } else if (data.type === 'leave') {
+        member.connected = false; member.ready = false; member.leftAt = 1;
+        client.room = undefined; client.member = undefined;
+        ws.close(1000); broadcast(room);
+      }
     });
     ws.on('close', () => {
       clients.delete(ws);
@@ -144,7 +151,7 @@ export function attachTabletop(server: Server) {
       }
       room.players = room.players.filter(p => !expired.includes(p));
       if (!room.players.length) rooms.delete(code);
-      else broadcast(room);
+      else { start(room); broadcast(room); }
     }
   }, 1000);
   const heartbeat = setInterval(() => {
