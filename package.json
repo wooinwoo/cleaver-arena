@@ -1,0 +1,29 @@
+{
+  "name": "cleaver-arena",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "server": "tsx watch server/index.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "tsx tests/browser.ts",
+    "test:tables": "tsx tests/table-browser.ts",
+    "test:responsive": "tsx tests/responsive.ts"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.25.0",
+    "chess.js": "^1.4.0",
+    "tsx": "^4.21.0",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.0",
+    "vite": "^7.3.0"
+  }
+}
