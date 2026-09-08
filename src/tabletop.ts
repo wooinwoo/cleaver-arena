@@ -2,13 +2,13 @@ import { TABLE_GAMES, type TableId } from '../shared/catalog.ts';
 import type { Action } from '../shared/tabletop-types.ts';
 import type { GomokuState } from '../shared/gomoku.ts';
 import type { QuoridorState } from '../shared/quoridor.ts';
-import type { JanggiState, PieceKind } from '../shared/janggi.ts';
+import { JANGGI_VARIANTS, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
 import type { PokerState } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
 
 type PublicPoker = Omit<PokerState, 'cards'> & { cards: (number | null)[] };
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState;
-type RoomState = { code: string; kind: TableId; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
+type RoomState = { code: string; kind: TableId; variant?: JanggiVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
@@ -26,10 +26,11 @@ export function initTabletop(kind: TableId) {
     <aside class="table-sidebar">
       <h1>${config.title}</h1><p class="table-description">${config.description}</p>
       <form id="t-entry"><label for="t-name">내 닉네임</label><input id="t-name" maxlength="12" autocomplete="nickname" placeholder="친구들이 알아볼 이름" required />
+        ${kind === 'janggi' ? '<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note"><option value="animal">동물장기</option><option value="genius">더 지니어스 기본룰</option></select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>' : ''}
         <button class="primary" type="submit">방 만들기</button><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="방 코드 6자리"/><button type="button" id="t-join">입장</button></div></form>
       <details id="t-room" open hidden><summary>방 정보 · 참가자</summary><div class="table-invite"><span>우리 방 <strong id="t-code"></strong></span><button id="t-copy">초대 링크 복사</button></div>
         <ul id="t-players"></ul><button id="t-ready" class="primary">준비하기</button><p id="t-ready-note">모두 준비하면 시작해요.</p></details>
-      <p id="t-error" role="alert"></p><details class="table-rules" open><summary>이 게임의 규칙</summary><p>${config.rules}</p></details>
+      <p id="t-error" role="alert"></p><details class="table-rules" open><summary id="t-rules-title">이 게임의 규칙</summary><p id="t-rules-text">${config.rules}</p></details>
       <button id="t-leave" class="text-button">다른 게임 고르기</button>
     </aside>
     <div class="table-stage"><div class="table-status"><span id="t-round">친구를 기다리는 중</span><strong id="t-turn" role="status">방을 만들거나 입장해 주세요</strong></div>
@@ -40,13 +41,22 @@ export function initTabletop(kind: TableId) {
   document.body.append(section);
   let ws: WebSocket | null = null, room: RoomState | null = null;
   let session: { code: string; token: string } | null = null;
-  let intentional = false, retries = 0, timer: ReturnType<typeof setTimeout>;
+  let intentional = false, connecting = false, retries = 0, timer: ReturnType<typeof setTimeout>;
   let pending: Action | null = null, selectedPiece: number | null = null, drop: PieceKind | null = null;
   let wallMode: 'move' | 'h' | 'v' = 'move';
   let promotion = 'q';
   const compact = matchMedia('(max-width: 760px)');
   const roomDetails = $<HTMLDetailsElement>('t-room');
   const rules = document.querySelector<HTMLDetailsElement>('.table-rules')!;
+  const variant = $<HTMLSelectElement>('t-variant');
+  function renderRules() {
+    if (kind !== 'janggi') return;
+    const selected = JANGGI_VARIANTS[room?.variant ?? variant.value as JanggiVariant];
+    $('t-rules-title').textContent = `규칙 · ${selected.title}`;
+    $('t-rules-text').textContent = selected.rules;
+  }
+  if (variant) variant.onchange = renderRules;
+  renderRules();
   rules.open = !compact.matches;
   compact.addEventListener('change', () => {
     roomDetails.open = room?.phase !== 'playing' || !compact.matches;
@@ -59,7 +69,8 @@ export function initTabletop(kind: TableId) {
   if (invitation) $<HTMLInputElement>('t-code-input').value = invitation.toUpperCase().slice(0, 6);
   const send = (data: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); };
   function busy(value: boolean) {
-    for (const element of $('t-entry').querySelectorAll<HTMLButtonElement>('button')) element.disabled = value;
+    connecting = value;
+    for (const element of $('t-entry').querySelectorAll<HTMLButtonElement | HTMLSelectElement>('button, select')) element.disabled = value;
   }
   function resetEntry(message: string) {
     session = null; sessionStorage.removeItem(key); room = null;
@@ -68,6 +79,7 @@ export function initTabletop(kind: TableId) {
     $('t-error').textContent = message; $('t-turn').textContent = '다시 입장해 주세요';
     $('t-action-bar').hidden = true; $('t-toolbar').hidden = true;
     $('t-board').replaceChildren(); $('t-hands').replaceChildren();
+    renderRules();
   }
   function connect(request: Record<string, unknown>) {
     $('t-error').textContent = ''; busy(true);
@@ -99,7 +111,7 @@ export function initTabletop(kind: TableId) {
       clearTimeout(timeout); busy(false);
       if (intentional || current !== ws) return;
       $('connection').textContent = '연결 끊김';
-      if (session && retries < 5) {
+      if (session && retries < 10) {
         $('t-turn').textContent = '다시 연결 중…';
         timer = setTimeout(() => connect({ type: 'resume', game: kind, ...session }), Math.min(3000, 500 * 2 ** retries++));
       } else resetEntry('연결하지 못했어요. 잠시 후 다시 입장해 주세요.');
@@ -108,12 +120,16 @@ export function initTabletop(kind: TableId) {
   }
   $('t-entry').addEventListener('submit', event => { event.preventDefault(); enter('create'); });
   $('t-join').onclick = () => enter('join');
+  $('t-code-input').addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); enter('join'); }
+  });
   function enter(type: 'create' | 'join') {
+    if (connecting) return;
     if (!name.value.trim()) { name.reportValidity(); return; }
     const code = $<HTMLInputElement>('t-code-input').value.trim().toUpperCase();
     if (type === 'join' && !/^[A-F0-9]{6}$/.test(code)) { $('t-error').textContent = '방 코드 6자리를 확인해 주세요.'; return; }
     localStorage.setItem('cleaver-name', name.value.trim());
-    connect({ type, game: kind, name: name.value.trim(), code });
+    connect({ type, game: kind, name: name.value.trim(), code, ...(type === 'create' && variant ? { variant: variant.value } : {}) });
   }
   $('t-ready').onclick = () => send({ type: 'ready' });
   $('t-copy').onclick = async () => {
@@ -134,6 +150,7 @@ export function initTabletop(kind: TableId) {
   function playerName(seat: number) { return room?.players.find(p => p.seat === seat)?.name ?? `${seat + 1}번`; }
   function render() {
     if (!room) return;
+    renderRules();
     if (document.body.dataset.tablePhase !== room.phase) {
       document.body.dataset.tablePhase = room.phase;
       roomDetails.open = room.phase !== 'playing' || !compact.matches;

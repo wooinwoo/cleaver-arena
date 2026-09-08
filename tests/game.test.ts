@@ -110,6 +110,29 @@ test('six seats, balanced team start, readiness and disconnect victory', () => {
   assert.equal(match.winner, '첫째 승리');
 });
 
+test('shots hit the first player along their path, before later players, obstacles or the arena edge', () => {
+  const order = createGame('ABCDEF');
+  const shooter = addPlayer(order, 'a', '발사자');
+  const far = addPlayer(order, 'far', '뒤 상대'), near = addPlayer(order, 'near', '앞 상대');
+  order.phase = 'playing';
+  shooter.x = -1.6; shooter.z = 0;
+  far.x = .3; far.z = .5; near.x = 0; near.z = -.5;
+  shooter.input = { x: 0, z: 0, yaw: Math.PI / 2, fire: true };
+  tick(order, 1 / 30); tick(order, 1 / 30);
+  assert.equal(near.hp, 75); assert.equal(far.hp, 100);
+
+  for (const [x, z, targetX, targetZ, yaw] of [
+    [5.6, 4.5, 6, 2.8, Math.PI],
+    [10.92, -1.24, 11.5, 0, Math.atan2(.8, .6)],
+  ]) {
+    const { game, a, b } = duel();
+    a.x = x; a.z = z; b.x = targetX; b.z = targetZ; a.input.yaw = yaw;
+    tick(game, 1 / 30); tick(game, 1 / 30);
+    assert.equal(b.hp, 75);
+    assert.equal(game.shots.length, 0);
+  }
+});
+
 test('real WebSockets join, start, synchronize, isolate rooms, validate, reconnect and cancel countdown on leave', async () => {
   const arena = createArenaServer();
   await new Promise<void>(done => arena.server.listen(0, '127.0.0.1', done));
@@ -152,6 +175,11 @@ test('real WebSockets join, start, synchronize, isolate rooms, validate, reconne
     assert.ok(moved.game.players.find(p => p.id === joinedA.id)!.x < 10);
     const other = await c.wait(m => m.type === 'state');
     assert.equal(other.game.players.length, 1);
+    const busy = await client();
+    const busyClosed = new Promise<number>(done => busy.ws.once('close', done));
+    busy.send({ type: 'resume', code: joinedA.code, token: joinedB.token });
+    assert.equal((await busy.wait(m => m.type === 'error' || m.type === 'expired')).type, 'error');
+    assert.equal(await busyClosed, 1013);
     b.ws.close();
     await new Promise<void>(done => b.ws.once('close', () => done()));
     const resumed = await client();

@@ -9,20 +9,36 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox'] });
 const errors: string[] = [];
 try {
-  for (const kind of ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'] as TableId[]) {
+  const cases: { kind: TableId; variant?: 'animal' | 'genius' }[] = ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'].map(kind => ({ kind: kind as TableId }));
+  cases.push({ kind: 'janggi', variant: 'genius' });
+  for (const { kind, variant } of cases) {
     const ca = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const cb = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     const a = await ca.newPage(), b = await cb.newPage();
     for (const page of [a, b]) page.on('pageerror', error => errors.push(error.message));
     await a.goto(`${base}/?game=${kind}`);
     await a.locator('#t-name').fill('민트친구');
+    if (variant) await a.locator('#t-variant').selectOption(variant);
+    if (variant) await a.screenshot({ path: output + 'janggi-rules-desktop.png', fullPage: true });
     await a.locator('#t-entry button[type=submit]').click();
     await expect(a.locator('#t-room')).toBeVisible();
     const code = await a.locator('#t-code').innerText();
     await b.goto(`${base}/?game=${kind}&room=${code}`);
     await b.locator('#t-name').fill('코랄친구');
-    await b.locator('#t-join').click();
+    if (variant) {
+      await b.locator('#t-variant').selectOption(variant);
+      await b.screenshot({ path: output + 'janggi-rules-mobile.png', fullPage: true });
+      await b.locator('#t-variant').selectOption('animal');
+    }
+    await b.locator('#t-code-input').press('Enter');
     await expect(a.locator('#t-players li')).toHaveCount(2);
+    await expect(b.locator('#t-code')).toHaveText(code);
+    if (kind === 'janggi') {
+      for (const page of [a, b]) {
+        await expect(page.locator('#t-rules-title')).toContainText(variant === 'genius' ? '더 지니어스 기본룰' : '동물장기');
+        await expect(page.locator('#t-rules-text')).toContainText(variant === 'genius' ? '상대 끝줄에는 어떤 포로도 투입할 수 없어요' : '끝줄 투입을 허용');
+      }
+    }
     await a.locator('#t-ready').click(); await b.locator('#t-ready').click();
     await expect(a.locator('#t-turn')).toContainText('내 차례!');
     if (kind === 'chess') {
@@ -68,10 +84,11 @@ try {
       await expect(a.locator('.card-back')).toHaveCount(1);
       await expect(a.locator('#t-round')).toContainText('2번째');
     }
-    await a.screenshot({ path: output + `${kind}-desktop.png`, fullPage: true });
-    await b.screenshot({ path: output + `${kind}-mobile.png`, fullPage: true });
+    const label = variant ? `${kind}-${variant}` : kind;
+    await a.screenshot({ path: output + `${label}-desktop.png`, fullPage: true });
+    await b.screenshot({ path: output + `${label}-mobile.png`, fullPage: true });
     expect(await b.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-    console.log(`PASS ${kind}: desktop/mobile room, ready, action synchronization.`);
+    console.log(`PASS ${label}: desktop/mobile room, ready, action synchronization.`);
     await ca.close(); await cb.close();
   }
   expect(errors).toEqual([]);

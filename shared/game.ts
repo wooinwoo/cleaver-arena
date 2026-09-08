@@ -83,10 +83,15 @@ export function move(player: { x: number; z: number }, x: number, z: number, dt:
   }
 }
 
-export function segmentDistance(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
+function hitTime(x: number, z: number, ax: number, az: number, bx: number, bz: number, radius: number) {
   const dx = bx - ax, dz = bz - az;
-  const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
-  return Math.hypot(x - ax - dx * t, z - az - dz * t);
+  const mx = ax - x, mz = az - z, c = mx * mx + mz * mz - radius * radius;
+  if (c <= 0) return 0;
+  const a = dx * dx + dz * dz, b = mx * dx + mz * dz;
+  const discriminant = b * b - a * c;
+  if (a === 0 || discriminant < 0) return Infinity;
+  const time = (-b - Math.sqrt(discriminant)) / a;
+  return time >= 0 && time <= 1 ? time : Infinity;
 }
 
 export function tick(game: Game, dt: number) {
@@ -116,14 +121,22 @@ export function tick(game: Game, dt: number) {
   }
   game.shots = game.shots.filter(shot => {
     const oldX = shot.x, oldZ = shot.z;
+    if (Math.abs(oldX) > HALF_X || Math.abs(oldZ) > HALF_Z) return false;
     shot.x += shot.vx * dt;
     shot.z += shot.vz * dt;
-    if (Math.abs(shot.x) > HALF_X || Math.abs(shot.z) > HALF_Z) return false;
-    if (OBSTACLES.some(o => segmentDistance(o.x, o.z, oldX, oldZ, shot.x, shot.z) < o.radius + 0.15)) return false;
-    const target = game.players.find(p => p.connected && p.hp > 0 && p.id !== shot.owner &&
-      (game.mode === 'ffa' || p.team !== shot.team) &&
-      segmentDistance(p.x, p.z, oldX, oldZ, shot.x, shot.z) < RADIUS + 0.15);
-    if (!target) return true;
+    const dx = shot.x - oldX, dz = shot.z - oldZ;
+    let first = Math.min(
+      dx ? (Math.sign(dx) * HALF_X - oldX) / dx : Infinity,
+      dz ? (Math.sign(dz) * HALF_Z - oldZ) / dz : Infinity,
+      ...OBSTACLES.map(o => hitTime(o.x, o.z, oldX, oldZ, shot.x, shot.z, o.radius + .15)),
+    );
+    let target: Player | undefined;
+    for (const player of game.players) {
+      if (!player.connected || player.hp <= 0 || player.id === shot.owner || (game.mode === 'teams' && player.team === shot.team)) continue;
+      const time = hitTime(player.x, player.z, oldX, oldZ, shot.x, shot.z, RADIUS + .15);
+      if (time < first) { first = time; target = player; }
+    }
+    if (!target) return first > 1;
     target.hp = Math.max(0, target.hp - 25);
     return false;
   });

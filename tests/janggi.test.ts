@@ -121,3 +121,52 @@ test('janggi player with no safe move loses', () => {
   assert.equal(state.winner, 0);
   assert.match(state.log, /둘 수 없어/);
 });
+
+test('genius forbids every captured piece on the opponent home row, mirrored for both seats', () => {
+  for (const seat of [0, 1] as const) for (const piece of ['rook', 'bishop', 'pawn'] as const) {
+    const state = createJanggi('genius');
+    state.turn = seat;
+    state.hands[seat] = [piece];
+    const to = seat === 0 ? 0 : 11;
+    state.board[to] = null;
+    const before = structuredClone(state);
+    assert.match(actJanggi(state, seat, { type: 'drop', piece, to })!, /상대 진영/);
+    assert.deepEqual(state, before);
+    assert.equal(actJanggi(state, seat, { type: 'drop', piece, to: seat === 0 ? 6 : 5 }), null);
+    assert.equal(state.hands[seat].length, 0);
+  }
+});
+
+test('genius home entry waits for the opponent turn and capture takes priority', () => {
+  for (const seat of [0, 1] as const) {
+    const mirror = (square: number) => seat === 0 ? square : 11 - square;
+    for (const capture of [false, true]) {
+      const state = createJanggi('genius');
+      state.board.fill(null); state.positions = []; state.turn = seat;
+      state.board[mirror(3)] = { owner: seat, kind: 'king' };
+      state.board[mirror(8)] = { owner: (1 - seat) as 0 | 1, kind: 'king' };
+      state.board[mirror(1)] = { owner: (1 - seat) as 0 | 1, kind: 'rook' };
+      assert.equal(actJanggi(state, seat, { type: 'move', from: mirror(3), to: mirror(0) }), null);
+      assert.equal(state.winner, null);
+      assert.match(state.log, /한 턴/);
+      const before = structuredClone(state);
+      assert.ok(actJanggi(state, 1 - seat, { type: 'move', from: mirror(1), to: mirror(7) }));
+      assert.deepEqual(state, before);
+      assert.equal(actJanggi(state, 1 - seat, capture
+        ? { type: 'move', from: mirror(1), to: mirror(0) }
+        : { type: 'move', from: mirror(8), to: mirror(5) }), null);
+      assert.equal(state.winner, capture ? 1 - seat : seat);
+      if (!capture) assert.ok(state.log.includes(`${seat + 1}번 왕이 상대 진영에서 한 턴을 버텨 승리`));
+      assert.ok(!state.hands[1 - seat].includes('king'));
+    }
+  }
+});
+
+test('genius permits ignoring an attack and ends only when the king is captured', () => {
+  const state = position([[10, { owner: 0, kind: 'king' }], [1, { owner: 1, kind: 'king' }], [7, { owner: 1, kind: 'rook' }], [9, { owner: 0, kind: 'rook' }]]);
+  state.variant = 'genius';
+  assert.equal(actJanggi(state, 0, { type: 'move', from: 9, to: 6 }), null);
+  assert.equal(state.winner, null);
+  assert.equal(actJanggi(state, 1, { type: 'move', from: 7, to: 10 }), null);
+  assert.equal(state.winner, 1);
+});

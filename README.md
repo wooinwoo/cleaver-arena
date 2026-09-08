@@ -11,12 +11,21 @@
 | 쿼리도 | 2명 | 9×9, 벽 10개, 점프·경로 보존 |
 | 오목 | 2명 | 15×15, 금수 없는 자유룰, 5개 이상 승리 |
 | 인디언포커 | 2–6명 | 파티룰, 숫자 1–10, 기본 1칩, 한 판마다 20칩 |
-| 십이장기 | 2명 | 왕 안전 이동, 포획·투입·승급, 안전 진입 승리, 3회 반복 무승부 |
+| 십이장기 | 2명 | 방 생성 시 동물장기·더 지니어스 기본룰 선택 |
 | 체스 | 2명 | 캐슬링·앙파상·선택 승격, 체크메이트, 자동 반복·50수·기물 부족 무승부 |
 
 보드게임은 칸을 선택하고 `선택한 수 확정`을 눌러 진행합니다. 쿼리도는 말 이동/가로 벽/세로 벽을 먼저 선택합니다. 벽을 놓을 때 선택한 칸의 아래 또는 오른쪽에 두 칸 길이로 놓입니다. 십이장기는 내 말 또는 보유 말을 먼저 고릅니다. 체스는 이동 가능한 칸을 표시하고 흑의 화면은 회전합니다.
 
 인디언포커는 실제 돈을 사용하지 않으며 자기 카드는 종료 전까지 서버 응답에서도 숨깁니다. 모두가 낼 수 있는 금액까지만 올리므로 올인과 사이드 팟은 없습니다. 변형 규칙은 각 게임 화면에 표시합니다.
+
+십이장기는 방장이 생성할 때 룰을 정합니다. 입장·재접속·재경기에도 방의 룰을 유지하며, 다른 룰로 바꾸려면 새 방을 만듭니다.
+
+| 십이장기 룰 | 포로 투입 | 왕 이동과 승리 |
+|---|---|---|
+| 동물장기 | 상대 끝줄을 포함한 빈칸. 투입한 자는 즉시 승급하지 않음 | 자기 왕을 위험에 놓는 수 금지. 안전한 상대 끝줄 진입 또는 포획으로 즉시 승리 |
+| 더 지니어스 기본룰 | 상대 끝줄에 모든 포로 투입 금지 | 왕이 공격받는 수 허용. 왕 포획 또는 상대 끝줄에서 상대 한 턴을 버티면 승리 |
+
+두 룰 모두 말의 이동·포획·승급을 지원하고, 이 게임에서는 같은 국면 3회 반복을 무승부, 가능한 수가 없으면 패배로 처리합니다. 방송 결승전 전용 아이템과 90초 제한은 적용하지 않습니다.
 
 ## 새 게임 추가
 
@@ -93,6 +102,7 @@ npm test
 npm run build
 npm run test:browser
 npm run test:tables
+npm run test:reconnect
 ```
 
 브라우저 테스트는 실행 중인 게임 서버를 사용합니다. 기본 주소는 `http://127.0.0.1:3186`입니다. `BASE_URL`로 다른 주소를, `CHROME_PATH`로 Chromium 실행 파일을 지정할 수 있습니다. 기본 Chromium 경로는 개발 환경의 `/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome`입니다. 캡처는 `artifacts/`에 저장되고 Git에서 제외됩니다.
@@ -105,6 +115,8 @@ npm run test:tables
 
 연결이 끊기면 이동과 발사를 멈춥니다. 20초 동안 같은 세션으로 재접속할 수 있지만 경기 중 연결이 끊긴 플레이어는 생존 승리 판정에서 제외되므로 1대1은 상대 승리로 끝날 수 있습니다. 경기 도중 새 참가자는 받지 않습니다.
 
+통신망 변경으로 이전 연결이 서버에 남아 있으면 유효 세션을 지우지 않고 최대 10회 재시도합니다. 서버의 이전 연결 정리에는 최대 약 20초가 걸릴 수 있으며, 정리 후 20초간 복귀를 허용합니다. 명시적으로 나간 방의 세션은 복구하지 않습니다.
+
 초대 링크와 방 코드를 아는 사람이 입장할 수 있습니다. 별도 계정이나 비밀번호 인증은 없습니다.
 
 ## 기술
@@ -115,4 +127,4 @@ TypeScript, Babylon.js, Node.js, ws, Vite, chess.js를 사용합니다. 서버�
 
 참고: [Babylon.js](https://www.babylonjs.com/specifications/), [Render WebSocket](https://render.com/docs/websocket), [Render 무료 인스턴스](https://render.com/docs/free), [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
 
-규칙 참고: [Gigamic 쿼리도](https://export.gigamic.com/wp-content/uploads/2021/01/INS-RULES-QUORIDOR_10-2016.pdf), [LPSA 승인 동물장기 설명서](https://planeta-igr.com/image/data/instrukcii/93159.pdf), [chess.js](https://jhlywa.github.io/chess.js/).
+규칙 참고: [Gigamic 쿼리도](https://export.gigamic.com/wp-content/uploads/2021/01/INS-RULES-QUORIDOR_10-2016.pdf), [LPSA 승인 동물장기 설명서](https://planeta-igr.com/image/data/instrukcii/93159.pdf), [tvN 십이장기](https://tvn.cjenm.com/ko/thegenius3/contents3/), [chess.js](https://jhlywa.github.io/chess.js/). 체스의 3회 반복·50수 무승부는 이 게임의 자동 판정 방식이며, [FIDE 대회 규정](https://handbook.fide.com/chapter/e012023)의 청구 절차와는 다릅니다.

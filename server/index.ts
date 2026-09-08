@@ -68,7 +68,12 @@ export function createArenaServer() {
           const room = rooms.get(String(data.code));
           const id = room?.tokens.get(String(data.token));
           const player = room?.game.players.find(p => p.id === id);
-          if (!room || !player || player.connected) { send(ws, { type: 'expired', message: '방 연결이 만료됐어요. 다시 입장해 주세요.' }); return; }
+          const leftAt = player && room?.disconnected.get(player.id);
+          if (!room || !player || (leftAt !== undefined && (leftAt === 0 || now - leftAt > 20_000))) { send(ws, { type: 'expired', message: '방 연결이 만료됐어요. 다시 입장해 주세요.' }); return; }
+          if (player.connected) {
+            send(ws, { type: 'error', message: '이전 연결을 정리 중이에요. 잠시 후 다시 연결해요.' });
+            ws.close(1013); return;
+          }
           client.room = room; client.id = id;
           player.connected = true;
           room.disconnected.delete(player.id);

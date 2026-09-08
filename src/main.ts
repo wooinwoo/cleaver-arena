@@ -134,7 +134,7 @@ function connect(request: Record<string, unknown>) {
     resetControls();
     if (intentionalClose) return;
     $('connection').textContent = '연결 끊김';
-    if (session && reconnects < 5) {
+    if (session && reconnects < 10) {
       $('announcement').textContent = '다시 연결 중…';
       const delay = Math.min(3000, 500 * 2 ** reconnects++);
       retryTimer = setTimeout(() => connect({ type: 'resume', ...session }), delay);

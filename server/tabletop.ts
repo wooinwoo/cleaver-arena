@@ -5,7 +5,7 @@ import { TABLE_GAMES, isTableId, type TableId } from '../shared/catalog.ts';
 import { finished, type Action, type BaseState } from '../shared/tabletop-types.ts';
 import { createGomoku, actGomoku } from '../shared/gomoku.ts';
 import { createQuoridor, actQuoridor } from '../shared/quoridor.ts';
-import { createJanggi, actJanggi } from '../shared/janggi.ts';
+import { createJanggi, actJanggi, type JanggiVariant } from '../shared/janggi.ts';
 import { createPoker, actPoker, pokerView } from '../shared/poker.ts';
 import { createChess, actChess } from '../shared/chess.ts';
 
@@ -16,12 +16,12 @@ const definitions = {
   chess: (_: number) => runtime(createChess(), actChess),
   gomoku: (_: number) => runtime(createGomoku(), actGomoku),
   quoridor: (_: number) => runtime(createQuoridor(), actQuoridor),
-  janggi: (_: number) => runtime(createJanggi(), actJanggi),
+  janggi: (_: number, variant?: JanggiVariant) => runtime(createJanggi(variant), actJanggi),
   poker: (seats: number) => runtime(createPoker(seats), actPoker, pokerView),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
 type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number };
-type Room = { code: string; kind: TableId; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
+type Room = { code: string; kind: TableId; variant?: JanggiVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
 type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
 
 export function attachTabletop(server: Server) {
@@ -33,7 +33,7 @@ export function attachTabletop(server: Server) {
   };
   function broadcast(room: Room) {
     for (const [ws, client] of clients) if (client.room === room && client.member) {
-      send(ws, { type: 'table-state', room: { code: room.code, kind: room.kind, phase: room.phase, round: room.round, result: room.result,
+      send(ws, { type: 'table-state', room: { code: room.code, kind: room.kind, variant: room.variant, phase: room.phase, round: room.round, result: room.result,
         players: room.players.map(({ id, name, seat, ready, connected }) => ({ id, name, seat, ready, connected })),
         me: client.member.seat, game: room.match?.view(client.member.seat) ?? null } });
     }
@@ -69,7 +69,11 @@ export function attachTabletop(server: Server) {
         if (data.type === 'resume') {
           const room = rooms.get(String(data.code));
           const member = room?.players.find(p => p.token === data.token);
-          if (!room || room.kind !== data.game || !member || member.connected) { fail('방 연결이 만료됐어요. 다시 입장해 주세요.', 'expired'); return; }
+          if (!room || room.kind !== data.game || !member || member.leftAt === 1 || (!member.connected && Date.now() - member.leftAt > 20_000)) { fail('방 연결이 만료됐어요. 다시 입장해 주세요.', 'expired'); return; }
+          if (member.connected) {
+            fail('이전 연결을 정리 중이에요. 잠시 후 다시 연결해요.');
+            ws.close(1013); return;
+          }
           client.room = room; client.member = member; member.connected = true; member.leftAt = 0;
           send(ws, { type: 'joined', code: room.code, token: member.token }); broadcast(room); return;
         }
@@ -78,10 +82,12 @@ export function attachTabletop(server: Server) {
         if (!name) { fail('닉네임을 입력해 주세요.'); return; }
         let room: Room | undefined;
         if (data.type === 'create') {
+          if (data.game === 'janggi' && data.variant !== undefined && data.variant !== 'animal' && data.variant !== 'genius') { fail('십이장기 룰을 다시 선택해 주세요.'); return; }
           if (rooms.size >= 60) { fail('현재 방이 많아요. 잠시 후 다시 시도해 주세요.'); return; }
           let code: string;
           do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
           room = { code, kind: data.game, phase: 'lobby', players: [], match: null, round: 0, result: '' };
+          if (room.kind === 'janggi') room.variant = data.variant === 'genius' ? 'genius' : 'animal';
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room || room.kind !== data.game) { fail('이 게임의 방을 찾을 수 없어요. 초대 링크를 확인해 주세요.'); return; }
@@ -101,7 +107,7 @@ export function attachTabletop(server: Server) {
         member.ready = !member.ready;
         if (room.players.length >= TABLE_GAMES[room.kind].min && room.players.every(p => p.ready && p.connected)) {
           room.players.forEach((p, index) => { p.seat = index; });
-          room.match = definitions[room.kind](room.players.length);
+          room.match = definitions[room.kind](room.players.length, room.variant);
           room.phase = 'playing'; room.round++; room.result = '';
         }
         broadcast(room);

@@ -1,15 +1,21 @@
 import { finished, integer, type Action, type BaseState } from './tabletop-types.ts';
 
 export type PieceKind = 'king' | 'rook' | 'bishop' | 'pawn' | 'hen';
+export type JanggiVariant = 'animal' | 'genius';
 export type Piece = { owner: 0 | 1; kind: PieceKind };
 export interface JanggiState extends BaseState {
   kind: 'janggi';
+  variant: JanggiVariant;
   board: (Piece | null)[];
   hands: PieceKind[][];
   positions: string[];
 }
 
 export const RULES = '동물장기 기반 십이장기: 왕은 8방향, 장은 상하좌우, 상은 대각선, 자는 앞으로 한 칸 이동합니다. 후는 뒤쪽 대각선을 제외한 6방향으로 한 칸 이동합니다. 자는 이동하여 상대 끝줄에 도착하면 후가 됩니다. 잡은 말은 빈칸에 투입하고 후는 자로 돌아옵니다. 자의 같은 열·끝줄 투입을 허용하며 투입만으로 승급하지 않습니다. 자기 왕을 공격받는 상태로 두는 수는 금지합니다. 왕 포획 또는 안전한 상대 끝줄 진입으로 즉시 승리합니다. 둘 수 있는 수가 없으면 패배하며 같은 차례·판·보유 말이 세 번 반복되면 무승부입니다.';
+export const JANGGI_VARIANTS = {
+  animal: { title: '동물장기', rules: RULES },
+  genius: { title: '더 지니어스 기본룰', rules: '왕은 주변 8방향, 장은 상하좌우, 상은 대각선, 자는 앞으로 한 칸 이동해요. 자는 상대 끝줄에 도착하면 후가 되고, 후는 뒤 대각선을 제외한 6방향으로 이동해요. 잡은 말은 내 말로 투입하며 후는 자로 되돌려요. 상대 끝줄에는 어떤 포로도 투입할 수 없어요. 왕을 위험에 놓는 수는 허용하며, 상대 왕을 먼저 잡으면 승리해요. 왕이 상대 끝줄에 진입하면 상대가 한 수 둔 뒤에도 살아 있어야 승리해요. 결승전 전용 아이템과 90초 제한은 적용하지 않아요. 이 방에서는 둘 수 있는 수가 없으면 패배, 같은 국면 3회는 무승부로 처리해요.' },
+} as const;
 
 const names: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
 const row = (position: number) => Math.floor(position / 3);
@@ -18,9 +24,9 @@ const positionKey = (state: JanggiState) => JSON.stringify([
   state.turn, state.board, state.hands.map(hand => [...hand].sort()),
 ]);
 
-export function createJanggi(): JanggiState {
+export function createJanggi(variant: JanggiVariant = 'animal'): JanggiState {
   const state: JanggiState = {
-    kind: 'janggi', turn: 0, winner: null, draw: false, log: '첫 번째 플레이어부터 시작합니다.',
+    kind: 'janggi', variant, turn: 0, winner: null, draw: false, log: '첫 번째 플레이어부터 시작합니다.',
     board: [
       { owner: 1, kind: 'rook' }, { owner: 1, kind: 'king' }, { owner: 1, kind: 'bishop' },
       null, { owner: 1, kind: 'pawn' }, null,
@@ -62,13 +68,13 @@ function hasLegalAction(state: JanggiState, seat: 0 | 1): boolean {
     if (state.board[to]?.owner === seat) continue;
     for (let from = 0; from < 12; from++) {
       const piece = state.board[from];
-      if (piece?.owner === seat && canStep(piece, from, to) && safe(movedBoard(state.board, from, to), seat)) return true;
+      if (piece?.owner === seat && canStep(piece, from, to) && (state.variant === 'genius' || safe(movedBoard(state.board, from, to), seat))) return true;
     }
-    if (!state.board[to]) {
+    if (!state.board[to] && (state.variant !== 'genius' || row(to) !== farRow(seat))) {
       for (const kind of state.hands[seat]) {
         const board = state.board.slice();
         board[to] = { owner: seat, kind };
-        if (safe(board, seat)) return true;
+        if (state.variant === 'genius' || safe(board, seat)) return true;
       }
     }
   }
@@ -94,6 +100,7 @@ export function actJanggi(state: JanggiState, seat: number, action: Action): str
     if (capture && capture.kind !== 'king') hands[seat].push(capture.kind === 'hen' ? 'pawn' : capture.kind);
   } else if (action.type === 'drop') {
     if (state.board[to]) return '빈칸에만 투입할 수 있습니다.';
+    if (state.variant === 'genius' && row(to) === farRow(seat)) return '상대 진영에는 포로를 투입할 수 없습니다.';
     if (action.piece !== 'rook' && action.piece !== 'bishop' && action.piece !== 'pawn') return '투입할 수 없는 말입니다.';
     const index = hands[seat].indexOf(action.piece);
     if (index < 0) return '보유하지 않은 말입니다.';
@@ -101,18 +108,23 @@ export function actJanggi(state: JanggiState, seat: number, action: Action): str
     board = state.board.slice();
     moving = board[to] = { owner, kind: action.piece };
   } else return '지원하지 않는 행동입니다.';
-  if (!safe(board, seat)) return '왕이 공격받는 수는 둘 수 없습니다.';
+  if (state.variant === 'animal' && !safe(board, seat)) return '왕이 공격받는 수는 둘 수 없습니다.';
 
   state.board = board;
   state.hands = hands;
   state.log = `${seat + 1}번 ${names[moving.kind]} ${action.type === 'drop' ? '투입' : '이동'}${capture ? ` · ${names[capture.kind]} 포획` : ''}`;
   state.turn = 1 - seat;
-  if (capture?.kind === 'king' || (moving.kind === 'king' && row(to) === farRow(seat))) {
+  if (capture?.kind === 'king' || (state.variant === 'animal' && moving.kind === 'king' && row(to) === farRow(seat))) {
     state.winner = seat;
     state.log += capture?.kind === 'king' ? ' · 왕 포획 승리' : ' · 안전 진입 승리';
+  } else if (state.variant === 'genius' && board.some((piece, index) => piece?.kind === 'king' && piece.owner === state.turn && row(index) === farRow(state.turn))) {
+    state.winner = state.turn;
+    state.log += ` · ${state.turn + 1}번 왕이 상대 진영에서 한 턴을 버텨 승리`;
   } else if (!hasLegalAction(state, state.turn as 0 | 1)) {
     state.winner = seat;
     state.log += ' · 상대가 둘 수 없어 승리';
+  } else if (state.variant === 'genius' && moving.kind === 'king' && row(to) === farRow(seat)) {
+    state.log += ' · 상대 진영 진입! 상대 한 턴을 버티면 승리';
   }
   const key = positionKey(state);
   state.positions.push(key);
