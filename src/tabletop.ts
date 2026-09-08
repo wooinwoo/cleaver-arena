@@ -1,20 +1,22 @@
-import { TABLE_GAMES, type TableId } from '../shared/catalog.ts';
+import { TABLE_GAMES, POKER_VARIANTS, type PokerVariant, type TableId } from '../shared/catalog.ts';
 import type { Action } from '../shared/tabletop-types.ts';
 import type { GomokuState } from '../shared/gomoku.ts';
 import type { QuoridorState } from '../shared/quoridor.ts';
 import { JANGGI_VARIANTS, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
-import type { PokerState } from '../shared/poker.ts';
+import type { pokerView } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
+import type { PokerWorld } from './poker-world.ts';
 
-type PublicPoker = Omit<PokerState, 'cards'> & { cards: (number | null)[] };
+type PublicPoker = ReturnType<typeof pokerView>;
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState;
-type RoomState = { code: string; kind: TableId; variant?: JanggiVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
+type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
 
 export function initTabletop(kind: TableId) {
   const config = TABLE_GAMES[kind];
+  const variants: Record<string, { title: string; rules: string }> | null = kind === 'janggi' ? JANGGI_VARIANTS : kind === 'poker' ? POKER_VARIANTS : null;
   document.body.classList.add('in-table');
   $('hub').hidden = true; $('lobby').hidden = true; $('loading').hidden = true;
   $('game').hidden = true;
@@ -26,7 +28,7 @@ export function initTabletop(kind: TableId) {
     <aside class="table-sidebar">
       <h1>${config.title}</h1><p class="table-description">${config.description}</p>
       <form id="t-entry"><label for="t-name">내 닉네임</label><input id="t-name" maxlength="12" autocomplete="nickname" placeholder="친구들이 알아볼 이름" required />
-        ${kind === 'janggi' ? '<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note"><option value="animal">동물장기</option><option value="genius">더 지니어스 기본룰</option></select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>' : ''}
+        ${variants ? `<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note">${Object.entries(variants).map(([value, rule]) => `<option value="${value}">${rule.title}</option>`).join('')}</select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>` : ''}
         <button class="primary" type="submit">방 만들기</button><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="방 코드 6자리"/><button type="button" id="t-join">입장</button></div></form>
       <details id="t-room" open hidden><summary>방 정보 · 참가자</summary><div class="table-invite"><span>우리 방 <strong id="t-code"></strong></span><button id="t-copy">초대 링크 복사</button></div>
         <ul id="t-players"></ul><button id="t-ready" class="primary">준비하기</button><p id="t-ready-note">모두 준비하면 시작해요.</p></details>
@@ -45,13 +47,22 @@ export function initTabletop(kind: TableId) {
   let pending: Action | null = null, selectedPiece: number | null = null, drop: PieceKind | null = null;
   let wallMode: 'move' | 'h' | 'v' = 'move';
   let promotion = 'q';
+  let pokerWorld: PokerWorld | null = null;
+  let pokerLoading = false, pokerFailed = false, pokerLoadVersion = 0;
+  const pokerCanvas = document.createElement('canvas');
+  pokerCanvas.id = 'poker-canvas';
+  pokerCanvas.setAttribute('aria-label', '1인칭 포커 테이블. 상대 이마의 카드를 보고 베팅하세요.');
+  const pokerScene = document.createElement('div'); pokerScene.className = 'poker-scene';
+  const pokerHint = document.createElement('p'); pokerHint.className = 'poker-scene-hint';
+  pokerHint.textContent = '3D 테이블 준비 중…';
+  pokerScene.append(pokerCanvas, pokerHint);
   const compact = matchMedia('(max-width: 760px)');
   const roomDetails = $<HTMLDetailsElement>('t-room');
   const rules = document.querySelector<HTMLDetailsElement>('.table-rules')!;
   const variant = $<HTMLSelectElement>('t-variant');
   function renderRules() {
-    if (kind !== 'janggi') return;
-    const selected = JANGGI_VARIANTS[room?.variant ?? variant.value as JanggiVariant];
+    if (!variants) return;
+    const selected = variants[room?.variant ?? variant.value];
     $('t-rules-title').textContent = `규칙 · ${selected.title}`;
     $('t-rules-text').textContent = selected.rules;
   }
@@ -72,7 +83,14 @@ export function initTabletop(kind: TableId) {
     connecting = value;
     for (const element of $('t-entry').querySelectorAll<HTMLButtonElement | HTMLSelectElement>('button, select')) element.disabled = value;
   }
+  function disposePoker() {
+    pokerLoadVersion++;
+    pokerWorld?.dispose(); pokerWorld = null;
+    pokerLoading = false; pokerFailed = false;
+    pokerHint.textContent = '3D 테이블 준비 중…';
+  }
   function resetEntry(message: string) {
+    disposePoker();
     session = null; sessionStorage.removeItem(key); room = null;
     delete document.body.dataset.tablePhase;
     $('t-entry').hidden = false; $('t-room').hidden = true;
@@ -159,8 +177,9 @@ export function initTabletop(kind: TableId) {
     const me = room.players.find(p => p.seat === room!.me)!;
     $('t-ready').hidden = room.phase === 'playing';
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? '다시 준비하기' : '준비하기';
-    $('t-ready-note').textContent = room.phase === 'playing' ? '진행 중 · 상대가 끊기면 최대 20초 기다려요.' : `${room.players.length} / ${config.max}명 · 모두 준비하면 시작해요.`;
-    $('t-round').textContent = room.round ? `${config.title} · ${room.round}번째 판` : `${config.min}–${config.max}명 게임`;
+    const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
+    $('t-ready-note').textContent = room.phase === 'playing' ? '진행 중 · 상대가 끊기면 최대 20초 기다려요.' : `${room.players.length} / ${capacity}명 · 모두 준비하면 시작해요.`;
+    $('t-round').textContent = room.round ? `${config.title} · ${room.round}번째 판` : `${config.min}–${capacity}명 게임`;
     $('t-turn').textContent = room.phase === 'finished' ? room.result : room.phase === 'lobby' ? '친구와 함께 준비를 눌러 주세요' :
       room.players.some(p => !p.connected) ? '상대의 재접속을 기다리는 중…' : `${playerName(room.game!.turn)} 차례${canAct() ? ' · 내 차례!' : ''}`;
     $('t-players').replaceChildren(...room.players.map(p => {
@@ -170,6 +189,7 @@ export function initTabletop(kind: TableId) {
       li.append(dot, label, status); return li;
     }));
     if (!room.game) {
+      disposePoker();
       $('t-board').className = 'empty-board';
       $('t-board').textContent = '친구가 모이면 모두 준비를 눌러 주세요.';
       $('t-hands').replaceChildren(); $('t-log').textContent = '';
@@ -267,30 +287,82 @@ export function initTabletop(kind: TableId) {
     }
   }
   function drawPoker(game: PublicPoker) {
-    const board = $('t-board'); board.className = 'poker-table';
+    const board = $('t-board'); board.className = 'poker-table poker-3d-table';
+    board.append(pokerScene);
+    if (pokerWorld) pokerWorld.update(game, room!.me, room!.players, room!.round);
+    else if (!pokerLoading && !pokerFailed) {
+      pokerLoading = true;
+      const version = ++pokerLoadVersion;
+      void import('./poker-world.ts').then(async ({ PokerWorld }) => {
+        if (version !== pokerLoadVersion || !room || room.game?.kind !== 'poker') return;
+        const world = new PokerWorld(pokerCanvas);
+        pokerWorld = world;
+        await world.ready;
+        if (version !== pokerLoadVersion || pokerWorld !== world || !room || room.game?.kind !== 'poker') return;
+        world.update(room.game, room.me, room.players, room.round);
+        pokerHint.textContent = '내 눈높이 · 좌우로 드래그해 둘러보기 · 내 카드는 공개 전까지 비공개';
+      }).catch(() => {
+        if (version !== pokerLoadVersion) return;
+        pokerWorld?.dispose(); pokerWorld = null;
+        pokerFailed = true;
+        pokerHint.textContent = '3D 화면을 열지 못해 아래에 카드를 표시해요. 새로고침하면 다시 시도해요.';
+        board.querySelectorAll('.poker-card-value').forEach(face => face.classList.remove('sr-only'));
+      }).finally(() => { if (version === pokerLoadVersion) pokerLoading = false; });
+    }
     const pot = document.createElement('div'); pot.className = 'pot';
     pot.textContent = `모인 칩 ${game.pot} · 현재 베팅 ${game.bet}`; board.append(pot);
+    const seats = document.createElement('div'); seats.className = 'poker-seats'; board.append(seats);
     for (const p of room!.players) {
       const card = document.createElement('article'); card.className = `poker-player${game.folded[p.seat] ? ' folded' : ''}`;
+      card.dataset.seat = String(p.seat);
       const title = document.createElement('strong'); title.textContent = `${p.name}${p.seat === room!.me ? ' (나)' : ''}`;
-      const face = document.createElement('div'); face.className = `playing-card${game.cards[p.seat] === null ? ' card-back' : ''}`;
-      face.textContent = game.cards[p.seat] === null ? '?' : String(game.cards[p.seat]);
+      const face = document.createElement('span'); face.className = `poker-card-value${room!.phase === 'playing' && game.stage === 'betting' && !pokerFailed ? ' sr-only' : ''}`;
+      face.textContent = game.cards[p.seat] === null ? '비공개' : `카드 ${game.cards[p.seat]}`;
       face.setAttribute('aria-label', game.cards[p.seat] === null ? '내 카드는 공개 전까지 볼 수 없어요' : `${p.name}의 카드 ${game.cards[p.seat]}`);
       const chips = document.createElement('p'); chips.textContent = `${game.chips[p.seat]}칩 · ${game.folded[p.seat] ? '포기' : `${game.bets[p.seat]}칩 냄`}`;
-      card.append(title, face, chips); board.append(card);
+      card.append(title, face, chips); seats.append(card);
     }
-    if (canAct()) {
+    if (game.variant === 'duel') {
+      $('t-round').textContent = `${config.title} · ${room!.round}번째 경기 · ${game.hand}판`;
+      if (room!.phase === 'playing' && game.stage === 'reveal') {
+        $('t-turn').textContent = game.handWinner === null ? '이번 판 동점 · 칩 이월' : `${playerName(game.handWinner)} 이번 판 승리`;
+        const next = document.createElement('button'); next.className = 'primary poker-next';
+        next.textContent = game.nextReady[room!.me] ? '상대 준비 기다리는 중' : '다음 판 준비';
+        next.disabled = game.nextReady[room!.me] || room!.players.some(player => !player.connected);
+        next.onclick = () => { next.disabled = true; send({ type: 'action', action: { type: 'next' } }); };
+        board.append(next);
+      }
+      const decks = document.createElement('p'); decks.className = 'poker-decks';
+      decks.textContent = `개인 덱 · ${room!.players.map(player => `${player.name} ${game.remaining[player.seat]}장 남음`).join(' · ')}`;
+      board.append(decks);
+    }
+    if (canAct() && game.stage === 'betting') {
       const actions = document.createElement('div'); actions.className = 'poker-actions';
       const cost = game.bet - game.bets[room!.me];
-      for (const [type, text] of [['call', cost ? `${cost}칩 콜` : '체크'], ['raise', '1칩 올리기'], ['fold', '이번 판 포기']]) {
+      const raiseMax = Math.min(...game.chips.map((chips, i) => game.folded[i] ? Infinity : chips + game.bets[i])) - game.bet;
+      let amount: HTMLInputElement | undefined;
+      if (game.variant === 'duel') {
+        const sizing = document.createElement('div'); sizing.className = 'poker-bet-size';
+        const label = document.createElement('label'); label.htmlFor = 'poker-raise'; label.textContent = '추가로 올릴 칩';
+        amount = document.createElement('input'); amount.id = 'poker-raise'; amount.type = 'number'; amount.min = '1'; amount.max = String(Math.max(1, raiseMax)); amount.step = '1'; amount.value = '1'; amount.required = true; amount.disabled = raiseMax < 1;
+        const max = document.createElement('button'); max.textContent = '최대로'; max.disabled = raiseMax < 1;
+        max.onclick = () => { amount!.value = String(raiseMax); };
+        sizing.append(label, amount, max); board.append(sizing);
+      }
+      for (const [type, text] of [['call', cost ? `${cost}칩 콜` : '체크'], ['raise', game.variant === 'duel' ? '올리기' : '1칩 올리기'], ['fold', '이번 판 포기']]) {
         const button = document.createElement('button'); button.textContent = text; button.className = type === 'call' ? 'primary' : '';
-        button.onclick = () => { actions.querySelectorAll('button').forEach(b => { b.disabled = true; }); send({ type: 'action', action: { type } }); };
-        if (type === 'raise') button.disabled = game.bet >= Math.min(...game.chips.map((chips, i) => game.folded[i] ? Infinity : chips + game.bets[i]));
+        button.onclick = () => {
+          if (type === 'raise' && amount && !amount.reportValidity()) return;
+          actions.querySelectorAll('button').forEach(b => { b.disabled = true; });
+          send({ type: 'action', action: { type, ...(type === 'raise' && amount ? { amount: amount.valueAsNumber } : {}) } });
+        };
+        if (type === 'raise') button.disabled = raiseMax < 1;
         actions.append(button);
       }
       board.append(actions);
     }
   }
+
   function drawChess(game: ChessState) {
     const board = $('t-board'); board.className = 'chess-board';
     const names = { k: '킹', q: '퀸', r: '룩', b: '비숍', n: '나이트', p: '폰' };

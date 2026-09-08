@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
-import { TABLE_GAMES, isTableId, type TableId } from '../shared/catalog.ts';
+import { TABLE_GAMES, POKER_VARIANTS, isTableId, type TableId, type PokerVariant } from '../shared/catalog.ts';
 import { finished, type Action, type BaseState } from '../shared/tabletop-types.ts';
 import { createGomoku, actGomoku } from '../shared/gomoku.ts';
 import { createQuoridor, actQuoridor } from '../shared/quoridor.ts';
@@ -12,16 +12,17 @@ import { createChess, actChess } from '../shared/chess.ts';
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
 }
+type TableVariant = JanggiVariant | PokerVariant;
 const definitions = {
   chess: (_: number) => runtime(createChess(), actChess),
   gomoku: (_: number) => runtime(createGomoku(), actGomoku),
   quoridor: (_: number) => runtime(createQuoridor(), actQuoridor),
-  janggi: (_: number, variant?: JanggiVariant) => runtime(createJanggi(variant), actJanggi),
-  poker: (seats: number) => runtime(createPoker(seats), actPoker, pokerView),
+  janggi: (_: number, variant?: TableVariant) => runtime(createJanggi(variant === 'genius' ? 'genius' : 'animal'), actJanggi),
+  poker: (seats: number, variant?: TableVariant) => runtime(createPoker(seats, variant === 'duel' ? 'duel' : 'party'), actPoker, pokerView),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
 type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number };
-type Room = { code: string; kind: TableId; variant?: JanggiVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
+type Room = { code: string; kind: TableId; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
 type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
 
 export function attachTabletop(server: Server) {
@@ -90,16 +91,19 @@ export function attachTabletop(server: Server) {
         let room: Room | undefined;
         if (data.type === 'create') {
           if (data.game === 'janggi' && data.variant !== undefined && data.variant !== 'animal' && data.variant !== 'genius') { fail('십이장기 룰을 다시 선택해 주세요.'); return; }
+          if (data.game === 'poker' && data.variant !== undefined && data.variant !== 'duel' && data.variant !== 'party') { fail('인디언포커 룰을 다시 선택해 주세요.'); return; }
           if (rooms.size >= 60) { fail('현재 방이 많아요. 잠시 후 다시 시도해 주세요.'); return; }
           let code: string;
           do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
           room = { code, kind: data.game, phase: 'lobby', players: [], match: null, round: 0, result: '' };
           if (room.kind === 'janggi') room.variant = data.variant === 'genius' ? 'genius' : 'animal';
+          if (room.kind === 'poker') room.variant = data.variant === 'duel' ? 'duel' : 'party';
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room || room.kind !== data.game) { fail('이 게임의 방을 찾을 수 없어요. 초대 링크를 확인해 주세요.'); return; }
         if (room.phase === 'playing') { fail('경기 중이에요. 종료 후 입장할 수 있어요.'); return; }
-        if (room.players.length >= TABLE_GAMES[room.kind].max) { fail('방 정원이 찼어요.'); return; }
+        const capacity = room.kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : TABLE_GAMES[room.kind].max;
+        if (room.players.length >= capacity) { fail('방 정원이 찼어요.'); return; }
         if (room.phase === 'finished') {
           room.phase = 'lobby'; room.match = null; room.result = '';
           room.players.forEach(p => { p.ready = false; });
@@ -143,11 +147,18 @@ export function attachTabletop(server: Server) {
       if (!expired.length) continue;
       if (room.phase === 'playing' && room.match) {
         const connected = room.players.filter(p => p.connected);
-        if (room.kind === 'poker') room.match = definitions.poker(room.players.length);
+        if (room.kind === 'poker' && room.variant === 'party') room.match = definitions.poker(room.players.length, 'party');
+        if (room.match.state.kind === 'poker' && room.variant === 'duel' && connected.length === 1) {
+          const state = room.match.state, winner = connected[0].seat;
+          const total = state.chips.reduce((sum, chips) => sum + chips, state.pot);
+          state.chips = state.chips.map((_, seat) => seat === winner ? total : 0);
+          state.pot = 0; state.stage = 'reveal'; state.handWinner = winner;
+          state.log = '상대가 퇴장해 남은 칩을 모두 가져가요.';
+        }
         room.match.state.winner = connected.length === 1 ? connected[0].seat : null;
         room.match.state.draw = connected.length !== 1;
         end(room);
-        room.result = room.kind === 'poker' ? '접속 종료로 이번 판 취소 · 칩 초기화' : room.result;
+        room.result = room.kind === 'poker' && room.variant === 'party' ? '접속 종료로 이번 판 취소 · 칩 초기화' : room.result;
       }
       room.players = room.players.filter(p => !expired.includes(p));
       if (!room.players.length) rooms.delete(code);
