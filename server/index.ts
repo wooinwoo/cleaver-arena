@@ -131,15 +131,15 @@ export function createArenaServer() {
       }
     }
     for (const [code, room] of rooms) {
+      if (room.game.phase === 'countdown' && (room.disconnected.size > 0 || room.game.players.some(p => !p.connected))) {
+        room.game.phase = 'lobby'; room.game.players.forEach(p => { p.ready = p.bot; });
+      }
       for (const [id, at] of room.disconnected) if (now - at > 20_000) {
         room.game.players = room.game.players.filter(p => p.id !== id);
         room.disconnected.delete(id);
         for (const [token, owner] of room.tokens) if (owner === id) room.tokens.delete(token);
       }
       if (room.game.players.every(p => p.bot)) { rooms.delete(code); continue; }
-      if (room.game.phase === 'countdown' && room.game.players.some(p => !p.connected)) {
-        room.game.phase = 'lobby'; room.game.players.forEach(p => { p.ready = p.bot; });
-      }
       tick(room.game, 1 / 30);
     }
   }, 1000 / 30);

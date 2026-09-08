@@ -59,6 +59,40 @@ test('obstacles block projectiles and teammates do not take damage', () => {
   assert.equal(team.b.hp, 100);
 });
 
+test('projectiles pass through disconnected players and hit connected opponents', () => {
+  const { game, b } = duel();
+  const disconnected = addPlayer(game, 'offline', '접속 종료');
+  disconnected.x = 0; disconnected.z = 0; disconnected.connected = false;
+  for (let i = 0; i < 16; i++) tick(game, 1 / 30);
+  assert.equal(disconnected.hp, 100);
+  assert.equal(b.hp, 75);
+});
+
+test('bots aim at connected opponents instead of disconnected players', () => {
+  const game = createGame('ABCDEF');
+  const bot = addPlayer(game, 'bot', '로봇', true);
+  const offline = addPlayer(game, 'offline', '접속 종료');
+  const opponent = addPlayer(game, 'opponent', '상대');
+  bot.x = bot.z = 0;
+  offline.x = 0; offline.z = 3; offline.connected = false;
+  opponent.x = 0; opponent.z = -3;
+  game.phase = 'playing';
+  tick(game, 1 / 30);
+  assert.ok(game.shots[0].vz < 0);
+});
+
+test('projectiles preserve friendly fire protection after their owner leaves', () => {
+  const { game, a, b } = duel('teams');
+  const ally = addPlayer(game, 'ally', '아군');
+  ally.team = a.team; ally.x = ally.z = 0;
+  tick(game, 1 / 30);
+  assert.equal(game.shots.length, 1);
+  game.players = game.players.filter(p => p.id !== a.id);
+  for (let i = 0; i < 15; i++) tick(game, 1 / 30);
+  assert.equal(ally.hp, 100);
+  assert.equal(b.hp, 75);
+});
+
 test('six seats, balanced team start, readiness and disconnect victory', () => {
   const game = createGame('ABCDEF', 'teams');
   for (let i = 0; i < 6; i++) addPlayer(game, String(i), '플레이어').ready = true;
@@ -76,7 +110,7 @@ test('six seats, balanced team start, readiness and disconnect victory', () => {
   assert.equal(match.winner, '첫째 승리');
 });
 
-test('two real WebSockets join, start, synchronize, isolate rooms, validate and reconnect', async () => {
+test('real WebSockets join, start, synchronize, isolate rooms, validate, reconnect and cancel countdown on leave', async () => {
   const arena = createArenaServer();
   await new Promise<void>(done => arena.server.listen(0, '127.0.0.1', done));
   const address = arena.server.address() as { port: number };
@@ -139,6 +173,31 @@ test('two real WebSockets join, start, synchronize, isolate rooms, validate and 
     });
     assert.match(malformed, /^HTTP\/1.1 400/);
     assert.equal((await fetch(`http://127.0.0.1:${address.port}/health`)).status, 200);
+
+    for (const mode of ['ffa', 'teams'] as const) {
+      const host = await client();
+      host.send({ type: 'create', name: '방장', mode });
+      const room = await host.wait(m => m.type === 'joined');
+      const guests = [];
+      for (let i = 0; i < (mode === 'teams' ? 3 : 1); i++) {
+        const guest = await client();
+        guest.send({ type: 'join', name: '친구', code: room.code });
+        await guest.wait(m => m.type === 'joined');
+        guests.push(guest);
+      }
+      host.send({ type: 'ready' }); guests.forEach(guest => guest.send({ type: 'ready' }));
+      await host.wait(m => m.type === 'state' && m.game.phase === 'countdown');
+      guests.pop()!.send({ type: 'leave' });
+      const remaining = await host.wait(m => m.type === 'state' && m.game.round === 1 && m.game.players.length === guests.length + 1);
+      assert.equal(remaining.game.phase, 'lobby');
+      assert.ok(remaining.game.players.every(p => !p.ready));
+      const replacement = await client();
+      replacement.send({ type: 'join', name: '새 친구', code: room.code });
+      await replacement.wait(m => m.type === 'joined');
+      host.send({ type: 'ready' });
+      [...guests, replacement].forEach(guest => guest.send({ type: 'ready' }));
+      await host.wait(m => m.type === 'state' && m.game.phase === 'countdown' && m.game.round === 2);
+    }
   } finally {
     sockets.forEach(ws => ws.terminate());
     await arena.close();

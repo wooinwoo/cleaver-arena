@@ -14,7 +14,7 @@ export type Player = {
   x: number; z: number; yaw: number; hp: number; cooldown: number;
   ready: boolean; connected: boolean; bot: boolean; input: Input;
 };
-export type Shot = { id: number; owner: string; x: number; z: number; vx: number; vz: number };
+export type Shot = { id: number; owner: string; team: number; x: number; z: number; vx: number; vz: number };
 export type Game = {
   code: string; mode: 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
   players: Player[]; shots: Shot[]; time: number; countdown: number;
@@ -100,7 +100,7 @@ export function tick(game: Game, dt: number) {
   for (const player of game.players) {
     if (!player.connected || player.hp <= 0) continue;
     if (player.bot) {
-      const enemy = game.players.find(p => p.id !== player.id && p.hp > 0 && (game.mode === 'ffa' || p.team !== player.team));
+      const enemy = game.players.find(p => p.connected && p.id !== player.id && p.hp > 0 && (game.mode === 'ffa' || p.team !== player.team));
       if (enemy) player.input = { x: Math.cos(game.time * 1.2) * 0.5, z: Math.sin(game.time * 0.8) * 0.5,
         yaw: Math.atan2(enemy.x - player.x, enemy.z - player.z) + Math.sin(game.time * 2) * 0.18, fire: true };
     }
@@ -109,7 +109,7 @@ export function tick(game: Game, dt: number) {
     player.cooldown = Math.max(0, player.cooldown - dt);
     if (player.input.fire && player.cooldown <= 0) {
       const vx = Math.sin(player.yaw), vz = Math.cos(player.yaw);
-      game.shots.push({ id: game.nextShot++, owner: player.id, x: player.x + vx * 0.6,
+      game.shots.push({ id: game.nextShot++, owner: player.id, team: player.team, x: player.x + vx * 0.6,
         z: player.z + vz * 0.6, vx: vx * 15, vz: vz * 15 });
       player.cooldown = player.bot ? 1.3 : COOLDOWN;
     }
@@ -120,9 +120,8 @@ export function tick(game: Game, dt: number) {
     shot.z += shot.vz * dt;
     if (Math.abs(shot.x) > HALF_X || Math.abs(shot.z) > HALF_Z) return false;
     if (OBSTACLES.some(o => segmentDistance(o.x, o.z, oldX, oldZ, shot.x, shot.z) < o.radius + 0.15)) return false;
-    const owner = game.players.find(p => p.id === shot.owner);
-    const target = game.players.find(p => p.hp > 0 && p.id !== shot.owner &&
-      (game.mode === 'ffa' || p.team !== owner?.team) &&
+    const target = game.players.find(p => p.connected && p.hp > 0 && p.id !== shot.owner &&
+      (game.mode === 'ffa' || p.team !== shot.team) &&
       segmentDistance(p.x, p.z, oldX, oldZ, shot.x, shot.z) < RADIUS + 0.15);
     if (!target) return true;
     target.hp = Math.max(0, target.hp - 25);
