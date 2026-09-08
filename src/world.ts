@@ -10,11 +10,17 @@ import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Mesh } from '@babylonjs/core/Meshes/mesh.js';
 import { Ray } from '@babylonjs/core/Culling/ray.js';
+import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader.js';
+import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer.js';
+import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup.js';
+import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
+import '@babylonjs/loaders/glTF/glTFFileLoader.js';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_unlit.js';
 import '@babylonjs/core/Culling/ray.js';
-import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, move, type ArenaMap, type Game, type Input } from '../shared/game.ts';
+import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, type ArenaMap, type Game, type Input } from '../shared/game.ts';
 
 import { COLORS } from './palette.ts';
-type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; hp: number; color: string };
+type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; hp: number; color: string; instance?: InstantiatedEntries; clips?: AnimationGroup[]; animation?: string; flashes?: number };
 
 export class World {
   engine: Engine;
@@ -28,6 +34,10 @@ export class World {
   avatars = new Map<string, Avatar>();
   projectiles = new Map<number, TransformNode>();
   private materials = new Map<string, StandardMaterial>();
+  private model?: AssetContainer;
+  private weapon?: AssetContainer;
+  private baron?: AssetContainer;
+  private baronLoading = false;
   private hand: TransformNode;
   private preview: Avatar[] = [];
   private arena?: TransformNode;
@@ -68,12 +78,53 @@ export class World {
       avatar.root.rotation.y = i === 0 ? Math.PI / 2 : -Math.PI / 2;
       this.preview.push(avatar);
     }
+    void this.loadMundo();
     this.engine.runRenderLoop(() => {
       this.update(Math.min(.05, this.engine.getDeltaTime() / 1000));
       this.scene.render();
     });
     new ResizeObserver(() => this.engine.resize()).observe(canvas);
     window.addEventListener('resize', () => this.engine.resize());
+  }
+
+  private async loadMundo() {
+    const results = await Promise.allSettled(['mundo', 'mundo-cleaver'].map(async name => {
+      const response = await fetch(`/models/${name}.glb`);
+      if (!response.ok) throw new Error(`모델 다운로드 실패: ${response.status}`);
+      return LoadAssetContainerAsync(new Uint8Array(await response.arrayBuffer()), this.scene, { pluginExtension: '.glb' });
+    }));
+    if (results.some(result => result.status === 'rejected')) {
+      results.forEach(result => { if (result.status === 'fulfilled') result.value.dispose(); });
+      this.canvas.dataset.models = 'fallback'; return;
+    }
+    [this.model, this.weapon] = results.map(result => (result as PromiseFulfilledResult<AssetContainer>).value);
+    for (const avatar of [...this.preview, ...this.avatars.values()]) this.attachMundo(avatar);
+    this.hand.getChildren().forEach(node => node.dispose());
+    this.cleaver(this.hand, .65);
+    this.canvas.dataset.models = 'mundo';
+  }
+
+  private attachMundo(avatar: Avatar) {
+    avatar.body.getChildren().forEach(node => node.dispose());
+    const instance = this.model!.instantiateModelsToScene(name => `${avatar.root.name}-${name}`, false, { doNotInstantiate: true });
+    instance.rootNodes.forEach(node => { node.parent = avatar.body; });
+    avatar.instance = instance;
+    avatar.clips = instance.animationGroups;
+    avatar.arm = new TransformNode('throwing-arm', this.scene); avatar.arm.parent = avatar.body;
+    this.animateAvatar(avatar, 'idle');
+  }
+
+  private animateAvatar(avatar: Avatar, name: string) {
+    if (!avatar.clips || avatar.animation === name) return;
+    avatar.clips.forEach(clip => clip.stop());
+    const clip = avatar.clips.find(clip => clip.name.replace(/\.\d+$/, '').endsWith(`-${name}`));
+    clip?.start(name === 'run' || name === 'idle');
+    avatar.animation = name;
+  }
+
+  private disposeAvatar(avatar: Avatar) {
+    avatar.instance?.dispose();
+    avatar.root.dispose();
   }
 
   private material(color: string, glow = false) {
@@ -117,6 +168,19 @@ export class World {
     if (this.map === map) return;
     this.map = map;
     this.buildArena();
+    if (map === 'baron') void this.loadBaron();
+  }
+
+  private async loadBaron() {
+    if (this.baron || this.baronLoading) return;
+    this.baronLoading = true;
+    try {
+      const response = await fetch('/models/baron-pit.glb');
+      if (!response.ok) throw new Error(`맵 다운로드 실패: ${response.status}`);
+      this.baron = await LoadAssetContainerAsync(new Uint8Array(await response.arrayBuffer()), this.scene, { pluginExtension: '.glb' });
+      if (this.map === 'baron') this.buildArena();
+    } catch { this.canvas.dataset.mapModel = 'fallback'; }
+    finally { this.baronLoading = false; }
   }
 
   private buildArena() {
@@ -125,10 +189,15 @@ export class World {
     const firstMesh = this.scene.meshes.length;
     if (this.map === 'arena') this.buildOriginalArena();
     else this.buildWardArena();
-    for (const mesh of this.scene.meshes.slice(firstMesh)) mesh.parent = this.arena;
+    for (const mesh of this.scene.meshes.slice(firstMesh)) if (!mesh.parent) mesh.parent = this.arena;
+    if (this.map === 'baron' && this.baron) {
+      this.baron.instantiateModelsToScene(name => `baron-${name}`, false).rootNodes.forEach(node => { node.parent = this.arena!; });
+      this.canvas.dataset.mapModel = 'baron';
+    } else if (this.map !== 'baron') delete this.canvas.dataset.mapModel;
   }
 
   private buildWardArena() {
+    if (this.map !== 'baron' || !this.baron) {
     const base = MeshBuilder.CreateCylinder('round-court', { diameter: ARENA_RADIUS * 2 + .5, height: .8, tessellation: 96 }, this.scene);
     base.position.y = -.42; base.material = this.material('#355a5c');
     for (const team of [0, 1]) {
@@ -136,6 +205,7 @@ export class World {
       half.rotation.set(Math.PI / 2, team === 0 ? -Math.PI / 2 : Math.PI / 2, 0);
       half.position.y = .01;
       half.material = this.material(team === 0 ? '#88b5a1' : '#c6aa96');
+    }
     }
     const edge = MeshBuilder.CreateTorus('court-boundary', { diameter: ARENA_RADIUS * 2, thickness: .09, tessellation: 96 }, this.scene);
     edge.position.y = .05; edge.material = this.material('#e9edcc');
@@ -196,6 +266,10 @@ export class World {
     const knife = new TransformNode('cleaver', this.scene);
     knife.parent = parent;
     knife.scaling.setAll(scale);
+    if (this.weapon) {
+      this.weapon.instantiateModelsToScene(name => `knife-${name}`, false).rootNodes.forEach(node => { node.parent = knife; });
+      return knife;
+    }
     this.box('handle', [.13, .48, .14], [0, 0, 0], '#705448', knife);
     this.box('blade', [.42, .53, .08], [.13, .46, 0], '#e1e9da', knife);
     this.box('sharp-edge', [.07, .53, .09], [.37, .46, 0], '#ffffff', knife);
@@ -232,11 +306,13 @@ export class World {
     const shadow = this.cylinder('contact-shadow', 1.2, .012, [0, .04, 0], '#557d74', root);
     shadow.scaling.z = .8;
     const bar = this.box('health-bar', [.95, .08, .08], [0, 2.43, 0], color, root);
-    return { root, body, arm, ring, bar, hp: 100, color };
+    const avatar = { root, body, arm, ring, bar, hp: 100, color };
+    if (this.model) this.attachMundo(avatar);
+    return avatar;
   }
 
   reset() {
-    for (const avatar of this.avatars.values()) avatar.root.dispose();
+    for (const avatar of this.avatars.values()) this.disposeAvatar(avatar);
     for (const shot of this.projectiles.values()) shot.dispose();
     this.avatars.clear(); this.projectiles.clear();
     this.state = null; this.id = ''; this.priorShot = -1;
@@ -244,6 +320,7 @@ export class World {
   }
 
   setView(view: 'top' | 'fps') {
+    if (this.state && view !== this.state.view) return;
     this.view = view;
     this.hand.setEnabled(view === 'fps' && !!this.state);
     if (view === 'fps' && !this.state) this.yaw = 0;
@@ -254,16 +331,17 @@ export class World {
     const reset = !this.state || this.state.round !== game.round;
     this.setMap(game.map);
     this.state = game;
+    if (this.view !== game.view) this.setView(game.view);
     this.id = id;
     this.preview.forEach(p => p.root.setEnabled(false));
     for (const player of game.players) {
       let avatar = this.avatars.get(player.id);
-      const color = COLORS[game.mode === 'teams' || game.map === 'ward' ? player.team : player.slot];
-      if (avatar && avatar.color !== color) { avatar.root.dispose(); avatar = undefined; }
+      const color = COLORS[game.mode === 'teams' || game.map !== 'arena' ? player.team : player.slot];
+      if (avatar && avatar.color !== color) { this.disposeAvatar(avatar); avatar = undefined; }
       if (!avatar) { avatar = this.avatar(player.id, color); this.avatars.set(player.id, avatar); }
       avatar.ring.material = this.material(player.id === id ? '#fff8dc' : color, true);
       if (player.id === id) {
-        if (reset) { avatar.root.position.set(player.x, 0, player.z); this.yaw = player.yaw; }
+        if (reset || (avatar.flashes !== undefined && avatar.flashes !== player.flashes)) { avatar.root.position.set(player.x, 0, player.z); this.yaw = player.yaw; }
         else {
           const d = Math.hypot(avatar.root.position.x - player.x, avatar.root.position.z - player.z);
           const amount = d > 2 ? 1 : .35;
@@ -271,11 +349,12 @@ export class World {
           avatar.root.position.z += (player.z - avatar.root.position.z) * amount;
         }
         if (avatar.hp > player.hp) this.onHit();
-      } else if (reset) avatar.root.position.set(player.x, 0, player.z);
+      } else if (reset || (avatar.flashes !== undefined && avatar.flashes !== player.flashes)) avatar.root.position.set(player.x, 0, player.z);
+      avatar.flashes = player.flashes;
       avatar.hp = player.hp;
       avatar.bar.scaling.x = Math.max(.001, player.hp / 100);
     }
-    for (const [playerId, avatar] of this.avatars) if (!game.players.some(p => p.id === playerId)) { avatar.root.dispose(); this.avatars.delete(playerId); }
+    for (const [playerId, avatar] of this.avatars) if (!game.players.some(p => p.id === playerId)) { this.disposeAvatar(avatar); this.avatars.delete(playerId); }
     if (game.nextShot > this.priorShot && this.priorShot >= 0 && !reset) this.onShot();
     this.priorShot = game.nextShot;
   }
@@ -300,16 +379,20 @@ export class World {
       const avatar = this.avatars.get(player.id)!;
       const local = player.id === this.id;
       const position = avatar.root.position;
-      if (local && game?.phase === 'playing' && player.hp > 0) move(position, this.input.x, this.input.z, dt, player.team, game.map);
+      if (local && game?.phase === 'playing' && player.hp > 0) move(position, this.input.x, this.input.z, dt, player.team, game.map, player.ghostTime > 0 ? GHOST_MULTIPLIER : 1);
       if (!local) {
         position.x += (player.x - position.x) * Math.min(1, dt * 18);
         position.z += (player.z - position.z) * Math.min(1, dt * 18);
       }
       avatar.root.rotation.y = local ? this.yaw : player.yaw;
-      avatar.root.setEnabled(player.hp > 0 && !(local && this.view === 'fps'));
+      avatar.root.setEnabled((player.hp > 0 || !!avatar.instance) && !(local && this.view === 'fps'));
+      avatar.bar.setEnabled(player.hp > 0);
+      avatar.ring.setEnabled(player.hp > 0);
       const walking = game?.phase === 'playing' && Math.hypot(player.input.x, player.input.z) > .1;
-      avatar.body.position.y = walking ? Math.abs(Math.sin(this.elapsed * 12)) * .07 : 0;
+      this.animateAvatar(avatar, player.hp <= 0 ? 'death' : player.cooldown > .4 ? 'throw' : walking ? 'run' : 'idle');
+      avatar.body.position.y = !avatar.clips && walking ? Math.abs(Math.sin(this.elapsed * 12)) * .07 : 0;
       avatar.arm.rotation.x = player.cooldown > .4 ? -.8 : Math.sin(this.elapsed * 2) * .05;
+      avatar.ring.scaling.setAll(player.ghostTime > 0 ? 1.15 + Math.sin(this.elapsed * 12) * .08 : 1);
     }
     for (const shot of game?.shots ?? []) {
       let node = this.projectiles.get(shot.id);

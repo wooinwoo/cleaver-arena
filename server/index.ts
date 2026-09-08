@@ -4,7 +4,7 @@ import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
-import { addPlayer, createGame, parseInput, startRound, tick, type Game } from '../shared/game.ts';
+import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game } from '../shared/game.ts';
 import { attachTabletop } from './tabletop.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
@@ -85,11 +85,13 @@ export function createArenaServer() {
         if (!name) { send(ws, { type: 'error', message: '닉네임을 입력해 주세요.' }); return; }
         let room: Room | undefined;
         if (data.type === 'create') {
+          if (data.view !== undefined && data.view !== 'top' && data.view !== 'fps') { send(ws, { type: 'error', message: '시점을 다시 선택해 주세요.' }); return; }
+          if (data.map !== undefined && data.map !== 'ward' && data.map !== 'arena' && data.map !== 'baron') { send(ws, { type: 'error', message: '맵을 다시 선택해 주세요.' }); return; }
           if (rooms.size >= 60) { send(ws, { type: 'error', message: '현재 방이 많아요. 잠시 후 다시 시도해 주세요.' }); return; }
           let code: string;
           do { code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase(); } while (rooms.has(code));
-          const map = data.map === 'arena' ? 'arena' : 'ward';
-          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map), tokens: new Map(), disconnected: new Map() };
+          const map = data.map === 'arena' ? 'arena' : data.map === 'baron' ? 'baron' : 'ward';
+          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map, data.view === 'fps' ? 'fps' : 'top'), tokens: new Map(), disconnected: new Map() };
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room) { send(ws, { type: 'error', message: '방을 찾을 수 없어요. 코드를 확인해 주세요.' }); return; }
@@ -110,6 +112,20 @@ export function createArenaServer() {
       if (data.type === 'input') {
         const input = parseInput(data.input);
         if (input) { player.input = input; client.lastInput = now; }
+      } else if (data.type === 'spell') {
+        const problem = castSpell(game, player.id, data.spell, data.yaw);
+        if (problem) send(ws, { type: 'error', message: problem });
+      } else if (data.type === 'settings') {
+        if (!['lobby', 'finished'].includes(game.phase) || game.players.find(p => !p.bot)?.id !== player.id) {
+          send(ws, { type: 'error', message: '방장만 경기 시작 전에 설정할 수 있어요.' }); return;
+        }
+        if ((data.view !== 'top' && data.view !== 'fps') || !Number.isInteger(data.flashCooldown) || !Number.isInteger(data.ghostCooldown) ||
+            (data.flashCooldown as number) < 1 || (data.flashCooldown as number) > 300 || (data.ghostCooldown as number) < 6 || (data.ghostCooldown as number) > 300) {
+          send(ws, { type: 'error', message: '점멸은 1–300초, 유체화는 6–300초의 정수로 설정해 주세요.' }); return;
+        }
+        game.view = data.view as Game['view'];
+        game.spellCooldowns = { flash: data.flashCooldown as number, ghost: data.ghostCooldown as number };
+        game.players.forEach(p => { p.ready = p.bot; });
       } else if (data.type === 'ready' && (game.phase === 'lobby' || game.phase === 'finished')) {
         player.ready = !player.ready;
         startRound(game);

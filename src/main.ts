@@ -25,6 +25,7 @@ let intentionalClose = false;
 let connecting = false;
 let rosterKey = '';
 let phaseKey = '';
+let settingsKey = '';
 let mouseFire = false;
 let pulseUntil = 0;
 let stick = { x: 0, z: 0 };
@@ -161,6 +162,19 @@ function renderState() {
   const me = state.players.find(p => p.id === myId);
   if (!me) return;
   const active = state.phase === 'playing' || state.phase === 'countdown';
+  if ($('fps-view').getAttribute('aria-pressed') !== String(state.view === 'fps')) setView(state.view);
+  for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = true;
+  $('view-note').textContent = `전원 ${state.view === 'fps' ? '1인칭' : '롤 시점'} · 시작 후 고정`;
+  const host = state.players.find(player => !player.bot)?.id === myId;
+  const nextSettings = JSON.stringify([state.code, state.view, state.spellCooldowns, host, active]);
+  if (settingsKey !== nextSettings) {
+    settingsKey = nextSettings;
+    $<HTMLSelectElement>('room-view').value = state.view;
+    $<HTMLInputElement>('flash-cooldown').value = String(state.spellCooldowns.flash);
+    $<HTMLInputElement>('ghost-cooldown').value = String(state.spellCooldowns.ghost);
+    $<HTMLFieldSetElement>('room-settings').disabled = !host || active;
+    $('settings-note').textContent = host ? '설정을 적용하면 준비가 초기화돼요. 시작 후에는 바꿀 수 없어요.' : '방장이 시작 전에 설정해요. 참가자 모두 같은 설정으로 플레이해요.';
+  }
   const nextPhaseKey = `${state.phase}:${state.round}`;
   if (phaseKey !== nextPhaseKey) {
     phaseKey = nextPhaseKey;
@@ -188,9 +202,13 @@ function renderState() {
   const seconds = Math.ceil(state.time);
   $('timer').textContent = `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
   $('alive').textContent = `${state.players.filter(p => p.hp > 0 && p.connected).length}명 생존`;
+  for (const spell of ['flash', 'ghost'] as const) {
+    const cooldown = me[spell === 'flash' ? 'flashCooldown' : 'ghostCooldown'];
+    $<HTMLButtonElement>(spell).disabled = state.phase !== 'playing' || me.hp <= 0 || !me.connected || cooldown > 0;
+    $(`${spell}-status`).textContent = spell === 'ghost' && me.ghostTime > 0 ? `가속 ${Math.ceil(me.ghostTime)}초` : cooldown > 0 ? `${Math.ceil(cooldown)}초` : '준비';
+  }
   $('announcement').textContent = state.phase === 'countdown' ? `${Math.max(1, Math.ceil(state.countdown))}\n준비, 식칼!` :
-    me.hp <= 0 ? '이번 판은 여기까지!\n탑뷰로 남은 경기를 구경해요.' : '';
-  if (me.hp <= 0 && world.view === 'fps') setView('top');
+    me.hp <= 0 ? '이번 판은 여기까지!\n남은 경기를 구경해요.' : '';
   const nextRoster = JSON.stringify(state.players.map(p => [p.id, p.name, p.ready, p.connected, p.team])) + state.phase;
   if (nextRoster !== rosterKey) {
     rosterKey = nextRoster;
@@ -206,9 +224,9 @@ function renderState() {
       row.append(dot, name, ready); return row;
     }));
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
-    $('room-mode').textContent = `${state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
+    $('room-mode').textContent = `${state.map === 'baron' ? '바론 둥지' : state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map === 'ward' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
+    if (state.phase === 'lobby') $('ready-help').textContent = (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
   }
 }
 
@@ -222,11 +240,11 @@ function nickname() {
 function enter(practice = false) {
   if (connecting) return;
   const name = nickname();
-  if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, practice });
+  if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, view: world.view, practice });
 }
 
 mapInput.onchange = () => {
-  const ward = mapInput.value === 'ward', mode = $<HTMLSelectElement>('mode');
+  const ward = mapInput.value !== 'arena', mode = $<HTMLSelectElement>('mode');
   mode.options[0].value = ward ? 'duel' : 'ffa';
   mode.options[0].textContent = ward ? '1:1 · 각자의 반원에서 대결' : '개인전 · 마지막 생존자 승리';
   world.setMap(mapInput.value as ArenaMap);
@@ -267,12 +285,25 @@ function setView(view: 'top' | 'fps') {
   $('fps-view').classList.toggle('selected', view === 'fps');
   $('top-view').setAttribute('aria-pressed', String(view === 'top'));
   $('fps-view').setAttribute('aria-pressed', String(view === 'fps'));
+  for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = !!state;
+  if (!state) $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
   $('crosshair').hidden = view !== 'fps' || !['playing', 'countdown'].includes(state?.phase ?? '');
   $('controls-help').textContent = touch ? (view === 'fps' ? '왼손 이동 · 오른손 좌우 시점 회전 · 손 떼면 발사' : '왼손 이동 · 오른손 조준 · 손 떼면 발사') :
-    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · Esc 해제 · V 시점' : 'WASD 이동 · 마우스 조준 · 클릭 발사 · V 시점 전환';
+    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · F 점멸 · G 유체화' : 'WASD 이동 · 마우스 조준 · 클릭 발사 · F 점멸 · G 유체화';
 }
-$('top-view').onclick = () => setView('top');
-$('fps-view').onclick = () => setView('fps');
+$('top-view').onclick = () => { if (!state) setView('top'); };
+$('fps-view').onclick = () => { if (!state) setView('fps'); };
+$('apply-settings').onclick = () => {
+  const flash = $<HTMLInputElement>('flash-cooldown'), ghost = $<HTMLInputElement>('ghost-cooldown');
+  if (!flash.reportValidity() || !ghost.reportValidity()) return;
+  send({ type: 'settings', view: $<HTMLSelectElement>('room-view').value, flashCooldown: flash.valueAsNumber, ghostCooldown: ghost.valueAsNumber });
+};
+function useSpell(spell: 'flash' | 'ghost') {
+  if (!state || $<HTMLButtonElement>(spell).disabled) return;
+  send({ type: 'spell', spell, yaw: world.yaw });
+}
+$('flash').onclick = () => useSpell('flash');
+$('ghost').onclick = () => useSpell('ghost');
 
 function resetControls() {
   keys.clear(); mouseFire = false; pulseUntil = 0; stick = { x: 0, z: 0 };
@@ -286,7 +317,9 @@ function isTyping(target: EventTarget | null) { return target instanceof HTMLInp
 window.addEventListener('keydown', event => {
   if (!world) return;
   if (isTyping(event.target)) return;
-  if (event.code === 'KeyV' && !event.repeat) setView(world.view === 'top' ? 'fps' : 'top');
+  if (['KeyF', 'KeyG'].includes(event.code)) {
+    event.preventDefault(); if (!event.repeat) useSpell(event.code === 'KeyF' ? 'flash' : 'ghost');
+  }
   if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyQ'].includes(event.code)) {
     if (event.target instanceof HTMLButtonElement && event.code === 'Space') return;
     event.preventDefault(); keys.add(event.code);
@@ -371,6 +404,7 @@ if (home) {
 try {
   const { World: GameWorld } = await import('./world.ts');
   world = new GameWorld(canvas);
+  world.setMap(mapInput.value as ArenaMap);
   world.onShot = () => sound(360, .08);
   world.onHit = () => {
     sound(130, .15);

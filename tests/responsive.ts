@@ -38,7 +38,7 @@ async function check(page: Page, surface: string, hud = false) {
         if (rect.left < -1 || rect.right > innerWidth + 1) found.push(`${selector} outside viewport`);
       }
       const overlaps = (a: DOMRect, b: DOMRect) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
-      const selectors = hud ? ['.health-panel', '.view-switch', '#fire', '#move-pad', '#aim-pad', '#match-leave', '.match-bar', '.header-actions', '#announcement'] : ['.brand', '.header-actions'];
+      const selectors = hud ? ['.health-panel', '#view-note', '#spell-controls', '#fire', '#move-pad', '#aim-pad', '#match-leave', '.match-bar', '.header-actions', '#announcement'] : ['.brand', '.header-actions'];
       const elements = selectors.map(selector => [selector, document.querySelector(selector)] as const).filter((entry): entry is readonly [string, Element] => !!entry[1] && visible(entry[1]) && (entry[0] !== '#announcement' || !!entry[1].textContent));
       for (let i = 0; i < elements.length; i++) {
         const [name, element] = elements[i], rect = element.getBoundingClientRect();
@@ -46,7 +46,7 @@ async function check(page: Page, surface: string, hud = false) {
         for (let j = i + 1; j < elements.length; j++) if (overlaps(rect, elements[j][1].getBoundingClientRect())) found.push(`${name} overlaps ${elements[j][0]}`);
       }
       if (hud) {
-        for (const selector of ['#top-view', '#fps-view', '#fire', '#move-pad', '#aim-pad', '#match-leave']) {
+        for (const selector of ['#flash', '#ghost', '#fire', '#move-pad', '#aim-pad', '#match-leave']) {
           const element = document.querySelector(selector)!;
           if (!visible(element)) continue;
           const rect = element.getBoundingClientRect();
@@ -71,10 +71,11 @@ try {
   await context.addInitScript('window.__name = (fn) => fn;');
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  for (const kind of ['gomoku', 'quoridor', 'janggi', 'poker', 'chess']) {
+  for (const kind of (process.env.CLEAVER_ONLY === '1' ? [] : ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'])) {
     await page.goto(`${base}/?game=${kind}`);
     await check(page, `${kind}-entry`);
     await page.locator('#t-name').fill('가나다라마바사아자차카타');
+    if (kind === 'poker') await page.locator('#t-variant').selectOption('party');
     await page.locator('#t-entry button[type=submit]').click();
     await expect(page.locator('#t-room')).toBeVisible();
     const code = await page.locator('#t-code').innerText();
@@ -85,6 +86,10 @@ try {
     for (const rival of rivals) rival.send(JSON.stringify({ type: 'ready' }));
     await page.locator('#t-ready').click();
     await expect(page.locator('#t-turn')).toContainText('내 차례');
+    if (kind === 'poker') {
+      await expect(page.locator('#poker-canvas')).toHaveAttribute('data-models', 'blender', { timeout: 60_000 });
+      await expect(page.locator('#poker-canvas')).toHaveAttribute('data-ready', 'true', { timeout: 60_000 });
+    }
     await check(page, `${kind}-playing`);
     if (kind === 'gomoku') {
       await page.locator('[data-cell="112"]').click();
@@ -95,28 +100,31 @@ try {
     for (const rival of rivals) { rival.send(JSON.stringify({ type: 'leave' })); rival.close(); }
     await page.locator('#games-menu').click();
   }
-  await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#choose-cleaver')).toBeEnabled({ timeout: 60_000 });
-  await check(page, 'hub');
-  await page.locator('#choose-cleaver').click();
-  await check(page, 'cleaver-entry');
-  await page.locator('#nickname').fill('가나다라마바사아자차카타');
-  await page.locator('#create').click();
-  await expect(page.locator('#room')).toBeVisible();
-  const code = await page.locator('#code').innerText();
-  const rival = await peer('/ws', { type: 'join', code, name: 'abcdefghijk1' });
-  await expect(page.locator('#players li')).toHaveCount(2);
-  await check(page, 'cleaver-room');
-  rival.send(JSON.stringify({ type: 'ready' }));
-  await page.locator('#ready').click();
-  await expect(page.locator('#hud')).toBeVisible();
-  await check(page, 'cleaver-top', true);
-  await page.locator('#fps-view').click();
-  await expect(page.locator('#crosshair')).toBeVisible();
-  await check(page, 'cleaver-fps', true);
-  rival.send(JSON.stringify({ type: 'leave' })); rival.close();
-  await expect(page.locator('#room')).toBeVisible({ timeout: 30_000 });
-  await check(page, 'cleaver-result');
+  for (const view of ['top', 'fps']) {
+    await page.goto(base, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#choose-cleaver')).toBeEnabled({ timeout: 60_000 });
+    if (view === 'top') await check(page, 'hub');
+    await page.locator('#choose-cleaver').click();
+    await page.locator('#loading').waitFor({ state: 'hidden', timeout: 60_000 });
+    if (view === 'top') await check(page, 'cleaver-entry');
+    await page.locator('#nickname').fill('가나다라마바사아자차카타');
+    await page.locator(`#${view}-view`).click();
+    await page.locator('#create').click();
+    await expect(page.locator('#room')).toBeVisible();
+    const code = await page.locator('#code').innerText();
+    const rival = await peer('/ws', { type: 'join', code, name: 'abcdefghijk1' });
+    await expect(page.locator('#players li')).toHaveCount(2);
+    if (view === 'top') await check(page, 'cleaver-room');
+    rival.send(JSON.stringify({ type: 'ready' }));
+    await page.locator('#ready').click();
+    await expect(page.locator('#hud')).toBeVisible();
+    if (view === 'fps') await expect(page.locator('#crosshair')).toBeVisible();
+    await check(page, `cleaver-${view}`, true);
+    rival.send(JSON.stringify({ type: 'leave' })); rival.close();
+    await expect(page.locator('#room')).toBeVisible({ timeout: 30_000 });
+    if (view === 'top') await check(page, 'cleaver-result');
+    await page.locator('#leave').click();
+  }
   failures.push(...errors.map(error => `browser: ${error}`));
   await writeFile(`${output}issues.json`, JSON.stringify(failures, null, 2));
   console.log(`${failures.length} responsive issues. Evidence: ${output}`);

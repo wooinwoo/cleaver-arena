@@ -63,6 +63,7 @@ try {
   const a = await page(), b = await page();
   const onlyArena = process.argv.includes('--arena-only');
   if (!onlyArena) {
+  await a.locator('#map').selectOption('ward');
   await a.screenshot({ path: output + 'desktop-lobby.png' });
   await a.locator('#nickname').fill('민트친구');
   await a.locator('#create').click();
@@ -90,10 +91,9 @@ try {
   await a.keyboard.up('KeyD');
   await expect.poll(() => b.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].x)).toBeGreaterThan(startX + .3);
   await a.screenshot({ path: output + 'desktop-top.png' });
-  await a.locator('#fps-view').click();
-  await expect(a.locator('#fps-view')).toHaveAttribute('aria-pressed', 'true');
-  await expect(a.locator('#crosshair')).toBeVisible();
-  await a.screenshot({ path: output + 'desktop-fps.png' });
+  await expect(a.locator('#fps-view')).toBeDisabled();
+  await a.keyboard.press('KeyV');
+  await expect(a.locator('#top-view')).toHaveAttribute('aria-pressed', 'true');
   const shotBefore = await a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.nextShot);
   await a.locator('#game').focus();
   await a.keyboard.down('Space');
@@ -150,6 +150,7 @@ try {
   const mobile = await page(true);
   await mobile.locator('#map').selectOption('arena');
   await mobile.locator('#map').selectOption('ward');
+  await mobile.locator('#fps-view').tap();
   await expect(mobile.locator('#mode')).toHaveValue('duel');
   await mobile.screenshot({ path: output + 'map-selection-mobile.png' });
   await mobile.locator('#practice').click();
@@ -165,8 +166,8 @@ try {
   await mobile.waitForTimeout(400);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => mobile.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].z)).toBeGreaterThan(initial + .4);
-  await mobile.screenshot({ path: output + 'mobile-top.png' });
-  await mobile.locator('#fps-view').tap();
+  await mobile.screenshot({ path: output + 'mobile-fps-moving.png' });
+  await expect(mobile.locator('#top-view')).toBeDisabled();
   await expect(mobile.locator('#crosshair')).toBeVisible();
   const yaw = await mobile.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].yaw);
   const aim = await mobile.locator('#aim-pad').boundingBox();
