@@ -292,7 +292,8 @@ function setView(view: 'top' | 'fps') {
   if (!state) $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
   $('crosshair').hidden = view !== 'fps' || !['playing', 'countdown'].includes(state?.phase ?? '');
   $('controls-help').textContent = touch ? (view === 'fps' ? '왼손 이동 · 오른손 좌우 시점 회전 · 손 떼면 발사' : '왼손 이동 · 오른손 조준 · 손 떼면 발사') :
-    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · F 점멸 · G 유체화' : '우클릭 이동 · 좌클릭 / Q 발사 · F 마우스 방향 점멸 · G 유체화';
+    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · F 점멸 · G 유체화' : '우클릭 이동 · 좌클릭 / Q 발사 · F 마우스 방향 점멸 · D 유체화';
+  $('ghost').querySelector('kbd')!.textContent = view === 'top' ? 'D' : 'G';
   canvas.setAttribute('aria-label', `3D 식칼 피구 경기장. ${$('controls-help').textContent}`);
 }
 $('top-view').onclick = () => { if (!state) setView('top'); };
@@ -330,8 +331,9 @@ function isTyping(target: EventTarget | null) { return target instanceof HTMLInp
 window.addEventListener('keydown', event => {
   if (!world) return;
   if (isTyping(event.target)) return;
-  if (['KeyF', 'KeyG'].includes(event.code)) {
+  if (event.code === 'KeyF' || event.code === (world.view === 'top' ? 'KeyD' : 'KeyG')) {
     event.preventDefault(); if (!event.repeat) useSpell(event.code === 'KeyF' ? 'flash' : 'ghost');
+    return;
   }
   if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyQ'].includes(event.code)) {
     if (event.target instanceof HTMLButtonElement && event.code === 'Space') return;

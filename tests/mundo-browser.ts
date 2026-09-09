@@ -65,6 +65,7 @@ try {
       await page.locator('#game').focus(); await page.keyboard.press('KeyV');
       await expect(page.locator(`#${view}-view`)).toHaveAttribute('aria-pressed', 'true');
       expect((await state(page)).view).toBe(view);
+      await expect(page.locator('#ghost kbd')).toHaveText(view === 'top' ? 'D' : 'G');
     }
     await spellControlsClear();
   }
@@ -125,7 +126,7 @@ try {
   await expect.poll(async () => (await state(a)).players[0].flashes).toBe(1);
   await a.keyboard.press('KeyF');
   expect((await state(a)).players[0].flashes).toBe(1);
-  await a.keyboard.press('KeyG');
+  await a.keyboard.press('KeyD');
   await expect(a.locator('#ghost-status')).toContainText('가속');
   await expect(a.locator('#ghost')).toBeDisabled();
   await b.mouse.move(422, 195);
