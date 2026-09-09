@@ -77,7 +77,7 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
     }
     details.append(list); row.append(heading, tokens, bonuses, details); standings.append(row);
   }); board.append(standings);
-  if (game.finalRound) board.append(node('p', 'sp-final', game.winners.length ? '경기 종료 · 점수가 같으면 구매 카드 수로 결정해요.' : '마지막 라운드 · 마지막 참가자의 차례까지 진행해요.'));
+  if (game.finalRound) board.append(node('p', 'sp-final', game.winner !== null || game.draw ? '경기 종료 · 최종 결과를 확인해 주세요.' : '마지막 라운드 · 마지막 참가자의 차례까지 진행해요.'));
 
   const control = node('section', 'sp-control'); control.setAttribute('aria-label', '내 행동');
   const hint = node('p', 'sp-hint'); hint.id = 'sp-hint'; hint.setAttribute('role', 'status');

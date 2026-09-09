@@ -54,7 +54,7 @@ async function layout(page: Page) {
   }
 }
 try {
-  for (const seats of [2, 4]) {
+  for (const seats of [2, 3, 4]) {
     const contexts = [], pages: Page[] = [];
     for (let seat = 0; seat < seats; seat++) {
       const mobile = seat % 2 === 1;
