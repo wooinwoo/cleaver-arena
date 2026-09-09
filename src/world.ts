@@ -17,12 +17,12 @@ import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
 import '@babylonjs/loaders/glTF/glTFFileLoader.js';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_unlit.js';
 import '@babylonjs/core/Culling/ray.js';
-import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, type ArenaMap, type Game, type Input } from '../shared/game.ts';
+import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, moveInput, type ArenaMap, type Game, type Input } from '../shared/game.ts';
 
 import { COLORS } from './palette.ts';
 const AVATAR_SCALE = 1.5;
 const EYE_HEIGHT = 2.2;
-type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; hp: number; color: string; instance?: InstantiatedEntries; clips?: AnimationGroup[]; animation?: string; flashes?: number };
+type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; ghost: TransformNode; hp: number; color: string; instance?: InstantiatedEntries; clips?: AnimationGroup[]; animation?: string; flashes?: number };
 
 export class World {
   engine: Engine;
@@ -46,6 +46,12 @@ export class World {
   private map: ArenaMap = 'ward';
   private elapsed = 0;
   private priorShot = -1;
+  private snapshotAt = 0;
+  private effects: { mesh: Mesh; started: number; duration: number }[] = [];
+  private destinationMarker?: Mesh;
+  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  onInput = () => {};
+  onFlash = () => {};
   onShot = () => {};
   onHit = () => {};
 
@@ -53,6 +59,12 @@ export class World {
     this.engine = new Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false }, true);
     this.engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, 1.5));
     this.scene = new Scene(this.engine);
+    this.scene.skipPointerMovePicking = true;
+    this.scene.skipPointerDownPicking = true;
+    this.scene.skipPointerUpPicking = true;
+    // The app owns mouse buttons; cancelling pointerdown suppresses their mouse events.
+    this.scene.preventDefaultOnPointerDown = false;
+    this.scene.preventDefaultOnPointerUp = false;
     this.scene.clearColor = Color4.FromHexString('#183d47ff');
     this.scene.ambientColor = new Color3(.25, .32, .32);
     const ambient = new HemisphericLight('softbox', new Vector3(0, 1, 0), this.scene);
@@ -82,6 +94,8 @@ export class World {
     }
     void this.loadMundo();
     this.engine.runRenderLoop(() => {
+      if (document.hidden || document.body.classList.contains('in-hub')) return;
+      this.onInput();
       this.update(Math.min(.05, this.engine.getDeltaTime() / 1000));
       this.scene.render();
     });
@@ -193,10 +207,21 @@ export class World {
     if (this.map === 'arena') this.buildOriginalArena();
     else this.buildWardArena();
     for (const mesh of this.scene.meshes.slice(firstMesh)) if (!mesh.parent) mesh.parent = this.arena;
+    // Static pieces with the same material share a draw call; aim uses a mathematical plane.
+    const groups = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of this.arena.getChildMeshes()) if (mesh instanceof Mesh && mesh.material instanceof StandardMaterial) {
+      const group = groups.get(mesh.material) ?? [];
+      group.push(mesh); groups.set(mesh.material, group);
+    }
+    for (const group of groups.values()) if (group.length > 1) {
+      const merged = Mesh.MergeMeshes(group, true, true);
+      if (merged) merged.parent = this.arena;
+    }
     if (this.map === 'baron' && this.baron) {
       this.baron.instantiateModelsToScene(name => `baron-${name}`, false).rootNodes.forEach(node => { node.parent = this.arena!; });
       this.canvas.dataset.mapModel = 'baron';
     } else if (this.map !== 'baron') delete this.canvas.dataset.mapModel;
+    for (const mesh of this.arena.getChildMeshes()) { mesh.isPickable = false; mesh.freezeWorldMatrix(); }
   }
 
   private buildWardArena() {
@@ -311,12 +336,23 @@ export class World {
     shadow.scaling.z = .8;
     const bar = this.box('health-bar', [1.2, .08, .08], [0, 2.43 * AVATAR_SCALE, 0], color, root);
     bar.billboardMode = Mesh.BILLBOARDMODE_ALL;
-    const avatar = { root, body, arm, ring, bar, hp: 100, color };
+    const ghost = new TransformNode(id + '-ghost', this.scene);
+    ghost.parent = root;
+    const aura = MeshBuilder.CreateTorus('ghost-aura', { diameter: 1.8, thickness: .12, tessellation: 24 }, this.scene);
+    aura.parent = ghost; aura.position.y = .16; aura.material = this.material('#80eaff', true);
+    for (const side of [-1, 0, 1]) {
+      const trail = this.box('ghost-stream', [.16, .15, 2.2], [side * .55, .5 + Math.abs(side) * .2, -1.1], '#80eaff', ghost);
+      trail.material = aura.material; trail.visibility = .7;
+      trail.rotation.x = -.12;
+    }
+    ghost.setEnabled(false);
+    const avatar = { root, body, arm, ring, bar, ghost, hp: 100, color };
     if (this.model) this.attachMundo(avatar);
     return avatar;
   }
 
   reset() {
+    this.clearEffects();
     for (const avatar of this.avatars.values()) this.disposeAvatar(avatar);
     for (const shot of this.projectiles.values()) shot.dispose();
     this.avatars.clear(); this.projectiles.clear();
@@ -334,6 +370,8 @@ export class World {
 
   applyState(game: Game, id: string) {
     const reset = !this.state || this.state.round !== game.round;
+    if (reset) this.clearEffects();
+    this.snapshotAt = performance.now();
     this.setMap(game.map);
     this.state = game;
     if (this.view !== game.view) this.setView(game.view);
@@ -344,9 +382,17 @@ export class World {
       const color = COLORS[game.mode === 'teams' || game.map !== 'arena' ? player.team : player.slot];
       if (avatar && avatar.color !== color) { this.disposeAvatar(avatar); avatar = undefined; }
       if (!avatar) { avatar = this.avatar(player.id, color); this.avatars.set(player.id, avatar); }
+      const flashed = !reset && avatar.flashes !== undefined && player.flashes > avatar.flashes;
+      if (flashed) {
+        this.flashEffect(avatar.root.position.x, avatar.root.position.z);
+        this.flashEffect(player.x, player.z);
+        avatar.root.rotation.y = player.yaw;
+        if (player.id === id) this.onFlash();
+      }
+      if (reset) avatar.root.rotation.y = player.yaw;
       avatar.ring.material = this.material(player.id === id ? '#fff8dc' : color, true);
       if (player.id === id) {
-        if (reset || (avatar.flashes !== undefined && avatar.flashes !== player.flashes)) { avatar.root.position.set(player.x, 0, player.z); this.yaw = player.yaw; }
+        if (reset || flashed) { avatar.root.position.set(player.x, 0, player.z); if (reset) this.yaw = player.yaw; }
         else {
           const d = Math.hypot(avatar.root.position.x - player.x, avatar.root.position.z - player.z);
           const amount = d > 2 ? 1 : .35;
@@ -366,39 +412,102 @@ export class World {
 
   aimAt(screenX: number, screenY: number) {
     if (this.view !== 'top') return;
+    this.yaw = this.directionAt(screenX, screenY, EYE_HEIGHT) ?? this.yaw;
+  }
+
+  groundAt(screenX: number, screenY: number, height = 0) {
     const rect = this.canvas.getBoundingClientRect();
     const x = screenX - rect.left;
     const y = screenY - rect.top;
     const ray: Ray = this.scene.createPickingRay(x, y, null, this.camera);
-    if (Math.abs(ray.direction.y) < .001) return;
-    const distance = (EYE_HEIGHT - ray.origin.y) / ray.direction.y;
+    if (Math.abs(ray.direction.y) < .001) return null;
+    const distance = (height - ray.origin.y) / ray.direction.y;
+    if (distance < 0) return null;
+    return { x: ray.origin.x + ray.direction.x * distance, z: ray.origin.z + ray.direction.z * distance };
+  }
+
+  directionAt(screenX: number, screenY: number, height: number) {
+    const target = this.groundAt(screenX, screenY, height);
+    if (!target) return null;
     const origin = this.avatars.get(this.id)?.root.position ?? Vector3.Zero();
-    this.yaw = Math.atan2(ray.origin.x + ray.direction.x * distance - origin.x, ray.origin.z + ray.direction.z * distance - origin.z);
+    return Math.atan2(target.x - origin.x, target.z - origin.z);
+  }
+
+  markDestination(target: { x: number; z: number }) {
+    const player = this.state?.players.find(p => p.id === this.id);
+    if (!player || player.hp <= 0 || this.state?.phase !== 'playing') return null;
+    const point = { ...target };
+    move(point, 0, 0, 0, player.team, this.state.map);
+    if (!this.destinationMarker) {
+      this.destinationMarker = MeshBuilder.CreateTorus('move-destination', { diameter: .65, thickness: .08, tessellation: 20 }, this.scene);
+      this.destinationMarker.material = this.material('#d4f18d', true);
+    }
+    this.destinationMarker.position.set(point.x, .12, point.z);
+    this.destinationMarker.setEnabled(true);
+    return point;
+  }
+
+  private clearEffects() {
+    this.effects.forEach(effect => effect.mesh.dispose()); this.effects = [];
+    this.destinationMarker?.setEnabled(false);
+  }
+
+  private flashEffect(x: number, z: number) {
+    if (document.hidden) return;
+    const material = this.material('#ffe89a', true);
+    const ring = MeshBuilder.CreateTorus('flash-ring', { diameter: 1.7, thickness: .16, tessellation: 24 }, this.scene);
+    ring.position.y = .18;
+    const pieces = [ring];
+    for (let i = 0; i < 5; i++) {
+      const beam = MeshBuilder.CreateCylinder('flash-ray', { diameterTop: .03, diameterBottom: .25, height: 2.5, tessellation: 4 }, this.scene);
+      beam.position.set(Math.sin(i * 1.256) * .5, 1.2, Math.cos(i * 1.256) * .5);
+      beam.rotation.set(Math.cos(i * 1.256) * .4, 0, Math.sin(i * 1.256) * .4);
+      pieces.push(beam);
+    }
+    pieces.forEach(mesh => { mesh.material = material; });
+    const mesh = Mesh.MergeMeshes(pieces, true, false)!;
+    mesh.name = 'flash-burst'; mesh.position.set(x, 0, z); mesh.isPickable = false;
+    const duration = .45;
+    this.effects.push({ mesh, started: performance.now() / 1000, duration });
   }
 
   private update(dt: number) {
     this.elapsed += dt;
     const game = this.state;
     const mine = game?.players.find(p => p.id === this.id);
+    const lead = Math.min(.05, (performance.now() - this.snapshotAt) / 1000);
     for (const player of game?.players ?? []) {
       const avatar = this.avatars.get(player.id)!;
       const local = player.id === this.id;
       const position = avatar.root.position;
-      if (local && game?.phase === 'playing' && player.hp > 0) move(position, this.input.x, this.input.z, dt, player.team, game.map, player.ghostTime > 0 ? GHOST_MULTIPLIER : 1);
+      const oldX = position.x, oldZ = position.z;
+      if (local && game?.phase === 'playing' && player.hp > 0) moveInput(position, this.input, dt, player.team, game.map, player.ghostTime > 0 ? GHOST_MULTIPLIER : 1);
       if (!local) {
         position.x += (player.x - position.x) * Math.min(1, dt * 18);
         position.z += (player.z - position.z) * Math.min(1, dt * 18);
       }
-      avatar.root.rotation.y = local ? this.yaw : player.yaw;
+      const walking = game?.phase === 'playing' && Math.hypot(position.x - oldX, position.z - oldZ) > .001;
+      const attacking = player.cooldown > .4 || (local ? this.input.fire : player.input.fire);
+      if (this.view === 'fps' || attacking) avatar.root.rotation.y = local ? this.yaw : player.yaw;
+      else if (walking) avatar.root.rotation.y = Math.atan2(position.x - oldX, position.z - oldZ);
       avatar.root.setEnabled((player.hp > 0 || !!avatar.instance) && !(local && this.view === 'fps'));
       avatar.bar.setEnabled(player.hp > 0);
       avatar.ring.setEnabled(player.hp > 0);
-      const walking = game?.phase === 'playing' && Math.hypot(player.input.x, player.input.z) > .1;
       this.animateAvatar(avatar, player.hp <= 0 ? 'death' : player.cooldown > .4 ? 'throw' : walking ? 'run' : 'idle');
       avatar.body.position.y = !avatar.clips && walking ? Math.abs(Math.sin(this.elapsed * 12)) * .07 : 0;
       avatar.arm.rotation.x = player.cooldown > .4 ? -.8 : Math.sin(this.elapsed * 2) * .05;
       avatar.ring.scaling.setAll(player.ghostTime > 0 ? 1.15 + Math.sin(this.elapsed * 12) * .08 : 1);
+      avatar.ghost.setEnabled(player.hp > 0 && game?.phase === 'playing' && player.ghostTime > 0);
+      avatar.ghost.scaling.z = walking ? (this.reducedMotion ? 1 : 1.1 + Math.sin(this.elapsed * 18) * .15) : .45;
     }
+    for (const effect of this.effects) {
+      const life = effect.duration - (performance.now() / 1000 - effect.started);
+      effect.mesh.visibility = Math.max(0, life / effect.duration);
+      if (!this.reducedMotion) effect.mesh.scaling.setAll(1 + (1 - effect.mesh.visibility) * .5);
+      if (life <= 0) effect.mesh.dispose();
+    }
+    this.effects = this.effects.filter(effect => !effect.mesh.isDisposed());
+    if (!this.input.target || !mine || Math.hypot(mine.x - this.input.target.x, mine.z - this.input.target.z) < .15 || game?.phase !== 'playing') this.destinationMarker?.setEnabled(false);
     for (const shot of game?.shots ?? []) {
       let node = this.projectiles.get(shot.id);
       if (!node) {
@@ -406,7 +515,7 @@ export class World {
         this.cleaver(node, .85);
         this.projectiles.set(shot.id, node);
       }
-      node.position.set(shot.x, EYE_HEIGHT, shot.z);
+      node.position.set(shot.x + shot.vx * lead, EYE_HEIGHT, shot.z + shot.vz * lead);
       node.rotation.set(this.elapsed * 22, Math.atan2(shot.vx, shot.vz), Math.PI / 2);
     }
     for (const [id, mesh] of this.projectiles) if (!game?.shots.some(s => s.id === id)) { mesh.dispose(); this.projectiles.delete(id); }

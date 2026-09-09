@@ -37,6 +37,15 @@ try {
     await expect(page.locator('#loading')).toBeHidden({ timeout: 90_000 });
   }
   const state = (page: Page) => page.evaluate(() => (window as unknown as { arenaState: Game }).arenaState);
+  async function groundPoint(page: Page, x: number, z: number) {
+    return page.evaluate(({ x, z }) => {
+      const rect = document.getElementById('game')!.getBoundingClientRect(), aspect = rect.width / rect.height;
+      const distance = Math.max(22, (10.6 / (Math.tan(.85 / 2) * aspect) + 10.5 * .6 + 3.645 * .8) / 1.25);
+      const depth = 1.25 * distance + z * .6;
+      return { x: rect.left + rect.width / 2 * (1 + x / (depth * Math.tan(.85 / 2) * aspect)),
+        y: rect.top + rect.height / 2 * (1 - z * .8 / (depth * Math.tan(.85 / 2))) };
+    }, { x, z });
+  }
   async function spellControlsClear() {
     const [note, spells] = await Promise.all([b.locator('#view-note').boundingBox(), b.locator('#spell-controls').boundingBox()]);
     expect(!note || !!spells && (note.x + note.width <= spells.x || spells.x + spells.width <= note.x ||
@@ -96,16 +105,37 @@ try {
   await playing(1, 'top');
   await a.screenshot({ path: output + 'baron-top.png' });
 
+  const feet = await groundPoint(a, -5, 0);
+  await a.mouse.move(feet.x, feet.y);
+  for (const first of ['right', 'left'] as const) {
+    await a.mouse.down({ button: first });
+    await a.mouse.down({ button: first === 'right' ? 'left' : 'right' });
+    await expect.poll(async () => (await state(a)).players[0].input.fire).toBe(true);
+    await a.mouse.up({ button: 'left' }); await a.mouse.up({ button: 'right' });
+    await expect.poll(async () => (await state(a)).players[0].input.fire).toBe(false);
+  }
+  const flashAim = await groundPoint(a, 5, 0);
+  await a.mouse.move(flashAim.x, flashAim.y);
+
   await a.bringToFront(); await a.locator('#game').focus();
+  const beforeFlash = (await state(a)).players[0];
   await a.keyboard.press('KeyF');
   await expect.poll(async () => (await state(b)).players[0].flashes).toBe(1);
-  expect((await state(b)).players[0].x).toBeCloseTo(-1, 2);
+  expect((await state(b)).players[0].x - beforeFlash.x).toBeCloseTo(4, 2);
   await expect.poll(async () => (await state(a)).players[0].flashes).toBe(1);
   await a.keyboard.press('KeyF');
   expect((await state(a)).players[0].flashes).toBe(1);
   await a.keyboard.press('KeyG');
   await expect(a.locator('#ghost-status')).toContainText('가속');
   await expect(a.locator('#ghost')).toBeDisabled();
+  await b.mouse.move(422, 195);
+  const aimPad = (await b.locator('#aim-pad').boundingBox())!;
+  const touchSession = await b.context().newCDPSession(b);
+  await touchSession.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: aimPad.x + aimPad.width / 2 - 25, y: aimPad.y + aimPad.height / 2, id: 1 }] });
+  await b.waitForTimeout(200);
+  await expect.poll(async () => Math.abs((await state(b)).players[1].yaw + Math.PI / 2)).toBeLessThan(.03);
+  await touchSession.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await touchSession.detach();
   await b.locator('#flash').tap();
   await expect.poll(async () => (await state(a)).players[1].flashes).toBe(1);
   expect((await state(a)).players[1].x).toBeCloseTo(1, 2);
@@ -114,8 +144,7 @@ try {
   await expect(b.locator('#ghost')).toBeDisabled();
   await b.screenshot({ path: output + 'baron-spells.png' });
   await a.bringToFront(); await a.locator('#game').focus();
-  await a.keyboard.down('KeyD');
-  await a.waitForTimeout(500); await a.keyboard.up('KeyD');
+  await a.mouse.click(800, 450, { button: 'right' });
   await expect.poll(async () => (await state(b)).players[0].x).toBeCloseTo(-.5, 2);
 
   // Project the stationary opponent onto the same top-view camera used by the existing duel test.

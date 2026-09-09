@@ -29,6 +29,8 @@ let settingsKey = '';
 let mouseFire = false;
 let pulseUntil = 0;
 let stick = { x: 0, z: 0 };
+let cursor: { x: number; y: number } | null = null;
+let destination: Input['target'];
 const keys = new Set<string>();
 let soundEnabled = false;
 let audio: AudioContext | null = null;
@@ -197,6 +199,7 @@ function renderState() {
   }
   $('health').textContent = String(me.hp);
   $('health-fill').style.transform = `scaleX(${me.hp / 100})`;
+  $('spell-feedback').classList.toggle('ghost', state.phase === 'playing' && me.hp > 0 && me.ghostTime > 0);
   $('my-name').textContent = `${me.name}${me.hp <= 0 ? ' · 탈락' : ''}`;
   $('round').textContent = `ROUND ${state.round}`;
   const seconds = Math.ceil(state.time);
@@ -289,7 +292,8 @@ function setView(view: 'top' | 'fps') {
   if (!state) $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
   $('crosshair').hidden = view !== 'fps' || !['playing', 'countdown'].includes(state?.phase ?? '');
   $('controls-help').textContent = touch ? (view === 'fps' ? '왼손 이동 · 오른손 좌우 시점 회전 · 손 떼면 발사' : '왼손 이동 · 오른손 조준 · 손 떼면 발사') :
-    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · F 점멸 · G 유체화' : 'WASD 이동 · 마우스 조준 · 클릭 발사 · F 점멸 · G 유체화';
+    view === 'fps' ? '화면 클릭으로 마우스 고정 · WASD 이동 · 클릭 발사 · F 점멸 · G 유체화' : '우클릭 이동 · 좌클릭 / Q 발사 · F 마우스 방향 점멸 · G 유체화';
+  canvas.setAttribute('aria-label', `3D 식칼 피구 경기장. ${$('controls-help').textContent}`);
 }
 $('top-view').onclick = () => { if (!state) setView('top'); };
 $('fps-view').onclick = () => { if (!state) setView('fps'); };
@@ -300,13 +304,22 @@ $('apply-settings').onclick = () => {
 };
 function useSpell(spell: 'flash' | 'ghost') {
   if (!state || $<HTMLButtonElement>(spell).disabled) return;
-  send({ type: 'spell', spell, yaw: world.yaw });
+  let yaw = world.yaw;
+  if (spell === 'flash') {
+    if (world.view === 'top' && cursor) yaw = world.directionAt(cursor.x, cursor.y, 0) ?? yaw;
+    destination = undefined;
+    latestInput = { ...latestInput }; delete latestInput.target;
+    world.input = latestInput;
+    send({ type: 'input', input: latestInput });
+  }
+  send({ type: 'spell', spell, yaw });
 }
 $('flash').onclick = () => useSpell('flash');
 $('ghost').onclick = () => useSpell('ghost');
 
 function resetControls() {
   keys.clear(); mouseFire = false; pulseUntil = 0; stick = { x: 0, z: 0 };
+  destination = undefined; cursor = null;
   latestInput = { x: 0, z: 0, yaw: world?.yaw ?? 0, fire: false };
   if (world) world.input = latestInput;
   send({ type: 'input', input: latestInput });
@@ -330,18 +343,36 @@ window.addEventListener('blur', resetControls);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetControls(); });
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement) resetControls(); });
 canvas.addEventListener('pointermove', event => {
-  if (event.pointerType === 'touch') return;
-  if (world.view === 'top') world.aimAt(event.clientX, event.clientY);
+  if (!world || event.pointerType === 'touch') return;
+  if (world.view === 'top') {
+    cursor = { x: event.clientX, y: event.clientY };
+    world.aimAt(cursor.x, cursor.y);
+    if (event.buttons & 2) {
+      const point = world.groundAt(cursor.x, cursor.y);
+      if (point) destination = world.markDestination(point) ?? destination;
+    }
+  }
   else if (document.pointerLockElement === canvas) world.yaw += event.movementX * .003;
 });
-canvas.addEventListener('pointerdown', event => {
-  if (event.pointerType === 'touch' || event.button !== 0) return;
+canvas.addEventListener('pointerdown', event => { if (event.pointerType === 'touch') event.preventDefault(); });
+canvas.addEventListener('mousedown', event => {
+  if (!world || ![0, 2].includes(event.button)) return;
   canvas.focus();
+  if (world.view === 'top') {
+    cursor = { x: event.clientX, y: event.clientY };
+    world.aimAt(cursor.x, cursor.y);
+    if (event.button === 2) {
+      const point = world.groundAt(cursor.x, cursor.y);
+      if (point) destination = world.markDestination(point) ?? destination;
+      event.preventDefault(); return;
+    }
+  }
+  if (event.button !== 0) return;
   if (world.view === 'fps' && document.pointerLockElement !== canvas) {
     if (canvas.requestPointerLock) Promise.resolve(canvas.requestPointerLock()).catch(() => toast('마우스 고정을 허용하거나 방향키로 이동해 주세요.'));
   } else mouseFire = true;
 });
-window.addEventListener('pointerup', event => { if (event.pointerType !== 'touch') mouseFire = false; });
+window.addEventListener('mouseup', event => { if (event.button === 0) mouseFire = false; });
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 
 function pad(id: string, aim: boolean) {
@@ -352,13 +383,14 @@ function pad(id: string, aim: boolean) {
     const dx = event.clientX - rect.left - rect.width / 2, dy = event.clientY - rect.top - rect.height / 2;
     const radius = rect.width * .3, length = Math.max(radius, Math.hypot(dx, dy));
     thumb.style.transform = `translate(${dx / length * radius}px, ${dy / length * radius}px)`;
-    if (!aim) stick = { x: dx / length, z: -dy / length };
+    if (!aim) { destination = undefined; stick = { x: dx / length, z: -dy / length }; }
     else if (world.view === 'fps') { world.yaw += (event.clientX - lastX) * .012; didAim = true; }
     else if (Math.hypot(dx, dy) > 8) { world.yaw = Math.atan2(dx, -dy); didAim = true; }
     lastX = event.clientX;
   };
   element.addEventListener('pointerdown', event => {
     if (pointer !== null) return;
+    cursor = null;
     pointer = event.pointerId; lastX = event.clientX; didAim = false;
     element.setPointerCapture(pointer); update(event); event.preventDefault();
   });
@@ -406,6 +438,11 @@ try {
   world = new GameWorld(canvas);
   world.setMap(mapInput.value as ArenaMap);
   world.onShot = () => sound(360, .08);
+  world.onFlash = () => {
+    $('spell-feedback').classList.add('flash');
+    setTimeout(() => $('spell-feedback').classList.remove('flash'), 450);
+    sound(800, .12);
+  };
   world.onHit = () => {
     sound(130, .15);
     $('hit-flash').classList.add('hit');
@@ -429,16 +466,22 @@ try {
     }
   } catch { sessionStorage.removeItem(sessionKey); }
   function updateInput() {
-    let x = stick.x + Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
-    let z = stick.z + Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
+    const keyboard = world.view === 'fps';
+    let x = stick.x + (keyboard ? Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')) : 0);
+    let z = stick.z + (keyboard ? Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown')) : 0);
     const length = Math.max(1, Math.hypot(x, z)); x /= length; z /= length;
     if (world.view === 'fps') {
       const cos = Math.cos(world.yaw), sin = Math.sin(world.yaw);
       [x, z] = [x * cos + z * sin, z * cos - x * sin];
     }
-    latestInput = { x, z, yaw: world.yaw, fire: mouseFire || performance.now() < pulseUntil || keys.has('Space') || keys.has('KeyQ') };
+    if (world.view === 'top' && cursor) world.aimAt(cursor.x, cursor.y);
+    const active = state?.phase === 'playing' && state.players.some(player => player.id === myId && player.hp > 0 && player.connected);
+    latestInput = { x: active ? x : 0, z: active ? z : 0, yaw: world.yaw,
+      fire: !!active && (mouseFire || performance.now() < pulseUntil || keys.has('Space') || keys.has('KeyQ')),
+      ...(active && world.view === 'top' && destination ? { target: destination } : {}) };
     world.input = latestInput;
   }
+  world.onInput = updateInput;
   setInterval(() => {
     updateInput();
     if (session && !document.hidden) send({ type: 'input', input: latestInput });

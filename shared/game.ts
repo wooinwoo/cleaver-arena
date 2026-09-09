@@ -15,7 +15,7 @@ export const OBSTACLES = [
   { x: -4.5, z: 2.8, radius: 1 }, { x: 4.5, z: -2.8, radius: 1 },
 ];
 
-export type Input = { x: number; z: number; yaw: number; fire: boolean };
+export type Input = { x: number; z: number; yaw: number; fire: boolean; target?: { x: number; z: number } };
 export type Player = {
   id: string; name: string; slot: number; team: number;
   x: number; z: number; yaw: number; hp: number; cooldown: number;
@@ -81,9 +81,26 @@ export function parseInput(value: unknown): Input | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Record<string, unknown>;
   if (![v.x, v.z, v.yaw].every(n => typeof n === 'number' && Number.isFinite(n)) || typeof v.fire !== 'boolean') return null;
+  let target: Input['target'];
+  if (v.target !== undefined) {
+    if (!v.target || typeof v.target !== 'object') return null;
+    const point = v.target as Record<string, unknown>;
+    if (![point.x, point.z].every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 1000)) return null;
+    target = { x: point.x as number, z: point.z as number };
+  }
   const length = Math.max(1, Math.hypot(v.x as number, v.z as number));
   return { x: (v.x as number) / length, z: (v.z as number) / length,
-    yaw: (v.yaw as number) % (Math.PI * 2), fire: v.fire };
+    yaw: (v.yaw as number) % (Math.PI * 2), fire: v.fire, ...(target ? { target } : {}) };
+}
+
+export function moveInput(player: { x: number; z: number }, input: Input, dt: number, team: number, map: ArenaMap, multiplier = 1) {
+  let { x, z } = input;
+  if (input.target) {
+    const dx = input.target.x - player.x, dz = input.target.z - player.z;
+    const distance = Math.max(Math.hypot(dx, dz), SPEED * dt * multiplier, .0001);
+    x = dx / distance; z = dz / distance;
+  }
+  move(player, x, z, dt, team, map, multiplier);
 }
 
 export function move(player: { x: number; z: number }, x: number, z: number, dt: number, team: number, map: ArenaMap, multiplier = 1) {
@@ -145,6 +162,8 @@ export function castSpell(game: Game, id: string, spell: unknown, yaw: unknown):
     }
     move(target, 0, 0, 0, player.team, game.map);
     player.x = target.x; player.z = target.z;
+    delete player.input.target;
+    player.yaw = yaw % (Math.PI * 2); player.input.yaw = player.yaw;
     player.flashCooldown = game.spellCooldowns.flash;
     player.flashes++;
   }
@@ -170,8 +189,8 @@ export function tick(game: Game, dt: number) {
       if (enemy) player.input = { x: Math.cos(game.time * 1.2) * 0.5, z: Math.sin(game.time * 0.8) * 0.5,
         yaw: Math.atan2(enemy.x - player.x, enemy.z - player.z) + Math.sin(game.time * 2) * 0.18, fire: true };
     }
-    if (boostedTime > 0) move(player, player.input.x, player.input.z, boostedTime, player.team, game.map, GHOST_MULTIPLIER);
-    if (dt > boostedTime) move(player, player.input.x, player.input.z, dt - boostedTime, player.team, game.map);
+    if (boostedTime > 0) moveInput(player, player.input, boostedTime, player.team, game.map, GHOST_MULTIPLIER);
+    if (dt > boostedTime) moveInput(player, player.input, dt - boostedTime, player.team, game.map);
     player.yaw = player.input.yaw;
     player.cooldown = Math.max(0, player.cooldown - dt);
     if (player.input.fire && player.cooldown <= 0) {

@@ -174,3 +174,5 @@ body.has-touch.in-match .view-switch button span, body.has-touch.in-match #contr
 @media(max-width:760px){.poker-scene{height:360px}.poker-scene-hint{left:8px;right:8px;font-size:10px}.poker-seats{gap:6px;padding:0 10px 12px}.poker-seats .poker-player{min-width:90px}.poker-3d-table .poker-actions{gap:6px;padding:0 10px 12px}.poker-3d-table .poker-actions button{font-size:12px;padding:10px 8px}.poker-3d-table .pot{font-size:14px}}
 
 @media(min-width:481px) and (orientation:landscape){body.has-touch.in-match .view-dock{bottom:calc(var(--safe-bottom) + 62px)}}
+
+#spell-feedback{position:absolute;inset:0;pointer-events:none;transition:box-shadow .15s}#spell-feedback.ghost{box-shadow:inset 0 -28px 75px #66ddff55}#spell-feedback.flash{animation:flash-spell .45s ease-out}@keyframes flash-spell{from{box-shadow:inset 0 0 110px #ffe89add;background:#ffe89a20}to{box-shadow:inset 0 0 35px #ffe89a00;background:transparent}}@media(prefers-reduced-motion:reduce){#spell-feedback{transition:none}#spell-feedback.flash{animation:none;box-shadow:inset 0 0 40px #ffe89a88}}

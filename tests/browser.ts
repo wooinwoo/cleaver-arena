@@ -88,9 +88,7 @@ try {
   })).toBeLessThan(.08);
   const startX = await a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].x);
   await a.locator('#game').focus();
-  await a.keyboard.down('KeyD');
-  await a.waitForTimeout(350);
-  await a.keyboard.up('KeyD');
+  await a.mouse.click(720, 450, { button: 'right' });
   await expect.poll(() => b.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].x)).toBeGreaterThan(startX + .3);
   await a.screenshot({ path: output + 'desktop-top.png' });
   await expect(a.locator('#fps-view')).toBeDisabled();
@@ -111,7 +109,7 @@ try {
     return state?.round === 2 && state.phase === 'playing' && state.players.every(p => p.hp === 100);
   });
   await a.bringToFront(); await a.locator('#game').focus();
-  await a.keyboard.down('KeyD'); await a.waitForTimeout(1400); await a.keyboard.up('KeyD');
+  await a.mouse.click(900, 450, { button: 'right' });
   await expect.poll(() => a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].x)).toBeCloseTo(-.5, 2);
   await a.screenshot({ path: output + 'cleaver-ward-boundary.png' });
   console.log('PASS ward: four-hit win, result, rematch and center movement boundary.');

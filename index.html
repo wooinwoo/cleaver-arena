@@ -15,7 +15,7 @@
     Composition: a playable 3D arena leads; the invitation panel becomes a quiet HUD in play.
     Signature: first-person and overhead cameras share the exact same match.
     Limits: procedural original models, compact geometry, no decorative postprocessing. -->
-    <canvas id="game" aria-label="3D 식칼 피구 경기장. WASD로 이동하고 마우스로 조준하세요." tabindex="0"></canvas>
+    <canvas id="game" aria-label="3D 식칼 피구 경기장. 우클릭으로 이동하고 좌클릭으로 발사하세요." tabindex="0"></canvas>
     <header>
       <a class="brand" href="/" aria-label="클리버 클럽 홈">
         <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 6h24v18H18v10H9z"/><circle cx="28" cy="11" r="2"/></svg>
@@ -91,6 +91,7 @@
       <div id="announcement" role="status"></div>
       <button id="match-leave" class="icon-button">나가기</button>
       <div id="hit-flash" aria-hidden="true"></div>
+      <div id="spell-feedback" aria-hidden="true"></div>
       <div id="spell-controls" role="group" aria-label="소환사 주문">
         <button id="flash" type="button"><span>점멸 <kbd>F</kbd></span><small id="flash-status">준비</small></button>
         <button id="ghost" type="button"><span>유체화 <kbd>G</kbd></span><small id="ghost-status">준비</small></button>
@@ -103,7 +104,7 @@
         <button id="fps-view" aria-pressed="false">1인칭 <span>내 눈높이</span></button>
       </div>
       <p id="view-note">방을 만들기 전에 시점 선택 · 참가자 모두 같은 시점</p>
-      <p id="controls-help">WASD 이동 · 마우스 조준 · 클릭 발사 · F 점멸 · G 유체화</p>
+      <p id="controls-help">우클릭 이동 · 좌클릭 / Q 발사 · F 마우스 방향 점멸 · G 유체화</p>
     </div>
     <div id="touch-controls" hidden>
       <div id="move-pad" class="pad" role="group" aria-label="이동 조이스틱"><span class="pad-thumb"></span><b>이동</b></div>
