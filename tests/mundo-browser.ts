@@ -164,12 +164,24 @@ try {
     const [me, opponent] = (await state(a)).players;
     return Math.abs(me.yaw - Math.atan2(opponent.x - me.x, opponent.z - me.z));
   }, { timeout: 15_000 }).toBeLessThan(.03);
+  // Down and up in one browser task must still produce exactly one throw.
+  await a.evaluate(({ x, y }) => {
+    const canvas = document.getElementById('game')!;
+    for (const type of ['mousedown', 'mouseup']) canvas.dispatchEvent(new MouseEvent(type, {
+      button: 0, buttons: type === 'mousedown' ? 1 : 0, clientX: x, clientY: y, bubbles: true,
+    }));
+  }, target);
+  await expect.poll(async () => (await state(b)).players[1].hp).toBe(75);
+  await expect(a.locator('#hit-confirm')).toHaveText('명중 · 25');
+  await expect(b.locator('#hit-confirm')).toBeEmpty();
+  expect((await state(a)).hits).toHaveLength(1);
   await a.locator('#game').focus(); await a.keyboard.down('Space');
   await a.waitForFunction(() => (window as unknown as { arenaState: Game }).arenaState.phase === 'finished', undefined, { timeout: 20_000 });
   await a.keyboard.up('Space');
   for (const page of [a, b]) {
     await expect(page.locator('.room-title')).toHaveText('민트친구 승리');
     expect((await state(page)).players[1].hp).toBe(0);
+    expect((await state(page)).hits).toHaveLength(4);
   }
   await a.locator('#room-view').selectOption('fps');
   await a.locator('#apply-settings').click();
@@ -180,6 +192,8 @@ try {
     await expect(page.locator('#crosshair')).toBeVisible();
     expect((await state(page)).spellCooldowns).toEqual({ flash: 3, ghost: 6 });
     expect((await state(page)).players.every(player => player.hp === 100 && player.flashes === 0)).toBe(true);
+    expect((await state(page)).hits).toEqual([]);
+    await expect(page.locator('#hit-confirm')).toBeEmpty();
     await expect(page.locator('#error')).toBeEmpty();
   }
   await a.screenshot({ path: output + 'baron-fps.png' });

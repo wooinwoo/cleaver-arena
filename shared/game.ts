@@ -23,16 +23,17 @@ export type Player = {
   ready: boolean; connected: boolean; bot: boolean; input: Input;
 };
 export type Shot = { id: number; owner: string; team: number; x: number; z: number; vx: number; vz: number };
+export type Hit = { owner: string; target: string; x: number; z: number; damage: number };
 export type Game = {
   code: string; map: ArenaMap; mode: 'duel' | 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
   view: 'top' | 'fps'; spellCooldowns: { flash: number; ghost: number };
-  players: Player[]; shots: Shot[]; time: number; countdown: number;
+  players: Player[]; shots: Shot[]; hits: Hit[]; time: number; countdown: number;
   winner: string; nextShot: number; round: number;
 };
 
 export function createGame(code: string, mode: Game['mode'] = 'duel', map: ArenaMap = 'ward', view: Game['view'] = 'top'): Game {
   return { code, map, view, spellCooldowns: { flash: FLASH_COOLDOWN, ghost: GHOST_COOLDOWN },
-    mode: map !== 'arena' && mode === 'ffa' ? 'duel' : mode, phase: 'lobby', players: [], shots: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
+    mode: map !== 'arena' && mode === 'ffa' ? 'duel' : mode, phase: 'lobby', players: [], shots: [], hits: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
 }
 
 export function addPlayer(game: Game, id: string, name: string, bot = false): Player {
@@ -69,6 +70,7 @@ export function startRound(game: Game): boolean {
   if (game.mode === 'teams' && game.players.length % 2 !== 0) return false;
   game.players.forEach((player, index) => { player.team = index % 2; spawn(player, game.map, Math.floor(index / 2)); });
   game.shots = [];
+  game.hits = [];
   game.phase = 'countdown';
   game.countdown = 3;
   game.time = 120;
@@ -221,6 +223,8 @@ export function tick(game: Game, dt: number) {
       if (time < first) { first = time; target = player; }
     }
     if (!target) return first > 1;
+    // Retain hits between broadcasts. A round has at most six players × four hits.
+    game.hits.push({ owner: shot.owner, target: target.id, x: target.x, z: target.z, damage: Math.min(25, target.hp) });
     target.hp = Math.max(0, target.hp - 25);
     return false;
   });

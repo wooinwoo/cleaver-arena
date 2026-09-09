@@ -36,6 +36,8 @@ let soundEnabled = false;
 let audio: AudioContext | null = null;
 let toastTimer: ReturnType<typeof setTimeout>;
 let latestInput: Input = { x: 0, z: 0, yaw: 0, fire: false };
+let freshState = false;
+let hitAnimation: Animation | undefined;
 
 function openGame() {
   $('hub').hidden = true;
@@ -96,6 +98,7 @@ function connect(request: Record<string, unknown>) {
     if (thisSocket !== socket) return;
     const data = JSON.parse(event.data);
     if (data.type === 'joined') {
+      freshState = true;
       setBusy(false);
       reconnects = 0;
       myId = data.id;
@@ -109,7 +112,8 @@ function connect(request: Record<string, unknown>) {
       error.textContent = '';
     } else if (data.type === 'state') {
       state = data.game;
-      world.applyState(state!, myId);
+      world.applyState(state!, myId, freshState);
+      freshState = false;
       renderState();
     } else if (data.type === 'error' || data.type === 'expired') {
       setBusy(false);
@@ -319,12 +323,19 @@ $('flash').onclick = () => useSpell('flash');
 $('ghost').onclick = () => useSpell('ghost');
 
 function resetControls() {
+  hitAnimation?.cancel(); $('hit-confirm').textContent = '';
   keys.clear(); mouseFire = false; pulseUntil = 0; stick = { x: 0, z: 0 };
   destination = undefined; cursor = null;
   latestInput = { x: 0, z: 0, yaw: world?.yaw ?? 0, fire: false };
   if (world) world.input = latestInput;
   send({ type: 'input', input: latestInput });
   document.querySelectorAll<HTMLElement>('.pad-thumb').forEach(thumb => { thumb.style.transform = ''; });
+}
+
+function publishInput() {
+  if (!world) return;
+  world.onInput();
+  if (session && !document.hidden) send({ type: 'input', input: latestInput });
 }
 
 function isTyping(target: EventTarget | null) { return target instanceof HTMLInputElement || target instanceof HTMLSelectElement; }
@@ -338,9 +349,11 @@ window.addEventListener('keydown', event => {
   if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyQ'].includes(event.code)) {
     if (event.target instanceof HTMLButtonElement && event.code === 'Space') return;
     event.preventDefault(); keys.add(event.code);
+    if (!event.repeat && ['Space', 'KeyQ'].includes(event.code)) pulseUntil = performance.now() + 120;
+    if (!event.repeat) publishInput();
   }
 });
-window.addEventListener('keyup', event => { keys.delete(event.code); });
+window.addEventListener('keyup', event => { if (keys.delete(event.code)) publishInput(); });
 window.addEventListener('blur', resetControls);
 document.addEventListener('visibilitychange', () => { if (document.hidden) resetControls(); });
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement) resetControls(); });
@@ -366,15 +379,15 @@ canvas.addEventListener('mousedown', event => {
     if (event.button === 2) {
       const point = world.groundAt(cursor.x, cursor.y);
       if (point) destination = world.markDestination(point) ?? destination;
-      event.preventDefault(); return;
+      publishInput(); event.preventDefault(); return;
     }
   }
   if (event.button !== 0) return;
   if (world.view === 'fps' && document.pointerLockElement !== canvas) {
     if (canvas.requestPointerLock) Promise.resolve(canvas.requestPointerLock()).catch(() => toast('마우스 고정을 허용하거나 방향키로 이동해 주세요.'));
-  } else mouseFire = true;
+  } else { mouseFire = true; pulseUntil = performance.now() + 120; publishInput(); }
 });
-window.addEventListener('mouseup', event => { if (event.button === 0) mouseFire = false; });
+window.addEventListener('mouseup', event => { if (event.button === 0) { mouseFire = false; publishInput(); } });
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 
 function pad(id: string, aim: boolean) {
@@ -395,6 +408,7 @@ function pad(id: string, aim: boolean) {
     cursor = null;
     pointer = event.pointerId; lastX = event.clientX; didAim = false;
     element.setPointerCapture(pointer); update(event); event.preventDefault();
+    publishInput();
   });
   element.addEventListener('pointermove', event => { if (event.pointerId === pointer) update(event); });
   const end = (event: PointerEvent) => {
@@ -402,12 +416,13 @@ function pad(id: string, aim: boolean) {
     if (aim && didAim && event.type === 'pointerup') pulseUntil = performance.now() + 120;
     if (!aim) stick = { x: 0, z: 0 };
     pointer = null; thumb.style.transform = '';
+    publishInput();
   };
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) element.addEventListener(type, event => end(event as PointerEvent));
 }
 pad('move-pad', false); pad('aim-pad', true);
-$('fire').addEventListener('pointerdown', event => { $('fire').setPointerCapture(event.pointerId); mouseFire = true; event.preventDefault(); });
-for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) $('fire').addEventListener(type, () => { mouseFire = false; });
+$('fire').addEventListener('pointerdown', event => { $('fire').setPointerCapture(event.pointerId); mouseFire = true; pulseUntil = performance.now() + 120; publishInput(); event.preventDefault(); });
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) $('fire').addEventListener(type, () => { mouseFire = false; publishInput(); });
 
 $('sound').onclick = () => {
   soundEnabled = !soundEnabled;
@@ -440,6 +455,19 @@ try {
   world = new GameWorld(canvas);
   world.setMap(mapInput.value as ArenaMap);
   world.onShot = () => sound(360, .08);
+  world.onConfirm = (damage, x, y) => {
+    const indicator = $('hit-confirm');
+    indicator.textContent = `명중 · ${damage}`;
+    indicator.style.left = `${Math.max(50, Math.min(innerWidth - 50, x))}px`;
+    indicator.style.top = `${Math.max(90, Math.min(innerHeight - 100, y - 38))}px`;
+    hitAnimation?.cancel();
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    hitAnimation = indicator.animate([
+      { opacity: 1, transform: 'translate(-50%, -50%)' },
+      { opacity: 0, transform: reduced ? 'translate(-50%, -50%)' : 'translate(-50%, calc(-50% - 24px))' },
+    ], { duration: reduced ? 220 : 550, easing: 'ease-out' });
+    sound(720, .07);
+  };
   world.onFlash = () => {
     $('spell-feedback').classList.add('flash');
     setTimeout(() => $('spell-feedback').classList.remove('flash'), 450);

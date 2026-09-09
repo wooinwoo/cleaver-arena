@@ -4,11 +4,11 @@ import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
-import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game } from '../shared/game.ts';
+import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game, type Player } from '../shared/game.ts';
 import { attachTabletop } from './tabletop.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
-type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number };
+type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean };
 const publicDir = fileURLToPath(new URL('../dist/', import.meta.url));
 const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
 
@@ -111,7 +111,10 @@ export function createArenaServer() {
       if (!player) return;
       if (data.type === 'input') {
         const input = parseInput(data.input);
-        if (input) { player.input = input; client.lastInput = now; }
+        if (input) {
+          client.pendingFire ||= input.fire && game.phase === 'playing';
+          player.input = input; client.lastInput = now;
+        }
       } else if (data.type === 'spell') {
         const problem = castSpell(game, player.id, data.spell, data.yaw);
         if (problem) send(ws, { type: 'error', message: problem });
@@ -151,11 +154,16 @@ export function createArenaServer() {
   });
   const simulation = setInterval(() => {
     const now = Date.now();
+    const released: Player[] = [];
     for (const client of clients.values()) {
-      if (client.room && now - client.lastInput > 250) {
-        const player = client.room.game.players.find(p => p.id === client.id);
-        if (player) player.input = { x: 0, z: 0, yaw: player.yaw, fire: false };
+      const player = client.room?.game.players.find(p => p.id === client.id);
+      if (player && now - client.lastInput > 250) {
+        player.input = { x: 0, z: 0, yaw: player.yaw, fire: false };
+      } else if (player && client.pendingFire && client.room?.game.phase === 'playing' && !player.input.fire) {
+        // Preserve a press/release received together for one authoritative tick.
+        player.input.fire = true; released.push(player);
       }
+      client.pendingFire = false;
     }
     for (const [code, room] of rooms) {
       if (room.game.phase === 'countdown' && (room.disconnected.size > 0 || room.game.players.some(p => !p.connected))) {
@@ -170,6 +178,7 @@ export function createArenaServer() {
       if (room.game.players.every(p => p.bot)) { rooms.delete(code); continue; }
       tick(room.game, 1 / 30);
     }
+    for (const player of released) player.input.fire = false;
   }, 1000 / 30);
   const broadcast = setInterval(() => {
     for (const [ws, client] of clients) if (client.room) send(ws, { type: 'state', game: client.room.game });

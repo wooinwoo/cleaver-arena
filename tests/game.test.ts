@@ -35,16 +35,20 @@ test('authoritative shots, cooldown, four-hit elimination and rematch reset', ()
   for (let i = 0; i < 18; i++) tick(game, 1 / 30);
   assert.equal(b.hp, 75);
   assert.equal(game.nextShot, 1);
+  assert.deepEqual(game.hits, [{ owner: a.id, target: b.id, x: b.x, z: b.z, damage: 25 }]);
   for (let i = 0; i < 100; i++) tick(game, 1 / 30);
   assert.equal(b.hp, 0);
   assert.equal(game.phase, 'finished');
   assert.equal(game.winner, '첫째 승리');
+  assert.equal(game.hits.length, 4);
+  assert.ok(game.hits.every(hit => hit.owner === a.id && hit.target === b.id && hit.damage === 25));
   assert.equal(startRound(game), false);
   a.ready = b.ready = true;
   assert.equal(startRound(game), true);
   assert.equal(a.hp, 100); assert.equal(b.hp, 100);
   assert.equal(a.input.fire, false);
   assert.equal(game.round, 2);
+  assert.deepEqual(game.hits, []);
 });
 
 test('obstacles block projectiles and teammates do not take damage', () => {
@@ -52,11 +56,13 @@ test('obstacles block projectiles and teammates do not take damage', () => {
   a.x = -8; a.z = 2.8; b.x = -1; b.z = 2.8;
   for (let i = 0; i < 90; i++) tick(game, 1 / 30);
   assert.equal(b.hp, 100);
+  assert.deepEqual(game.hits, []);
   const team = duel('teams');
   addPlayer(team.game, 'c', '셋째').team = 1;
   team.a.team = team.b.team = 0;
   for (let i = 0; i < 60; i++) tick(team.game, 1 / 30);
   assert.equal(team.b.hp, 100);
+  assert.ok(team.game.hits.every(hit => hit.target !== team.b.id));
 });
 
 test('projectiles pass through disconnected players and hit connected opponents', () => {
@@ -66,6 +72,8 @@ test('projectiles pass through disconnected players and hit connected opponents'
   for (let i = 0; i < 16; i++) tick(game, 1 / 30);
   assert.equal(disconnected.hp, 100);
   assert.equal(b.hp, 75);
+  assert.equal(game.hits.length, 1);
+  assert.equal(game.hits[0].target, b.id);
 });
 
 test('bots aim at connected opponents instead of disconnected players', () => {
@@ -131,6 +139,36 @@ test('shots hit the first player along their path, before later players, obstacl
     assert.equal(b.hp, 75);
     assert.equal(game.shots.length, 0);
   }
+});
+
+test('a press and release received before the same simulation tick fire exactly once', async context => {
+  context.mock.timers.enable({ apis: ['setInterval'] });
+  const arena = createArenaServer();
+  await new Promise<void>(done => arena.server.listen(0, '127.0.0.1', done));
+  const { port } = arena.server.address() as { port: number };
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+  const message = () => new Promise<{ type: string; code: string; id: string }>(done => ws.once('message', raw => done(JSON.parse(raw.toString()))));
+  try {
+    await new Promise<void>(done => ws.once('open', done));
+    const joined = message();
+    ws.send(JSON.stringify({ type: 'create', name: '발사 검증', practice: true }));
+    const { code, id } = await joined;
+    const game = arena.rooms.get(code)!.game, player = game.players.find(p => p.id === id)!;
+    game.phase = 'playing';
+    game.players.find(p => p.bot)!.cooldown = 10;
+    const input = { x: 0, z: 0, yaw: Math.PI / 2, fire: true };
+    const pong = message();
+    ws.send(JSON.stringify({ type: 'input', input }));
+    ws.send(JSON.stringify({ type: 'input', input: { ...input, fire: false } }));
+    ws.send(JSON.stringify({ type: 'ping', time: 1 }));
+    assert.equal((await pong).type, 'pong');
+    assert.equal(player.input.fire, false);
+    context.mock.timers.tick(34);
+    assert.equal(game.shots.filter(shot => shot.owner === id).length, 1);
+    assert.equal(player.input.fire, false);
+    for (let i = 0; i < 30; i++) context.mock.timers.tick(34);
+    assert.equal(game.nextShot, 1);
+  } finally { ws.terminate(); await arena.close(); }
 });
 
 test('real WebSockets join, start, synchronize, isolate rooms, validate, reconnect and cancel countdown on leave', async () => {

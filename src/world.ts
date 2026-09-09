@@ -1,7 +1,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color.js';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder.js';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial.js';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
@@ -34,7 +34,7 @@ export class World {
   id = '';
   input: Input = { x: 0, z: 0, yaw: 0, fire: false };
   avatars = new Map<string, Avatar>();
-  projectiles = new Map<number, TransformNode>();
+  projectiles = new Map<number, { root: TransformNode; blade: TransformNode }>();
   private materials = new Map<string, StandardMaterial>();
   private model?: AssetContainer;
   private weapon?: AssetContainer;
@@ -46,6 +46,7 @@ export class World {
   private map: ArenaMap = 'ward';
   private elapsed = 0;
   private priorShot = -1;
+  private priorHit = 0;
   private snapshotAt = 0;
   private effects: { mesh: Mesh; started: number; duration: number }[] = [];
   private destinationMarker?: Mesh;
@@ -54,6 +55,7 @@ export class World {
   onFlash = () => {};
   onShot = () => {};
   onHit = () => {};
+  onConfirm = (_damage: number, _x: number, _y: number) => {};
 
   constructor(private canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false }, true);
@@ -354,9 +356,9 @@ export class World {
   reset() {
     this.clearEffects();
     for (const avatar of this.avatars.values()) this.disposeAvatar(avatar);
-    for (const shot of this.projectiles.values()) shot.dispose();
+    for (const shot of this.projectiles.values()) shot.root.dispose();
     this.avatars.clear(); this.projectiles.clear();
-    this.state = null; this.id = ''; this.priorShot = -1;
+    this.state = null; this.id = ''; this.priorShot = -1; this.priorHit = 0;
     this.preview.forEach(avatar => avatar.root.setEnabled(true));
   }
 
@@ -368,8 +370,8 @@ export class World {
     this.engine.resize();
   }
 
-  applyState(game: Game, id: string) {
-    const reset = !this.state || this.state.round !== game.round;
+  applyState(game: Game, id: string, fresh = false) {
+    const reset = fresh || !this.state || this.state.round !== game.round;
     if (reset) this.clearEffects();
     this.snapshotAt = performance.now();
     this.setMap(game.map);
@@ -399,13 +401,25 @@ export class World {
           avatar.root.position.x += (player.x - avatar.root.position.x) * amount;
           avatar.root.position.z += (player.z - avatar.root.position.z) * amount;
         }
-        if (avatar.hp > player.hp) this.onHit();
+        if (!reset && avatar.hp > player.hp) this.onHit();
       } else if (reset || (avatar.flashes !== undefined && avatar.flashes !== player.flashes)) avatar.root.position.set(player.x, 0, player.z);
       avatar.flashes = player.flashes;
       avatar.hp = player.hp;
       avatar.bar.scaling.x = Math.max(.001, player.hp / 100);
     }
     for (const [playerId, avatar] of this.avatars) if (!game.players.some(p => p.id === playerId)) { this.disposeAvatar(avatar); this.avatars.delete(playerId); }
+    const hits = game.hits ?? [];
+    if (!reset) for (const hit of hits.slice(this.priorHit)) {
+      this.impactEffect(hit.x, hit.z);
+      if (hit.owner === id) {
+        const rect = this.canvas.getBoundingClientRect();
+        const width = this.engine.getRenderWidth(), height = this.engine.getRenderHeight();
+        const point = Vector3.Project(new Vector3(hit.x, EYE_HEIGHT, hit.z), Matrix.Identity(), this.scene.getTransformMatrix(), this.camera.viewport.toGlobal(width, height));
+        const visible = point.z >= 0 && point.z <= 1;
+        this.onConfirm(hit.damage, rect.left + rect.width * (visible ? point.x / width : .5), rect.top + rect.height * (visible ? point.y / height : .5));
+      }
+    }
+    this.priorHit = hits.length;
     if (game.nextShot > this.priorShot && this.priorShot >= 0 && !reset) this.onShot();
     this.priorShot = game.nextShot;
   }
@@ -471,6 +485,21 @@ export class World {
     this.effects.push({ mesh, started: performance.now() / 1000, duration });
   }
 
+  private impactEffect(x: number, z: number) {
+    if (document.hidden) return;
+    const pieces: Mesh[] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI / 3;
+      const spark = this.box('hit-spark', [.1, .5, .1], [Math.sin(angle) * .3, Math.cos(angle) * .3, 0], '#fff2cd');
+      spark.material = this.material('#fff2cd', true); spark.rotation.z = -angle;
+      pieces.push(spark);
+    }
+    const mesh = Mesh.MergeMeshes(pieces, true, false)!;
+    mesh.name = 'hit-impact'; mesh.position.set(x, EYE_HEIGHT, z);
+    mesh.billboardMode = Mesh.BILLBOARDMODE_ALL; mesh.isPickable = false;
+    this.effects.push({ mesh, started: performance.now() / 1000, duration: .22 });
+  }
+
   private update(dt: number) {
     this.elapsed += dt;
     const game = this.state;
@@ -509,16 +538,20 @@ export class World {
     this.effects = this.effects.filter(effect => !effect.mesh.isDisposed());
     if (!this.input.target || !mine || Math.hypot(mine.x - this.input.target.x, mine.z - this.input.target.z) < .15 || game?.phase !== 'playing') this.destinationMarker?.setEnabled(false);
     for (const shot of game?.shots ?? []) {
-      let node = this.projectiles.get(shot.id);
-      if (!node) {
-        node = new TransformNode('shot-' + shot.id, this.scene);
-        this.cleaver(node, .85);
-        this.projectiles.set(shot.id, node);
+      let projectile = this.projectiles.get(shot.id);
+      if (!projectile) {
+        const root = new TransformNode('shot-' + shot.id, this.scene);
+        const blade = this.cleaver(root, .85);
+        const trail = this.box('cleaver-trail', [.08, .06, 1.35], [0, 0, -.7], '#ffe5a6', root);
+        trail.material = this.material('#ffe5a6', true); trail.visibility = .6; trail.isPickable = false;
+        projectile = { root, blade };
+        this.projectiles.set(shot.id, projectile);
       }
-      node.position.set(shot.x + shot.vx * lead, EYE_HEIGHT, shot.z + shot.vz * lead);
-      node.rotation.set(this.elapsed * 22, Math.atan2(shot.vx, shot.vz), Math.PI / 2);
+      projectile.root.position.set(shot.x + shot.vx * lead, EYE_HEIGHT, shot.z + shot.vz * lead);
+      projectile.root.rotation.y = Math.atan2(shot.vx, shot.vz);
+      projectile.blade.rotation.set(this.elapsed * 22, 0, Math.PI / 2);
     }
-    for (const [id, mesh] of this.projectiles) if (!game?.shots.some(s => s.id === id)) { mesh.dispose(); this.projectiles.delete(id); }
+    for (const [id, projectile] of this.projectiles) if (!game?.shots.some(s => s.id === id)) { projectile.root.dispose(); this.projectiles.delete(id); }
     const minePosition = this.avatars.get(this.id)?.root.position;
     if (this.view === 'fps') {
       // Cleavers travel at reticle height; body hitboxes remain a top-down circle on the server.
