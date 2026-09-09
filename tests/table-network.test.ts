@@ -47,7 +47,7 @@ test('all table games create/join/start/action; private poker views; wrong-game 
         assert.equal(snapshotB.room.game.variant, variant ?? 'animal');
       }
       assert.ok(snapshotA.room.players.every((p: Record<string, unknown>) => !('token' in p)));
-      const actions = { chess: { type: 'move', from: 'e2', to: 'e4' }, gomoku: { type: 'place', r: 7, c: 7 }, quoridor: { type: 'move', r: 7, c: 4 }, janggi: { type: 'move', from: 7, to: 4 }, poker: { type: 'call' } };
+      const actions = { splendor: { type: 'take', gems: [1, 1, 1, 0, 0] }, chess: { type: 'move', from: 'e2', to: 'e4' }, gomoku: { type: 'place', r: 7, c: 7 }, quoridor: { type: 'move', r: 7, c: 4 }, janggi: { type: 'move', from: 7, to: 4 }, poker: { type: 'call' } };
       b.send({ type: 'action', action: actions[kind], seat: 0 });
       assert.match((await b.wait(data => data.type === 'error')).message, /차례/);
       if (kind === 'poker') {

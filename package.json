@@ -11,6 +11,7 @@
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "tsx tests/browser.ts",
     "test:tables": "tsx tests/table-browser.ts",
+    "test:splendor": "tsx tests/splendor-browser.ts",
     "test:reconnect": "tsx tests/reconnect-browser.ts",
     "test:responsive": "tsx tests/responsive.ts"
   },

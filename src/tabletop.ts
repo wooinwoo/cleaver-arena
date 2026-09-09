@@ -6,9 +6,11 @@ import { JANGGI_VARIANTS, type JanggiState, type JanggiVariant, type PieceKind }
 import type { pokerView } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
 import type { PokerWorld } from './poker-world.ts';
+import type { splendorView } from '../shared/splendor.ts';
+import { renderSplendor } from './splendor.ts';
 
 type PublicPoker = ReturnType<typeof pokerView>;
-type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState;
+type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView>;
 type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -18,6 +20,7 @@ export function initTabletop(kind: TableId) {
   const config = TABLE_GAMES[kind];
   const variants: Record<string, { title: string; rules: string }> | null = kind === 'janggi' ? JANGGI_VARIANTS : kind === 'poker' ? POKER_VARIANTS : null;
   document.body.classList.add('in-table');
+  if (kind === 'splendor') document.body.classList.add('in-splendor');
   $('hub').hidden = true; $('lobby').hidden = true; $('loading').hidden = true;
   $('game').hidden = true;
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
@@ -112,6 +115,7 @@ export function initTabletop(kind: TableId) {
       const data = JSON.parse(event.data);
       if (data.type === 'joined') {
         busy(false); retries = 0;
+        if (kind === 'splendor') delete $('t-board').dataset.revision;
         session = { code: data.code, token: data.token };
         sessionStorage.setItem(key, JSON.stringify(session));
         history.replaceState(null, '', `/?game=${kind}&room=${data.code}`);
@@ -122,6 +126,7 @@ export function initTabletop(kind: TableId) {
         $('t-error').textContent = ''; render();
       } else if (data.type === 'error' || data.type === 'expired') {
         busy(false); $('t-error').textContent = data.message;
+        if (kind === 'splendor' && data.type === 'error') render();
         if (data.type === 'expired') resetEntry(data.message);
       }
     };
@@ -129,6 +134,7 @@ export function initTabletop(kind: TableId) {
       clearTimeout(timeout); busy(false);
       if (intentional || current !== ws) return;
       $('connection').textContent = '연결 끊김';
+      if (kind === 'splendor') render();
       if (session && retries < 10) {
         $('t-turn').textContent = '다시 연결 중…';
         timer = setTimeout(() => connect({ type: 'resume', game: kind, ...session }), Math.min(3000, 500 * 2 ** retries++));
@@ -159,7 +165,7 @@ export function initTabletop(kind: TableId) {
   $('t-leave').onclick = leave; $('games-menu').onclick = leave;
   $('t-confirm').onclick = () => { if (pending) { send({ type: 'action', action: pending }); pending = null; $<HTMLButtonElement>('t-confirm').disabled = true; } };
   $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; render(); };
-  function canAct() { return room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
+  function canAct() { return ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
   function choose(action: Action, text: string, button?: HTMLElement) {
     pending = action; $('t-choice').textContent = text; $<HTMLButtonElement>('t-confirm').disabled = false;
     $('t-board').querySelectorAll('.pending').forEach(cell => cell.classList.remove('pending'));
@@ -197,12 +203,14 @@ export function initTabletop(kind: TableId) {
       return;
     }
     $('t-log').textContent = room.game.log;
-    $('t-board').replaceChildren(); $('t-hands').replaceChildren();
+    if (kind !== 'splendor') $('t-board').replaceChildren();
+    $('t-hands').replaceChildren();
     $('t-toolbar').hidden = true;
-    $('t-action-bar').hidden = !canAct() || kind === 'poker';
+    $('t-action-bar').hidden = !canAct() || kind === 'poker' || kind === 'splendor';
     $('t-choice').textContent = kind === 'janggi' ? '움직일 말 또는 보유 말을 선택하세요' : '칸을 선택한 뒤 확정하세요';
     $<HTMLButtonElement>('t-confirm').disabled = true;
     switch (room.game.kind) {
+      case 'splendor': renderSplendor($('t-board'), room.game, room.me, playerName, canAct(), action => send({ type: 'action', action }), room.round); break;
       case 'gomoku': drawGomoku(room.game); break;
       case 'quoridor': drawQuoridor(room.game); break;
       case 'janggi': drawJanggi(room.game); break;

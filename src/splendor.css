@@ -1,0 +1,129 @@
+.in-splendor #table-page { max-width: 1420px; gap: 28px; }
+.in-splendor .table-status { max-width: none; }
+.in-splendor #t-board-wrap { overflow: visible; padding: 0; }
+.splendor-board { width: 100%; color: #f6f3df; font-variant-numeric: tabular-nums; }
+.splendor-board button { touch-action: manipulation; }
+.splendor-board button:focus-visible, .splendor-board input:focus-visible, .splendor-board summary:focus-visible { outline: 3px solid #d4f18d; outline-offset: 3px; }
+.splendor-board ::selection { background: #d4f18d; color: #173b3d; }
+.sp-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; }
+.sp-player { min-width: 0; padding: 12px 0; border-bottom: 1px solid #52716a; }
+.sp-player-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.sp-player-heading strong { overflow-wrap: anywhere; font-size: 14px; }
+.sp-score { white-space: nowrap; color: #d4f18d; font-size: 22px; }
+.sp-turn .sp-player-heading strong::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d4f18d; margin-right: 6px; }
+.sp-self .sp-player-heading strong { color: #d4f18d; }
+.sp-resource-row { display: flex; align-items: center; gap: 9px; margin: 5px 0; }
+.sp-row-label { font-size: 11px; color: #cbddd4; }
+.sp-amount { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; line-height: 1.5; white-space: nowrap; }
+.sp-gem { display: inline-block; width: 19px; height: 19px; flex: 0 0 auto; stroke-width: 1; stroke-linejoin: round; }
+.sp-color-0 { fill: #fff8e8; stroke: #687d8a; }
+.sp-color-1 { fill: #64b5f2; stroke: #153f75; }
+.sp-color-2 { fill: #80cc9b; stroke: #1b6641; }
+.sp-color-3 { fill: #f27d76; stroke: #852e43; }
+.sp-color-4 { fill: #35445a; stroke: #d3dce2; }
+.sp-color-5 { fill: #efd174; stroke: #7e581f; }
+.sp-collection summary { min-height: 32px; padding: 8px 0 0; font-size: 11px; color: #d8e4d8; cursor: pointer; }
+.sp-collection-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-top: 10px; }
+.sp-collection-cards .sp-card { padding: 6px; }
+.sp-collection-cards .sp-card-gem { display: none; }
+.sp-owned-noble { font-size: 11px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.sp-control { margin: 18px 0 12px; padding: 14px 16px; background: #234c4c; border-radius: 12px; scroll-margin-top: 16px; }
+.sp-hint { margin: 0; font-size: 13px; line-height: 1.7; }
+.sp-choice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sp-choice:empty { display: none; }
+.sp-choice button { min-height: 44px; font-size: 13px; }
+.sp-choice .primary { width: auto; margin: 0; }
+.sp-bank { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; }
+.sp-bank-token { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 3px 21px; border-radius: 12px; background: #294b4a; color: #f6f3df; min-width: 0; }
+.sp-bank-token > .sp-gem { width: 32px; height: 32px; }
+.sp-bank-token > span { font-size: 11px; }
+.sp-bank-token .sp-stock { position: absolute; top: 7px; right: 8px; font-size: 15px; }
+.sp-bank-token .sp-picked { position: absolute; bottom: 6px; color: #d4f18d; font-size: 11px; }
+.sp-bank-token:disabled { opacity: 1; cursor: default; }
+.sp-bank-token:disabled > .sp-gem { opacity: .7; }
+.sp-bank-token:not(:disabled):hover { background: #3b6260; }
+.sp-bank-token.is-picked { outline: 2px solid #d4f18d; outline-offset: -2px; }
+.sp-nobles { display: flex; gap: 8px; margin: 18px 0 20px; }
+.sp-noble { flex: 1; min-width: 0; padding: 12px 5px; background: #ceb77a; color: #243b3c; border-radius: 12px; }
+.sp-noble strong { display: block; font-size: 12px; margin-bottom: 8px; }
+.sp-noble .sp-cost { justify-content: center; }
+.sp-noble:disabled { opacity: 1; cursor: default; }
+.sp-noble.sp-eligible { background: #e6d49d; }
+.sp-noble:not(:disabled) { outline: 3px solid #d4f18d; outline-offset: 2px; }
+.sp-tier-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 16px 0 8px; }
+.sp-tier-heading h2, .sp-hand h2 { font-size: 16px; margin: 0; }
+.sp-tier-heading button { min-height: 40px; padding: 8px 12px; font-size: 11px; background: #315855; color: #e8efdf; }
+.sp-market-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.sp-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 10px; border-radius: 12px; background: #f0eedb; color: #203d3c; box-shadow: 0 4px 9px #061c2433; text-align: left; }
+.sp-card:disabled { opacity: 1; cursor: default; }
+.sp-card:not(:disabled):hover { background: #fffbe7; transform: translateY(-2px); }
+.sp-card.is-picked { outline: 3px solid #d4f18d; outline-offset: 2px; }
+.sp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.sp-points { font-size: 21px; }
+.sp-bonus { font-size: 14px; font-weight: 800; }
+.sp-card .sp-card-gem { width: 48px; height: 48px; align-self: center; margin: 6px 0 3px; }
+.sp-card-name { font-size: 11px; font-weight: 700; text-align: center; margin-bottom: 9px; }
+.sp-cost { display: flex; flex-wrap: wrap; gap: 3px 6px; margin-top: auto; }
+.sp-card .sp-cost { padding-top: 8px; border-top: 1px solid #abb7a4; min-height: 30px; }
+.sp-cost .sp-gem { width: 16px; height: 16px; }
+.sp-cost .sp-amount { gap: 2px; }
+.sp-empty-slot { display: grid; place-items: center; min-height: 110px; color: #c2d7c9; border: 1px dashed #648477; border-radius: 12px; font-size: 13px; }
+.sp-hand { margin-top: 24px; padding-top: 18px; border-top: 1px solid #52716a; }
+.sp-hand > p { margin: 7px 0 12px; }
+.sp-hand .sp-market-row > p { grid-column: 1 / -1; }
+.sp-muted { color: #d0dfd5; font-size: 12px; line-height: 1.6; }
+.sp-final { padding: 12px; background: #d4f18d; color: #173b3d; border-radius: 12px; font-size: 13px; font-weight: 700; }
+.sp-payment { flex-basis: 100%; display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.sp-payment > strong { flex-basis: 100%; font-size: 12px; }
+.sp-payment-color { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; color: #f6f3df; font-size: 11px; }
+.sp-payment-color input { width: 62px; min-height: 44px; padding: 7px; font-size: 16px; text-align: center; caret-color: #173b3d; }
+.sp-payment-total, .sp-payment > small { flex-basis: 100%; font-size: 12px; }
+.sp-returns { flex-basis: 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.sp-flight { position: fixed; z-index: 100; pointer-events: none; margin: 0; }
+@media (max-width: 1000px) {
+  .sp-resource-row { gap: 5px; }
+  .sp-resource-row .sp-gem { width: 15px; height: 15px; }
+  .sp-card { padding: 8px; }
+}
+@media (max-width: 760px) {
+  .in-splendor #table-page { gap: 18px; }
+  .sp-players { gap: 4px 12px; }
+  .sp-player-heading strong { font-size: 12px; }
+  .sp-score { font-size: 19px; }
+  .sp-resource-row { gap: 4px; }
+  .sp-resource-row .sp-row-label { width: 100%; font-size: 10px; }
+  .sp-resource-row { flex-wrap: wrap; }
+  .sp-resource-row .sp-amount { font-size: 11px; gap: 2px; }
+  .sp-resource-row .sp-gem { width: 14px; height: 14px; }
+  .sp-control { padding: 12px; margin-top: 14px; }
+  .sp-bank { gap: 5px; }
+  .sp-bank-token { padding-top: 18px; }
+  .sp-bank-token .sp-stock { top: 4px; right: 5px; font-size: 12px; }
+  .sp-bank-token > .sp-gem { width: 26px; height: 26px; }
+  .sp-bank-token > span { font-size: 10px; }
+  .sp-nobles { gap: 5px; margin: 14px 0; }
+  .sp-noble { padding: 10px 3px; }
+  .sp-noble strong { font-size: 10px; }
+  .sp-noble .sp-cost { gap: 2px; }
+  .sp-noble .sp-amount { font-size: 10px; }
+  .sp-noble .sp-gem { width: 13px; height: 13px; }
+  .sp-market-row { gap: 6px; }
+  .sp-card { padding: 7px 5px; }
+  .sp-points { font-size: 17px; }
+  .sp-bonus { font-size: 11px; }
+  .sp-card .sp-card-gem { width: 32px; height: 32px; }
+  .sp-card-name { font-size: 10px; margin-bottom: 6px; }
+  .sp-card .sp-cost { gap: 2px 4px; min-height: 42px; }
+  .sp-cost .sp-amount { font-size: 11px; }
+  .sp-cost .sp-gem { width: 13px; height: 13px; }
+  .sp-returns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sp-collection-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 360px) {
+  .sp-bank { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sp-bank-token { padding: 8px 3px 18px; }
+  .sp-resource-row { gap: 3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-card:not(:disabled):hover { transform: none; }
+}

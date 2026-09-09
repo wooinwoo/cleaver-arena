@@ -8,12 +8,14 @@ import { createQuoridor, actQuoridor } from '../shared/quoridor.ts';
 import { createJanggi, actJanggi, type JanggiVariant } from '../shared/janggi.ts';
 import { createPoker, actPoker, pokerView } from '../shared/poker.ts';
 import { createChess, actChess } from '../shared/chess.ts';
+import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
 }
 type TableVariant = JanggiVariant | PokerVariant;
 const definitions = {
+  splendor: (seats: number) => runtime(createSplendor(seats), actSplendor, splendorView),
   chess: (_: number) => runtime(createChess(), actChess),
   gomoku: (_: number) => runtime(createGomoku(), actGomoku),
   quoridor: (_: number) => runtime(createQuoridor(), actQuoridor),
@@ -42,6 +44,9 @@ export function attachTabletop(server: Server) {
   function end(room: Room) {
     room.phase = 'finished';
     room.result = room.match?.state.draw ? '무승부' : `${room.players.find(p => p.seat === room.match?.state.winner)?.name ?? '상대'} 승리`;
+    if (room.match?.state.kind === 'splendor' && room.match.state.winners.length > 1) {
+      room.result = `${room.match.state.winners.map(seat => room.players.find(p => p.seat === seat)?.name ?? `${seat + 1}번`).join(' · ')} 공동 승리`;
+    }
     room.players.forEach(p => { p.ready = false; });
   }
   function start(room: Room) {
