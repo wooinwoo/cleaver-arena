@@ -100,6 +100,7 @@ try {
   await a.keyboard.press('KeyF');
   await expect.poll(async () => (await state(b)).players[0].flashes).toBe(1);
   expect((await state(b)).players[0].x).toBeCloseTo(-1, 2);
+  await expect.poll(async () => (await state(a)).players[0].flashes).toBe(1);
   await a.keyboard.press('KeyF');
   expect((await state(a)).players[0].flashes).toBe(1);
   await a.keyboard.press('KeyG');
