@@ -11,7 +11,10 @@ const errors: string[] = [];
 try {
   const cases: { kind: TableId; variant?: 'animal' | 'genius' }[] = ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'].map(kind => ({ kind: kind as TableId }));
   cases.push({ kind: 'janggi', variant: 'genius' });
+  const target = process.argv.find(arg => arg.startsWith('--game='))?.slice(7);
+  if (target && !cases.some(({ kind }) => kind === target)) throw new Error(`Unknown game: ${target}`);
   for (const { kind, variant } of cases) {
+    if (target && kind !== target) continue;
     if (process.argv.includes('--poker-only') && kind !== 'poker') continue;
     const ca = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const cb = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -68,6 +71,14 @@ try {
       await a.getByRole('button', { name: '가로 벽', exact: true }).click();
       await move(a, [10]);
       await expect(b.locator('.q-wall')).toHaveCount(1);
+      for (const page of [a, b]) {
+        const wall = (await page.locator('.q-wall').boundingBox())!;
+        const left = (await page.locator('[data-cell="10"]').boundingBox())!;
+        const right = (await page.locator('[data-cell="11"]').boundingBox())!;
+        expect(Math.abs(wall.y + wall.height / 2 - left.y - left.height)).toBeLessThan(1);
+        expect(Math.abs(wall.x - left.x)).toBeLessThan(1);
+        expect(Math.abs(wall.x + wall.width - right.x - right.width)).toBeLessThan(1);
+      }
       await move(b, [13]);
       await expect(a.locator('#t-turn')).toContainText('내 차례!');
       await a.getByRole('button', { name: '말 이동', exact: true }).click();

@@ -118,6 +118,12 @@ test('chess ends on insufficient material after a capture', () => {
   assert.equal(chess.isInsufficientMaterial(), true);
 });
 
+test('chess ends on stalemate without checking the king', () => {
+  const chess = beforeLastMove('e3 a5 Qh5 Ra6 Qxa5 h5 Qxc7 Rah6 h4 f6 Qxd7+ Kf7 Qxb7 Qd3 Qxb8 Qh7 Qxc8 Kg6 Qe6');
+  assert.equal(chess.isStalemate(), true);
+  assert.equal(chess.isCheck(), false);
+});
+
 test('chess ends after fifty moves without pawn movement or capture', () => {
   const chess = beforeLastMove(`${captureOpening} Qc7 Ke4 Qe5+ Kf3 Bg7 Kg2 Qe3 Kh2 Kg4 Kh1 Bc3 Kg2 Bg7 Kh2 Qe1 Kg2 Bf8 Kh2 Kf3 Kh3 Qe5 Kh4 Qh2+ Kg5 Qg2+ Kh4 Qb2 Kg5 Qb7 Kf5 Qa8 Kg5 Bh6+ Kg6 Bc1 Kf5 Qb7 Kg6 Ba3 Kg7 Qb1 Kf8 Qb6 Kg7 Qb4 Kf8 Kf4 Kf7 Qb6 Kg7 Qe3 Kf8 Qc3 Kf7 Bb2 Kg6 Ba3 Kh5 Qg7 Kh4 Bc5 Kh3 Qh7+ Kg2 Kg4 Kf1 Kf3 Ke1 Bd6 Kd2 Qh1 Kd3 Qh3 Kc3 Qg3 Kd2 Qf4+ Kc2 Qd4 Kb1 Bf4 Ka2 Ke3 Ka3 Qc5+ Kb2 Qf5 Kb3 Ke4 Kb4 Be5 Kc5 Qh5 Kb6 Bh2 Kc6 Qc5+ Kd7 Qd4+ Kc6`);
   assert.equal(chess.isDrawByFiftyMoves(), true);
