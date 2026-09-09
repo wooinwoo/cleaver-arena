@@ -120,12 +120,14 @@ try {
 
   // Project the stationary opponent onto the same top-view camera used by the existing duel test.
   const target = await a.evaluate(() => {
-    const opponent = (window as unknown as { arenaState: Game }).arenaState.players[1];
+    const game = (window as unknown as { arenaState: Game }).arenaState, opponent = game.players[1];
     const rect = document.getElementById('game')!.getBoundingClientRect();
-    const aspect = rect.width / rect.height, distance = Math.max(29, 21 / Math.max(.35, aspect));
-    const depth = 1.25 * distance - 1.45 * .8 + opponent.z * .6;
+    const aspect = rect.width / rect.height;
+    const halfWidth = game.map === 'arena' ? 12 : 10, halfDepth = game.map === 'arena' ? 9 : 10;
+    const distance = Math.max(22, ((halfWidth + .6) / (Math.tan(.85 / 2) * aspect) + (halfDepth + .5) * .6 + 3.645 * .8) / 1.25);
+    const depth = 1.25 * distance - 2.2 * .8 + opponent.z * .6;
     return { x: rect.left + rect.width / 2 * (1 + opponent.x / (depth * Math.tan(.85 / 2) * aspect)),
-      y: rect.top + rect.height / 2 * (1 - (1.45 * .6 + opponent.z * .8) / (depth * Math.tan(.85 / 2))) };
+      y: rect.top + rect.height / 2 * (1 - (2.2 * .6 + opponent.z * .8) / (depth * Math.tan(.85 / 2))) };
   });
   await expect.poll(async () => {
     await a.mouse.move(target.x + 1, target.y); await a.mouse.move(target.x, target.y);

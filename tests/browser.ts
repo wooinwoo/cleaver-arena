@@ -34,12 +34,14 @@ async function page(mobile = false) {
 }
 async function finishDuel(a: Page, b: Page, label: string) {
   const target = await a.evaluate(() => {
-    const opponent = (window as unknown as { arenaState: Game }).arenaState.players[1];
+    const game = (window as unknown as { arenaState: Game }).arenaState, opponent = game.players[1];
     const rect = document.getElementById('game')!.getBoundingClientRect();
-    const aspect = rect.width / rect.height, distance = Math.max(29, 21 / Math.max(.35, aspect));
-    const depth = 1.25 * distance - 1.45 * .8 + opponent.z * .6;
+    const aspect = rect.width / rect.height;
+    const halfWidth = game.map === 'arena' ? 12 : 10, halfDepth = game.map === 'arena' ? 9 : 10;
+    const distance = Math.max(22, ((halfWidth + .6) / (Math.tan(.85 / 2) * aspect) + (halfDepth + .5) * .6 + 3.645 * .8) / 1.25);
+    const depth = 1.25 * distance - 2.2 * .8 + opponent.z * .6;
     return { x: rect.left + rect.width / 2 * (1 + opponent.x / (depth * Math.tan(.85 / 2) * aspect)),
-      y: rect.top + rect.height / 2 * (1 - (1.45 * .6 + opponent.z * .8) / (depth * Math.tan(.85 / 2))) };
+      y: rect.top + rect.height / 2 * (1 - (2.2 * .6 + opponent.z * .8) / (depth * Math.tan(.85 / 2))) };
   });
   await expect.poll(async () => {
     await a.mouse.move(target.x + 1, target.y); await a.mouse.move(target.x, target.y);
@@ -82,7 +84,7 @@ try {
   await a.mouse.move(720, 450);
   await expect.poll(() => a.evaluate(() => {
     const p = (window as unknown as { arenaState: Game }).arenaState.players[0];
-    return Math.abs(p.yaw - Math.atan2(-p.x, -1.45 * .75 - p.z));
+    return Math.abs(p.yaw - Math.atan2(-p.x, -2.2 * .75 - p.z));
   })).toBeLessThan(.08);
   const startX = await a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].x);
   await a.locator('#game').focus();

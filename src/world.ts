@@ -20,6 +20,8 @@ import '@babylonjs/core/Culling/ray.js';
 import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, type ArenaMap, type Game, type Input } from '../shared/game.ts';
 
 import { COLORS } from './palette.ts';
+const AVATAR_SCALE = 1.5;
+const EYE_HEIGHT = 2.2;
 type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; hp: number; color: string; instance?: InstantiatedEntries; clips?: AnimationGroup[]; animation?: string; flashes?: number };
 
 export class World {
@@ -106,6 +108,7 @@ export class World {
 
   private attachMundo(avatar: Avatar) {
     avatar.body.getChildren().forEach(node => node.dispose());
+    avatar.body.rotation.y = Math.PI;
     const instance = this.model!.instantiateModelsToScene(name => `${avatar.root.name}-${name}`, false, { doNotInstantiate: true });
     instance.rootNodes.forEach(node => { node.parent = avatar.body; });
     avatar.instance = instance;
@@ -281,6 +284,7 @@ export class World {
     const root = new TransformNode(id, this.scene);
     const body = new TransformNode(id + '-body', this.scene);
     body.parent = root;
+    body.scaling.setAll(AVATAR_SCALE);
     this.sphere('torso', [1.1, 1.25, .76], [0, .94, 0], color, body);
     this.box('shorts', [.76, .38, .66], [0, .42, 0], '#43516b', body);
     this.sphere('head', [.92, .82, .76], [0, 1.69, .12], color, body);
@@ -305,7 +309,8 @@ export class World {
     ring.parent = root; ring.position.y = .09; ring.material = this.material(color, true);
     const shadow = this.cylinder('contact-shadow', 1.2, .012, [0, .04, 0], '#557d74', root);
     shadow.scaling.z = .8;
-    const bar = this.box('health-bar', [.95, .08, .08], [0, 2.43, 0], color, root);
+    const bar = this.box('health-bar', [1.2, .08, .08], [0, 2.43 * AVATAR_SCALE, 0], color, root);
+    bar.billboardMode = Mesh.BILLBOARDMODE_ALL;
     const avatar = { root, body, arm, ring, bar, hp: 100, color };
     if (this.model) this.attachMundo(avatar);
     return avatar;
@@ -366,7 +371,7 @@ export class World {
     const y = screenY - rect.top;
     const ray: Ray = this.scene.createPickingRay(x, y, null, this.camera);
     if (Math.abs(ray.direction.y) < .001) return;
-    const distance = (1.45 - ray.origin.y) / ray.direction.y;
+    const distance = (EYE_HEIGHT - ray.origin.y) / ray.direction.y;
     const origin = this.avatars.get(this.id)?.root.position ?? Vector3.Zero();
     this.yaw = Math.atan2(ray.origin.x + ray.direction.x * distance - origin.x, ray.origin.z + ray.direction.z * distance - origin.z);
   }
@@ -401,21 +406,25 @@ export class World {
         this.cleaver(node, .85);
         this.projectiles.set(shot.id, node);
       }
-      node.position.set(shot.x, 1.45, shot.z);
+      node.position.set(shot.x, EYE_HEIGHT, shot.z);
       node.rotation.set(this.elapsed * 22, Math.atan2(shot.vx, shot.vz), Math.PI / 2);
     }
     for (const [id, mesh] of this.projectiles) if (!game?.shots.some(s => s.id === id)) { mesh.dispose(); this.projectiles.delete(id); }
     const minePosition = this.avatars.get(this.id)?.root.position;
     if (this.view === 'fps') {
       // Cleavers travel at reticle height; body hitboxes remain a top-down circle on the server.
-      this.camera.position.set(minePosition?.x ?? 0, 1.45, minePosition?.z ?? -6);
+      this.camera.position.set(minePosition?.x ?? 0, EYE_HEIGHT, minePosition?.z ?? -6);
       this.camera.setTarget(this.camera.position.add(new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw))));
       this.hand.setEnabled(!!mine && mine.hp > 0);
       this.hand.rotation.x = -.2 - Math.max(0, (mine?.cooldown ?? 0) - .35) * 2;
     } else {
       this.hand.setEnabled(false);
       const aspect = this.engine.getRenderWidth() / this.engine.getRenderHeight();
-      const distance = Math.max(29, 21 / Math.max(.35, aspect));
+      const halfWidth = this.map === 'arena' ? HALF_X : ARENA_RADIUS;
+      const halfDepth = this.map === 'arena' ? HALF_Z : ARENA_RADIUS;
+      // Fit enlarged players and health bars at the nearest court corners.
+      const distance = Math.max(22, ((halfWidth + .6) / (Math.tan(this.camera.fov / 2) * Math.max(.01, aspect)) +
+        (halfDepth + .5) * .6 + 2.43 * AVATAR_SCALE * .8) / 1.25);
       if (!game) {
         this.camera.position.set(distance * .5, distance * .8, -distance * .8);
         this.camera.setTarget(new Vector3(0, 0, 0));
