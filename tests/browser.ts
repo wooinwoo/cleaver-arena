@@ -62,6 +62,7 @@ async function finishDuel(a: Page, b: Page, label: string) {
   await a.screenshot({ path: output + `${label}-finished-desktop.png` });
 }
 try {
+  if (!process.argv.includes('--mobile-only')) {
   const a = await page(), b = await page();
   const onlyArena = process.argv.includes('--arena-only');
   if (!onlyArena) {
@@ -134,9 +135,17 @@ try {
     return state?.map === 'arena' && state.phase === 'playing';
   });
   await a.bringToFront();
-  await a.locator('#game').focus(); await a.keyboard.down('KeyW');
-  await a.waitForTimeout(950); await a.keyboard.up('KeyW');
-  await expect.poll(() => a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].z)).toBeGreaterThan(4);
+  const destination = await a.evaluate(() => {
+    const me = (window as unknown as { arenaState: Game }).arenaState.players[0];
+    const rect = document.getElementById('game')!.getBoundingClientRect(), aspect = rect.width / rect.height;
+    const distance = Math.max(22, (12.6 / (Math.tan(.85 / 2) * aspect) + 9.5 * .6 + 3.645 * .8) / 1.25);
+    const depth = 1.25 * distance + 6 * .6;
+    return { x: rect.left + rect.width / 2 * (1 + me.x / (depth * Math.tan(.85 / 2) * aspect)),
+      y: rect.top + rect.height / 2 * (1 - 6 * .8 / (depth * Math.tan(.85 / 2))) };
+  });
+  await a.mouse.click(destination.x, destination.y, { button: 'right' });
+  await expect.poll(() => a.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].input.target?.z)).toBeCloseTo(6, 1);
+  await expect.poll(() => b.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].z)).toBeGreaterThan(5.8);
   await a.screenshot({ path: output + 'arena-desktop-top.png' });
   await finishDuel(a, b, 'arena');
   await a.locator('#ready').click(); await b.locator('#ready').click();
@@ -147,6 +156,7 @@ try {
   console.log('PASS arena: host map shared with guest, four-hit win, result and map-preserving rematch.');
   await a.context().close();
   await b.context().close();
+  }
   const mobile = await page(true);
   await mobile.locator('#map').selectOption('arena');
   await mobile.locator('#map').selectOption('ward');
@@ -158,14 +168,17 @@ try {
   await mobile.locator('#ready').click();
   await mobile.waitForFunction(() => (window as unknown as { arenaState: Game }).arenaState?.phase === 'playing');
   await expect(mobile.locator('#touch-controls')).toBeVisible();
-  const initial = await mobile.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].z);
+  const initial = await mobile.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0]);
   const pad = await mobile.locator('#move-pad').boundingBox();
   const cdp = await mobile.context().newCDPSession(mobile);
   const point = { x: pad!.x + pad!.width / 2, y: pad!.y + 18 };
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, id: 1 }] });
   await mobile.waitForTimeout(400);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect.poll(() => mobile.evaluate(() => (window as unknown as { arenaState: Game }).arenaState.players[0].z)).toBeGreaterThan(initial + .4);
+  await expect.poll(() => mobile.evaluate(start => {
+    const current = (window as unknown as { arenaState: Game }).arenaState.players[0];
+    return (current.x - start.x) * Math.sin(start.yaw) + (current.z - start.z) * Math.cos(start.yaw);
+  }, initial)).toBeGreaterThan(.4);
   await mobile.screenshot({ path: output + 'mobile-fps-moving.png' });
   await expect(mobile.locator('#top-view')).toBeDisabled();
   await expect(mobile.locator('#crosshair')).toBeVisible();
@@ -182,5 +195,5 @@ try {
   const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   expect(overflow).toBe(false);
   expect(errors).toEqual([]);
-  console.log('PASS: Full duel, winner and rematch, ward boundary, both cameras, mobile touch movement/aim, portrait layout, no page errors.');
+  console.log('PASS mobile: first-person forward movement, touch aim, portrait layout and no page errors.');
 } finally { await browser.close(); }
