@@ -4,6 +4,9 @@ export const HALF_X = 12;
 export const HALF_Z = 9;
 export const SPEED = 5.5;
 export const RADIUS = 0.5;
+export const AVATAR_SCALE = 1.5;
+// Posed shoulders span about 1.5 model units at cleaver height; movement has its own radius.
+export const HIT_RADIUS = .75 * AVATAR_SCALE;
 export const COOLDOWN = 0.65;
 export const FLASH_COOLDOWN = 20;
 export const GHOST_COOLDOWN = 30;
@@ -219,7 +222,7 @@ export function tick(game: Game, dt: number) {
     let target: Player | undefined;
     for (const player of game.players) {
       if (!player.connected || player.hp <= 0 || player.id === shot.owner || (game.mode !== 'ffa' && player.team === shot.team)) continue;
-      const time = hitTime(player.x, player.z, oldX, oldZ, shot.x, shot.z, RADIUS + .15);
+      const time = hitTime(player.x, player.z, oldX, oldZ, shot.x, shot.z, HIT_RADIUS + .15);
       if (time < first) { first = time; target = player; }
     }
     if (!target) return first > 1;

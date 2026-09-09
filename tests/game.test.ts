@@ -65,6 +65,22 @@ test('obstacles block projectiles and teammates do not take damage', () => {
   assert.ok(team.game.hits.every(hit => hit.target !== team.b.id));
 });
 
+test('cleavers catch the enlarged body edge but miss outside it in every map and view', () => {
+  for (const map of ['arena', 'ward', 'baron'] as const) for (const view of ['top', 'fps'] as const) {
+    for (const [offset, expectedHp] of [[.8, 75], [1.1, 75], [1.3, 100], [-1.1, 75], [-1.3, 100]]) {
+      const game = createGame('EDGE', 'duel', map, view);
+      const shooter = addPlayer(game, 'a', '발사자'), target = addPlayer(game, 'b', '상대');
+      game.phase = 'playing';
+      shooter.x = -3; shooter.z = offset; target.x = 3; target.z = 0;
+      shooter.input = { x: 0, z: 0, yaw: Math.PI / 2, fire: true };
+      tick(game, 1 / 30); shooter.input.fire = false;
+      for (let frame = 0; frame < 20; frame++) tick(game, 1 / 30);
+      assert.equal(target.hp, expectedHp, `${map}/${view} offset ${offset}`);
+      assert.equal(game.hits.length, expectedHp === 75 ? 1 : 0);
+    }
+  }
+});
+
 test('projectiles pass through disconnected players and hit connected opponents', () => {
   const { game, b } = duel();
   const disconnected = addPlayer(game, 'offline', '접속 종료');

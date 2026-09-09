@@ -17,10 +17,9 @@ import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
 import '@babylonjs/loaders/glTF/glTFFileLoader.js';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_unlit.js';
 import '@babylonjs/core/Culling/ray.js';
-import { ARENA_RADIUS, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, moveInput, type ArenaMap, type Game, type Input } from '../shared/game.ts';
+import { ARENA_RADIUS, AVATAR_SCALE, HALF_X, HALF_Z, OBSTACLES, GHOST_MULTIPLIER, move, moveInput, type ArenaMap, type Game, type Input } from '../shared/game.ts';
 
 import { COLORS } from './palette.ts';
-const AVATAR_SCALE = 1.5;
 const EYE_HEIGHT = 2.2;
 type Avatar = { root: TransformNode; body: TransformNode; arm: TransformNode; ring: Mesh; bar: Mesh; ghost: TransformNode; hp: number; color: string; instance?: InstantiatedEntries; clips?: AnimationGroup[]; animation?: string; flashes?: number };
 
