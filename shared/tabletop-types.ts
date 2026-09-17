@@ -1,4 +1,4 @@
-export type TableGameId = 'quoridor' | 'gomoku' | 'janggi' | 'poker' | 'chess' | 'splendor';
+export type TableGameId = 'quoridor' | 'gomoku' | 'janggi' | 'poker' | 'chess' | 'splendor' | 'davinci' | 'coup';
 export type Action = { type: string; [key: string]: unknown };
 export type BaseState = {
   kind: TableGameId;

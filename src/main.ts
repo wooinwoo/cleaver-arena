@@ -194,7 +194,11 @@ function renderState() {
       resetControls();
       if (document.pointerLockElement) document.exitPointerLock();
       if (state.phase === 'finished') {
-        document.querySelector<HTMLElement>('.room-title')!.textContent = state.winner;
+        const title = document.querySelector<HTMLElement>('.room-title')!;
+        title.replaceChildren();
+        const head = state.winner.endsWith(' 승리') ? state.winner.slice(0, -' 승리'.length) : state.winner;
+        const headSpan = document.createElement('span'); headSpan.textContent = head; title.append(headSpan);
+        if (head !== state.winner) { const tail = document.createElement('span'); tail.className = 'title-suffix'; tail.textContent = ' 승리'; title.append(tail); }
         $('ready-help').textContent = '한 판 더? 모두 다시 준비하면 시작해요.';
         sound(me.hp > 0 ? 650 : 180, .3);
       }
@@ -203,6 +207,7 @@ function renderState() {
   }
   $('health').textContent = String(me.hp);
   $('health-fill').style.transform = `scaleX(${me.hp / 100})`;
+  $('health-fill').classList.toggle('low', me.hp > 0 && me.hp <= 25);
   $('spell-feedback').classList.toggle('ghost', state.phase === 'playing' && me.hp > 0 && me.ghostTime > 0);
   $('my-name').textContent = `${me.name}${me.hp <= 0 ? ' · 탈락' : ''}`;
   $('round').textContent = `ROUND ${state.round}`;
@@ -524,3 +529,36 @@ try {
 }
 }
 void boot();
+
+// 앱처럼 설치·실행하기 위한 서비스워커 등록. 실패해도 게임 플레이에는 영향이 없다.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(cause => console.warn('service worker skipped', cause));
+  });
+}
+
+// PWA 설치 버튼: 브라우저가 설치 신호를 주면 연결하고, iOS는 수동 추가 방법을 안내한다.
+{
+  type InstallPrompt = Event & { prompt: () => Promise<void> };
+  const installButton = $<HTMLButtonElement>('install-app');
+  const standalone = matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  let deferred: InstallPrompt | null = null;
+  if (!standalone) {
+    const ios = (/iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) &&
+      !(window as unknown as { MSStream?: unknown }).MSStream;
+    if (ios) {
+      installButton.hidden = false;
+      installButton.onclick = () => toast('공유 버튼을 누르고 홈 화면에 추가를 선택해 주세요.');
+    } else {
+      installButton.onclick = () => { void deferred?.prompt(); };
+      window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferred = event as InstallPrompt;
+        installButton.hidden = false;
+      });
+    }
+    window.addEventListener('appinstalled', () => { installButton.hidden = true; deferred = null; });
+  }
+}

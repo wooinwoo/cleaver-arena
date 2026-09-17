@@ -5,12 +5,16 @@ import type { QuoridorState } from '../shared/quoridor.ts';
 import { JANGGI_VARIANTS, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
 import type { pokerView } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
+import type { DaVinciView } from '../shared/davinci.ts';
+import { DAVINCI_COLOR_NAME } from '../shared/davinci.ts';
+import type { CoupView, CoupActionKind, CoupRole } from '../shared/coup.ts';
+import { COUP_ACTION_NAME, COUP_ACTION_COST, COUP_CLAIM, COUP_ROLE_NAME, coupBlockRoles } from '../shared/coup.ts';
 import type { PokerWorld } from './poker-world.ts';
 import type { splendorView } from '../shared/splendor.ts';
 import { renderSplendor } from './splendor.ts';
 
 type PublicPoker = ReturnType<typeof pokerView>;
-type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView>;
+type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView> | DaVinciView | CoupView;
 type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -49,6 +53,9 @@ export function initTabletop(kind: TableId) {
   let intentional = false, connecting = false, retries = 0, timer: ReturnType<typeof setTimeout>;
   let pending: Action | null = null, selectedPiece: number | null = null, drop: PieceKind | null = null;
   let wallMode: 'move' | 'h' | 'v' = 'move';
+  let davinciPick: { target: number; tile: number; num: number | null } | null = null;
+  let coupTargeting: CoupActionKind | null = null;
+  let coupKeep: string[] = [];
   let promotion = 'q';
   let pokerWorld: PokerWorld | null = null;
   let pokerLoading = false, pokerFailed = false, pokerLoadVersion = 0;
@@ -164,7 +171,7 @@ export function initTabletop(kind: TableId) {
   function leave() { intentional = true; clearTimeout(timer); send({ type: 'leave' }); ws?.close(); sessionStorage.removeItem(key); location.assign('/'); }
   $('t-leave').onclick = leave; $('games-menu').onclick = leave;
   $('t-confirm').onclick = () => { if (pending) { send({ type: 'action', action: pending }); pending = null; $<HTMLButtonElement>('t-confirm').disabled = true; } };
-  $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; render(); };
+  $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; davinciPick = null; render(); };
   function canAct() { return ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
   function choose(action: Action, text: string, button?: HTMLElement) {
     pending = action; $('t-choice').textContent = text; $<HTMLButtonElement>('t-confirm').disabled = false;
@@ -206,8 +213,8 @@ export function initTabletop(kind: TableId) {
     if (kind !== 'splendor') $('t-board').replaceChildren();
     $('t-hands').replaceChildren();
     $('t-toolbar').hidden = true;
-    $('t-action-bar').hidden = !canAct() || kind === 'poker' || kind === 'splendor';
-    $('t-choice').textContent = kind === 'janggi' ? '움직일 말 또는 보유 말을 선택하세요' : '칸을 선택한 뒤 확정하세요';
+    $('t-action-bar').hidden = !canAct() || kind === 'poker' || kind === 'splendor' || kind === 'coup';
+    $('t-choice').textContent = kind === 'janggi' ? '움직일 말 또는 보유 말을 선택하세요' : kind === 'davinci' ? '상대 타일을 고르고 숫자를 골라 주세요' : '칸을 선택한 뒤 확정하세요';
     $<HTMLButtonElement>('t-confirm').disabled = true;
     switch (room.game.kind) {
       case 'splendor': renderSplendor($('t-board'), room.game, room.me, playerName, canAct(), action => send({ type: 'action', action }), room.round); break;
@@ -216,8 +223,208 @@ export function initTabletop(kind: TableId) {
       case 'janggi': drawJanggi(room.game); break;
       case 'poker': drawPoker(room.game); break;
       case 'chess': drawChess(room.game); break;
+      case 'davinci': drawDavinci(room.game); break;
+      case 'coup': drawCoup(room.game); break;
     }
   }
+  function drawDavinci(game: DaVinciView) {
+    const board = $('t-board'); board.className = 'davinci-board';
+    const acting = canAct();
+    if (davinciPick && (!acting || game.stage !== 'guess' || game.hands[davinciPick.target]?.[davinciPick.tile]?.revealed)) davinciPick = null;
+    const toolbar = $('t-toolbar'); toolbar.hidden = false; toolbar.replaceChildren();
+    const mine = new Set(game.hands[room!.me].filter(tile => !tile.revealed).map(tile => `${tile.color}${tile.num}`));
+    if (acting) {
+      if (game.stage === 'draw') {
+        const draw = document.createElement('button'); draw.id = 't-draw'; draw.className = 'primary'; draw.textContent = `타일 뽑기 · 더미 ${game.deckCount}장`;
+        draw.onclick = () => send({ type: 'action', action: { type: 'draw' } });
+        toolbar.append(draw);
+      } else {
+        const target = davinciPick ? game.hands[davinciPick.target][davinciPick.tile] : null;
+        for (let num = 0; num <= 11; num++) {
+          const button = document.createElement('button'); button.classList.add('t-num'); button.dataset.num = String(num); button.textContent = String(num);
+          button.disabled = !target || target.failed.includes(num) || mine.has(`${target.color}${num}`);
+          button.onclick = () => {
+            const pick = davinciPick;
+            const picked = pick ? game.hands[pick.target]?.[pick.tile] : null;
+            if (!pick || !picked) return;
+            davinciPick = { ...pick, num };
+            choose({ type: 'guess', target: pick.target, tile: pick.tile, num }, `${DAVINCI_COLOR_NAME[picked.color]} ${num} 맞히기`,
+              toolbar.querySelector<HTMLElement>(`.t-num[data-num="${num}"]`) ?? undefined);
+          };
+          toolbar.append(button);
+        }
+        const stop = document.createElement('button'); stop.id = 't-davinci-stop'; stop.textContent = '추측 마치기';
+        stop.disabled = !game.guessed;
+        stop.onclick = () => { davinciPick = null; send({ type: 'action', action: { type: 'stop' } }); };
+        toolbar.append(stop);
+      }
+    } else if (game.stage === 'draw') {
+      const info = document.createElement('span'); info.textContent = `더미 ${game.deckCount}장`; toolbar.append(info);
+    }
+    if (davinciPick?.num != null && acting && game.stage === 'guess' && !game.hands[davinciPick.target][davinciPick.tile].revealed) {
+      const picked = game.hands[davinciPick.target][davinciPick.tile];
+      choose({ type: 'guess', target: davinciPick.target, tile: davinciPick.tile, num: davinciPick.num },
+        `${DAVINCI_COLOR_NAME[picked.color]} ${davinciPick.num} 맞히기`, toolbar.querySelector<HTMLElement>(`.t-num[data-num="${davinciPick.num}"]`) ?? undefined);
+    }
+    for (let seat = 0; seat < game.hands.length; seat++) {
+      const rack = document.createElement('section'); rack.className = 'davinci-rack'; rack.dataset.seat = String(seat);
+      if (room!.phase === 'playing' && game.turn === seat) rack.classList.add('davinci-turn');
+      const heading = document.createElement('header');
+      const hidden = game.hands[seat].filter(tile => !tile.revealed).length;
+      heading.append(document.createElement('strong'), document.createElement('span'));
+      heading.querySelector('strong')!.textContent = `${playerName(seat)}${seat === room!.me ? ' (나)' : ''}`;
+      heading.querySelector('span')!.textContent = hidden ? `숨은 타일 ${hidden}장` : '모두 공개됨';
+      rack.append(heading);
+      const tiles = document.createElement('div'); tiles.className = 'davinci-tiles';
+      game.hands[seat].forEach((tile, index) => {
+        const button = document.createElement('button');
+        button.className = `davinci-tile color-${tile.color}${tile.revealed ? ' revealed' : ''}${tile.id === game.drawnId ? ' drawn' : ''}`;
+        button.dataset.tile = String(index);
+        button.setAttribute('aria-label', `${playerName(seat)}의 ${DAVINCI_COLOR_NAME[tile.color]} 타일${tile.revealed ? ` ${tile.num} 공개됨` : tile.failed.length ? ` 제외 ${tile.failed.join(', ')}` : ''}`);
+        const value = document.createElement('b'); value.textContent = tile.num === null ? '?' : String(tile.num);
+        button.append(value);
+        if (tile.failed.length && !tile.revealed) {
+          const hints = document.createElement('small'); hints.textContent = tile.failed.join(' ');
+          hints.setAttribute('aria-hidden', 'true'); button.append(hints);
+        }
+        button.disabled = !acting || game.stage !== 'guess' || seat === room!.me || tile.revealed;
+        button.onclick = () => {
+          davinciPick = { target: seat, tile: index, num: null };
+          board.querySelectorAll('.pending').forEach(cell => cell.classList.remove('pending'));
+          button.classList.add('pending');
+          $('t-choice').textContent = `${playerName(seat)} ${DAVINCI_COLOR_NAME[tile.color]} 타일 · 숫자를 골라 주세요`;
+          $<HTMLButtonElement>('t-confirm').disabled = true;
+          toolbar.querySelectorAll<HTMLButtonElement>('.t-num').forEach(b => { b.disabled = tile.failed.includes(Number(b.dataset.num)) || mine.has(`${tile.color}${b.dataset.num}`); });
+        };
+        tiles.append(button);
+      });
+      rack.append(tiles); board.append(rack);
+    }
+  }
+
+  function drawCoup(game: CoupView) {
+    const board = $('t-board'); board.className = 'coup-board';
+    const interactive = ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.players.every(p => p.connected) && !finishedTable();
+    coupTargeting = coupTargeting && interactive ? coupTargeting : null;
+    const toolbar = $('t-toolbar'); toolbar.hidden = false; toolbar.replaceChildren();
+    const stage = game.stage;
+    const turnLabel = $('t-turn');
+    const act = (action: Record<string, unknown>) => send({ type: 'action', action });
+    const actButton = (label: string, className: string, disabled: boolean, onclick: () => void) => {
+      const button = document.createElement('button'); button.className = className; button.textContent = label; button.disabled = disabled; button.onclick = onclick; toolbar.append(button); return button;
+    };
+    if (stage.kind === 'reveal') {
+      turnLabel.textContent = `${playerName(stage.seat)} · 공개할 카드 선택${stage.seat === room!.me && interactive ? ' · 나!' : ''}`;
+      if (stage.seat === room!.me && interactive) {
+        const note = document.createElement('span'); note.textContent = stage.cause; toolbar.append(note);
+      }
+    } else if (stage.kind === 'exchange') {
+      turnLabel.textContent = `${playerName(stage.seat)} · 카드 교환 중${stage.seat === room!.me && interactive ? ' · 나!' : ''}`;
+      if (stage.seat === room!.me && interactive && stage.options) {
+        coupKeep = coupKeep.filter(id => stage.options!.some(card => card.id === id));
+        const need = game.players[room!.me].influence.filter(card => !card.revealed).length;
+        for (const card of stage.options) {
+          const button = document.createElement('button');
+          button.className = `coup-keep-card${coupKeep.includes(card.id) ? ' selected' : ''}`;
+          button.dataset.id = String(card.id);
+          button.textContent = COUP_ROLE_NAME[card.role];
+          button.onclick = () => {
+            coupKeep = coupKeep.includes(card.id) ? coupKeep.filter(id => id !== card.id) : [...coupKeep, card.id];
+            render();
+          };
+          toolbar.append(button);
+        }
+        const confirm = document.createElement('button'); confirm.id = 't-coup-keep'; confirm.className = 'primary'; confirm.textContent = `유지할 ${need}장 확정`;
+        confirm.disabled = coupKeep.length !== need;
+        confirm.onclick = () => act({ type: 'keep', cards: coupKeep });
+        toolbar.append(confirm);
+      }
+    } else if (stage.kind === 'react') {
+      const mine = stage.reactor === room!.me && interactive;
+      turnLabel.textContent = `${playerName(stage.reactor)}의 반응${mine ? ' · 나!' : ''}`;
+      if (mine) {
+        const claim = COUP_CLAIM[stage.action.kind];
+        const info = document.createElement('span');
+        info.textContent = `${playerName(stage.action.actor)}이(가) ${COUP_ACTION_NAME[stage.action.kind]} 선언`;
+        toolbar.append(info);
+        if (claim) actButton(`챌린지 (${COUP_ROLE_NAME[claim]} 주장 의심)`, 'coup-challenge', false, () => act({ type: 'challenge' }));
+        for (const role of coupBlockRoles(stage.action.kind)) actButton(`${COUP_ROLE_NAME[role]} 주장으로 저지`, 'coup-block', false, () => act({ type: 'block', role }));
+        actButton('그냥 보기', 'coup-pass', false, () => act({ type: 'pass' }));
+      }
+    } else if (stage.kind === 'blockReact') {
+      const mine = stage.reactor === room!.me && interactive;
+      turnLabel.textContent = `${playerName(stage.reactor)}의 반응${mine ? ' · 나!' : ''}`;
+      if (mine) {
+        const info = document.createElement('span');
+        info.textContent = `${playerName(stage.blocker)}이(가) ${COUP_ROLE_NAME[stage.role]} 주장으로 저지`;
+        toolbar.append(info);
+        actButton('저지 챌린지', 'coup-challenge', false, () => act({ type: 'challenge' }));
+        actButton('수락', 'coup-accept', false, () => act({ type: 'accept' }));
+      }
+    } else if (game.turn === room!.me && interactive) {
+      turnLabel.textContent = `${playerName(game.turn)} 차례 · 내 차례!`;
+      if (coupTargeting) {
+        const back = actButton('← 대상 다시 고르기', 'coup-cancel-target', false, () => { coupTargeting = null; render(); });
+        back.classList.add('coup-cancel-target');
+        for (const seat of game.players.map((_, index) => index)) {
+          if (seat === room!.me || game.players[seat].influence.every(card => card.revealed)) continue;
+          actButton(`${playerName(seat)}에게 ${COUP_ACTION_NAME[coupTargeting]}`, 'coup-target', false, () => {
+            const kind = coupTargeting!;
+            coupTargeting = null;
+            act({ type: 'act', kind, target: seat });
+          });
+        }
+      } else {
+        const me = game.players[room!.me];
+        for (const kind of Object.keys(COUP_ACTION_NAME) as CoupActionKind[]) {
+          const cost = COUP_ACTION_COST[kind];
+          const needsTarget = kind === 'coup' || kind === 'steal' || kind === 'assassinate';
+          const disabled = me.coins < cost || (me.coins >= 10 && kind !== 'coup');
+          const label = `${COUP_ACTION_NAME[kind]}${cost ? ` ${cost}코인` : ''}`;
+          const button = actButton(label, `coup-act coup-${kind}`, disabled, () => {
+            if (needsTarget) { coupTargeting = kind; render(); return; }
+            act({ type: 'act', kind });
+          });
+          button.dataset.kind = kind;
+          button.title = '';
+        }
+        const deck = document.createElement('span'); deck.textContent = `더미 ${game.deckCount}장`; toolbar.append(deck);
+      }
+    }
+    for (let seat = 0; seat < game.players.length; seat++) {
+      const row = document.createElement('section');
+      row.className = `coup-player${game.turn === seat && stage.kind === 'action' && !finishedTable() ? ' coup-turn' : ''}${stage.kind === 'reveal' && stage.seat === seat ? ' coup-revealing' : ''}`;
+      row.dataset.seat = String(seat);
+      const heading = document.createElement('header');
+      const title = document.createElement('strong');
+      title.textContent = `${playerName(seat)}${seat === room!.me ? ' (나)' : ''}`;
+      const coins = document.createElement('span');
+      coins.textContent = `${game.players[seat].coins}코인`;
+      heading.append(title, coins);
+      row.append(heading);
+      const cards = document.createElement('div'); cards.className = 'coup-cards';
+      game.players[seat].influence.forEach((card, index) => {
+        const face = document.createElement('button');
+        face.className = `coup-card${card.revealed ? ' revealed' : ''}`;
+        face.dataset.id = String(card.id);
+        face.textContent = card.role ? COUP_ROLE_NAME[card.role] : '?';
+        face.setAttribute('aria-label', `${playerName(seat)}의 ${card.revealed ? `공개된 ${card.role ? COUP_ROLE_NAME[card.role] : ''}` : '숨은 카드'}`);
+        if (stage.kind === 'reveal' && stage.seat === seat && seat === room!.me && !card.revealed && interactive) {
+          face.onclick = () => act({ type: 'reveal', index });
+        } else face.disabled = true;
+        cards.append(face);
+      });
+      row.append(cards);
+      board.append(row);
+    }
+    const status = document.createElement('p'); status.className = 'coup-log'; status.textContent = game.log.split(' ').slice(-14).join(' ');
+    board.append(status);
+  }
+
+  function finishedTable() {
+    return room?.game ? room.game.winner !== null || room.game.draw : false;
+  }
+
   function cell(label: string, index: number) {
     const button = document.createElement('button'); button.className = 'board-cell'; button.setAttribute('aria-label', label);
     button.dataset.cell = String(index); button.disabled = !canAct(); return button;
@@ -276,6 +483,10 @@ export function initTabletop(kind: TableId) {
         token.append(title, direction); button.append(token);
       }
       button.onclick = () => {
+        if (drop && piece) {
+          if (piece.owner === room!.me) drop = null;
+          else { $('t-error').textContent = '비어 있는 칸에 투입해 주세요.'; return; }
+        }
         if (drop) { choose({ type: 'drop', piece: drop, to: i }, `${PIECES[drop]} 투입`, button); }
         else if (piece?.owner === room!.me) {
           selectedPiece = i; pending = null;
@@ -389,6 +600,7 @@ export function initTabletop(kind: TableId) {
       const option = document.createElement('option'); option.value = value; option.textContent = name; select.append(option);
     }
     select.value = promotion;
+    select.disabled = !canAct();
     select.onchange = () => { promotion = select.value; if (pending?.promotion) pending.promotion = promotion; };
     toolbar.append(label, select);
     if (game.check) $('t-turn').textContent += ' · 체크!';

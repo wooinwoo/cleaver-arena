@@ -10,7 +10,7 @@ import { attachTabletop } from './tabletop.ts';
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
 type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean };
 const publicDir = fileURLToPath(new URL('../dist/', import.meta.url));
-const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
+const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 
 export function createArenaServer() {
   // ponytail: Rooms live in one process. Add shared state and room routing only when scaling beyond one server.

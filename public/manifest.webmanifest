@@ -1,0 +1,17 @@
+{
+  "name": "친구네 오락실 — 링크로 모여서 한 판",
+  "short_name": "친구네 오락실",
+  "description": "친구와 초대 링크로 만나는 일곱 가지 게임. 3D 식칼 피구, 쿼리도, 오목, 인디언포커, 십이장기, 체스, 스플렌더.",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#112f35",
+  "theme_color": "#112f35",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

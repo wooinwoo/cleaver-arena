@@ -9,7 +9,7 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 const errors: string[] = [];
 try {
-  const cases: { kind: TableId; variant?: 'animal' | 'genius' }[] = ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'].map(kind => ({ kind: kind as TableId }));
+  const cases: { kind: TableId; variant?: 'animal' | 'genius' }[] = ['gomoku', 'quoridor', 'davinci', 'coup', 'janggi', 'poker', 'chess'].map(kind => ({ kind: kind as TableId }));
   cases.push({ kind: 'janggi', variant: 'genius' });
   const target = process.argv.find(arg => arg.startsWith('--game='))?.slice(7);
   if (target && !cases.some(({ kind }) => kind === target)) throw new Error(`Unknown game: ${target}`);
@@ -87,6 +87,86 @@ try {
         if (r > 0) await move(b, [r % 2 ? 12 : 3]);
       }
       await expect(b.locator('[data-cell="4"] .seat-0')).toHaveCount(1);
+    } else if (kind === 'davinci') {
+      // 숨은 정보라 승자는 정해둘 수 없다. 순차 추측으로 반드시 끝나는 것과 프라이버시를 검증한다.
+      await expect(a.locator('.davinci-rack[data-seat="0"] .davinci-tile:not(.revealed) b').first()).toHaveText(/\d/);
+      await expect(b.locator('.davinci-rack[data-seat="0"] .davinci-tile:not(.revealed) b').first()).toHaveText('?');
+      await expect(a.locator('.davinci-rack[data-seat="1"] .davinci-tile:not(.revealed) b').first()).toHaveText('?');
+      await expect(a.locator('.davinci-rack[data-seat="0"] .davinci-tile.drawn')).toHaveCount(0);
+      await a.locator('#t-draw').click();
+      await expect(a.locator('.davinci-rack[data-seat="0"] .davinci-tile.drawn')).toHaveCount(1);
+      await expect(b.locator('.davinci-tile.drawn')).toHaveCount(0);
+      await a.screenshot({ path: output + 'davinci-start-desktop.png', fullPage: true });
+      await b.screenshot({ path: output + 'davinci-start-mobile.png', fullPage: true });
+      const controls = (page: Page) => page.locator('#t-toolbar button:enabled, #t-board button:enabled').count();
+      let page: Page = (await controls(a)) > 0 ? a : b;
+      for (let guard = 0; guard < 800; guard++) {
+        if ((await page.locator('#t-turn').textContent())?.includes('승리')) break;
+        const draw = page.locator('#t-draw');
+        if (await draw.count()) { await draw.click(); await page.waitForTimeout(80); continue; }
+        const tile = page.locator('.davinci-tile:enabled');
+        if (!(await tile.count())) break;
+        await tile.first().click();
+        const num = page.locator('.t-num:enabled');
+        await num.first().click();
+        await page.locator('#t-confirm').click();
+        await page.waitForTimeout(120);
+        const nextA = await controls(a);
+        page = nextA > 0 ? a : b;
+      }
+      await expect(a.locator('#t-turn')).toContainText('승리');
+      await expect(a.locator('#t-error')).toBeEmpty();
+      await expect(a.locator('.davinci-rack.davinci-turn')).toHaveCount(0);
+      const tileTexts = await a.locator('.davinci-tile b').allTextContents();
+      expect(tileTexts.length).toBeGreaterThanOrEqual(8);
+      expect(tileTexts.every(text => /\d/.test(text))).toBe(true);
+    } else if (kind === 'coup') {
+      // 숨은 역할은 물음표로만 보인다. 랜덤 봇으로 끝까지 진행해 승리·재경기를 검증한다.
+      await expect(a.locator('.coup-player[data-seat="0"] .coup-card:not(.revealed)').first()).toContainText(/공작|암살자|선장|대사|콘테스타/);
+      await expect(b.locator('.coup-player[data-seat="0"] .coup-card:not(.revealed)').first()).toContainText('?');
+      await expect(a.locator('.coup-player[data-seat="1"] .coup-card:not(.revealed)').first()).toContainText('?');
+      await a.screenshot({ path: output + 'coup-start-desktop.png', fullPage: true });
+      await b.screenshot({ path: output + 'coup-start-mobile.png', fullPage: true });
+      const actorPage = async (): Promise<Page> => {
+        if (await a.locator('#t-toolbar button:enabled, #t-board button:enabled').count()) return a;
+        return b;
+      };
+      for (let guard = 0; guard < 1200; guard++) {
+        const page = await actorPage();
+        if ((await page.locator('#t-turn').textContent())?.includes('승리')) break;
+        const reveal = page.locator('.coup-card:enabled');
+        if (await reveal.count()) { await reveal.first().click(); await page.waitForTimeout(90); continue; }
+        const keep = page.locator('.coup-keep-card');
+        if (await keep.count()) {
+          const need = Number((await page.locator('#t-coup-keep').textContent())?.match(/유지할 (\d)장/)?.[1] ?? 2);
+          for (let i = 0; i < need; i++) await keep.nth(i).click();
+          await page.locator('#t-coup-keep').click();
+          await page.waitForTimeout(90);
+          continue;
+        }
+        const passButton = page.locator('.coup-pass, .coup-accept');
+        if (await passButton.count()) {
+          const roll = Math.random();
+          const challenge = page.locator('.coup-challenge:enabled');
+          const block = page.locator('.coup-block:enabled');
+          if (roll < 0.15 && (await challenge.count())) await challenge.click();
+          else if (roll < 0.3 && (await block.count())) await block.click();
+          else await passButton.first().click();
+          await page.waitForTimeout(90);
+          continue;
+        }
+        const act = page.locator('.coup-act:enabled');
+        if (!(await act.count())) { await page.waitForTimeout(150); continue; }
+        await act.first().click();
+        await page.waitForTimeout(60);
+        const target = page.locator('.coup-target:enabled');
+        if (await target.count()) { await target.first().click(); }
+        await page.waitForTimeout(90);
+      }
+      await expect(a.locator('#t-turn')).toContainText('승리');
+      await expect(a.locator('#t-error')).toBeEmpty();
+      const revealedCount = await a.locator('.coup-card.revealed').count();
+      expect(revealedCount).toBeGreaterThanOrEqual(1);
     } else if (kind === 'janggi') {
       const moves = variant === 'genius' ? [[7, 4], [0, 3], [4, 1]] : [[7, 4], [1, 5], [10, 6], [0, 1], [9, 7]];
       for (const [i, cells] of moves.entries()) await move(i % 2 ? b : a, cells);
@@ -121,7 +201,7 @@ try {
       await expect(a.locator('.poker-card-value')).not.toContainText(['비공개']);
     }
     for (const page of [a, b]) {
-      await expect(page.locator('#t-turn')).toContainText(kind === 'poker' ? '승리' : `${kind === 'chess' ? '코랄' : '민트'}친구 승리`);
+      await expect(page.locator('#t-turn')).toContainText(kind === 'poker' || kind === 'davinci' || kind === 'coup' ? '승리' : `${kind === 'chess' ? '코랄' : '민트'}친구 승리`);
       await expect(page.locator('#t-ready')).toHaveText('다시 준비하기');
       await expect(page.locator('#t-board .board-cell:enabled')).toHaveCount(0);
       await expect(page.locator('#t-action-bar')).toBeHidden();

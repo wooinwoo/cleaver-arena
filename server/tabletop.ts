@@ -9,6 +9,8 @@ import { createJanggi, actJanggi, type JanggiVariant } from '../shared/janggi.ts
 import { createPoker, actPoker, pokerView } from '../shared/poker.ts';
 import { createChess, actChess } from '../shared/chess.ts';
 import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
+import { createDavinci, actDavinci, davinciView } from '../shared/davinci.ts';
+import { createCoup, actCoup, coupView } from '../shared/coup.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
@@ -21,6 +23,8 @@ const definitions = {
   quoridor: (_: number) => runtime(createQuoridor(), actQuoridor),
   janggi: (_: number, variant?: TableVariant) => runtime(createJanggi(variant === 'genius' ? 'genius' : 'animal'), actJanggi),
   poker: (seats: number, variant?: TableVariant) => runtime(createPoker(seats, variant === 'duel' ? 'duel' : 'party'), actPoker, pokerView),
+  davinci: (seats: number) => runtime(createDavinci(seats), actDavinci, davinciView),
+  coup: (seats: number) => runtime(createCoup(seats), actCoup, coupView),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
 type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number };

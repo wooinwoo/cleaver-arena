@@ -27,7 +27,7 @@
 .sp-collection-cards .sp-card { padding: 6px; }
 .sp-collection-cards .sp-card-gem { display: none; }
 .sp-owned-noble { font-size: 11px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.sp-control { margin: 18px 0 12px; padding: 14px 16px; background: #234c4c; border-radius: 12px; scroll-margin-top: 16px; }
+.sp-control { margin: 18px 0 12px; padding: 14px 16px; background: #234c4c; border-radius: 12px; scroll-margin-top: 16px; min-height: 128px; }
 .sp-hint { margin: 0; font-size: 13px; line-height: 1.7; }
 .sp-choice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sp-choice:empty { display: none; }
@@ -118,6 +118,10 @@
   .sp-cost .sp-gem { width: 13px; height: 13px; }
   .sp-returns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sp-collection-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .sp-players { grid-template-columns: minmax(0, 1fr); }
+  .sp-player { padding: 10px 0; }
 }
 @media (max-width: 360px) {
   .sp-bank { grid-template-columns: repeat(3, minmax(0, 1fr)); }
