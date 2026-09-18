@@ -40,6 +40,7 @@ let freshState = false;
 let hitAnimation: Animation | undefined;
 
 function openGame() {
+  if (!world) { location.assign('/?game=cleaver'); return; }
   $('hub').hidden = true;
   $('lobby').hidden = false;
   $('games-menu').hidden = false;
@@ -453,7 +454,8 @@ if (home) {
   document.body.classList.add('in-hub');
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('loading').hidden = true;
-  $<HTMLButtonElement>('choose-cleaver').disabled = true;
+  $('connection').textContent = '게임을 선택해 주세요';
+  return;
 }
 try {
   const { World: GameWorld } = await import('./world.ts');

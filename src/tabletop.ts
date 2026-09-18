@@ -88,7 +88,18 @@ export function initTabletop(kind: TableId) {
   name.value = localStorage.getItem('cleaver-name') ?? '';
   const invitation = new URLSearchParams(location.search).get('room');
   if (invitation) $<HTMLInputElement>('t-code-input').value = invitation.toUpperCase().slice(0, 6);
-  const send = (data: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); };
+  let submitting = false;
+  const send = (data: unknown) => {
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    const action = (data as { type?: string }).type === 'action';
+    if (action && submitting) return;
+    if (action) {
+      submitting = true;
+      $('t-board').setAttribute('aria-busy', 'true');
+      for (const button of document.querySelectorAll<HTMLButtonElement>('#t-board button, #t-toolbar button, #t-action-bar button')) button.disabled = true;
+    }
+    ws.send(JSON.stringify(data));
+  };
   function busy(value: boolean) {
     connecting = value;
     for (const element of $('t-entry').querySelectorAll<HTMLButtonElement | HTMLSelectElement>('button, select')) element.disabled = value;
@@ -120,8 +131,13 @@ export function initTabletop(kind: TableId) {
     ws.onmessage = event => {
       if (current !== ws) return;
       const data = JSON.parse(event.data);
+      if (['joined', 'table-state', 'error', 'expired'].includes(data.type)) {
+        submitting = false;
+        $('t-board').removeAttribute('aria-busy');
+      }
       if (data.type === 'joined') {
         busy(false); retries = 0;
+        $<HTMLButtonElement>('t-cancel').disabled = false;
         if (kind === 'splendor') delete $('t-board').dataset.revision;
         session = { code: data.code, token: data.token };
         sessionStorage.setItem(key, JSON.stringify(session));
@@ -130,18 +146,23 @@ export function initTabletop(kind: TableId) {
         $('t-code').textContent = data.code; $('connection').textContent = '연결됨';
       } else if (data.type === 'table-state') {
         room = data.room; pending = null; selectedPiece = null; drop = null;
+        $<HTMLButtonElement>('t-cancel').disabled = false;
         $('t-error').textContent = ''; render();
       } else if (data.type === 'error' || data.type === 'expired') {
         busy(false); $('t-error').textContent = data.message;
-        if (kind === 'splendor' && data.type === 'error') render();
+        $<HTMLButtonElement>('t-cancel').disabled = false;
+        if (data.type === 'error') render();
         if (data.type === 'expired') resetEntry(data.message);
       }
     };
     ws.onclose = () => {
       clearTimeout(timeout); busy(false);
       if (intentional || current !== ws) return;
+      submitting = false;
+      $('t-board').removeAttribute('aria-busy');
+      $<HTMLButtonElement>('t-cancel').disabled = false;
       $('connection').textContent = '연결 끊김';
-      if (kind === 'splendor') render();
+      render();
       if (session && retries < 10) {
         $('t-turn').textContent = '다시 연결 중…';
         timer = setTimeout(() => connect({ type: 'resume', game: kind, ...session }), Math.min(3000, 500 * 2 ** retries++));
@@ -172,7 +193,7 @@ export function initTabletop(kind: TableId) {
   $('t-leave').onclick = leave; $('games-menu').onclick = leave;
   $('t-confirm').onclick = () => { if (pending) { send({ type: 'action', action: pending }); pending = null; $<HTMLButtonElement>('t-confirm').disabled = true; } };
   $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; davinciPick = null; render(); };
-  function canAct() { return ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
+  function canAct() { return !submitting && ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
   function choose(action: Action, text: string, button?: HTMLElement) {
     pending = action; $('t-choice').textContent = text; $<HTMLButtonElement>('t-confirm').disabled = false;
     $('t-board').querySelectorAll('.pending').forEach(cell => cell.classList.remove('pending'));

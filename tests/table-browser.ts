@@ -72,6 +72,7 @@ try {
       await move(a, [10]);
       await expect(b.locator('.q-wall')).toHaveCount(1);
       for (const page of [a, b]) {
+        await expect(page.locator('.q-wall')).toBeVisible();
         const wall = (await page.locator('.q-wall').boundingBox())!;
         const left = (await page.locator('[data-cell="10"]').boundingBox())!;
         const right = (await page.locator('[data-cell="11"]').boundingBox())!;

@@ -1,50 +1,45 @@
-/* 친구네 오락실 서비스워커: 앱 셸을 가볍게 캐시한다. 게임 상태는 실시간 WebSocket이 담당하므로 API/WS는 건드리지 않는다. */
-const VERSION = 'cleaver-arena-v1';
+const PREFIX = 'cleaver-arena-';
+const CACHE = `${PREFIX}v2`;
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png'];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(VERSION).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith(PREFIX) && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()),
-  );
-});
+async function store(request, response) {
+  if (!response.ok) return;
+  try {
+    const copy = response.clone();
+    const cache = await caches.open(CACHE);
+    await cache.put(request, copy);
+  } catch {}
+}
 
 self.addEventListener('fetch', event => {
   const { request } = event;
-  if (request.method !== 'GET') return;
-  let url;
-  try {
-    url = new URL(request.url);
-  } catch {
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (request.mode === 'navigate' && url.pathname === '/') {
+    let timer;
+    const network = fetch(request);
+    event.waitUntil(network.then(response => !url.search ? store('/', response) : undefined).catch(() => {}));
+    event.respondWith(Promise.race([
+      network.then(response => { if (!response.ok) throw new Error('navigation failed'); return response; }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('navigation timeout')), 3000); }),
+    ]).catch(async () => await caches.match('/', { cacheName: CACHE }) ?? Response.error()).finally(() => clearTimeout(timer)));
     return;
   }
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname === '/ws' || url.pathname === '/table-ws' || url.pathname === '/health') return;
-
-  // 내비게이션(앱 실행)은 네트워크 우선, 실패 시 캐시된 셸로 폴백한다.
-  if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).then(res => {
-      const copy = res.clone();
-      caches.open(VERSION).then(cache => cache.put('/', copy));
-      return res;
-    }).catch(() => caches.match('/')));
-    return;
-  }
-
-  // 빌드 산출물(/assets/*)은 stale-while-revalidate, 그 외 정적 파일은 캐시 우선이다.
-  event.respondWith(
-    caches.match(request).then(hit => {
-      const network = fetch(request).then(res => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(VERSION).then(cache => cache.put(request, copy));
-        }
-        return res;
-      }).catch(() => hit);
-      return url.pathname.startsWith('/assets/') ? network.then(res => res || hit) : hit || network;
-    }),
-  );
+  const immutable = /^\/assets\/[^/]+-[\w-]+\.(js|css)$/.test(url.pathname);
+  const staticFile = url.pathname === '/club.woff2' || url.pathname === '/manifest.webmanifest' || /^\/icons\/[^/]+\.png$/.test(url.pathname) || /^\/models\/[^/]+\.glb$/.test(url.pathname);
+  if (!immutable && !staticFile) return;
+  const cached = caches.match(request, { cacheName: CACHE });
+  const network = cached.then(hit => {
+    if (immutable && hit) return hit;
+    return fetch(request);
+  });
+  event.waitUntil(network.then(response => store(request, response)).catch(() => {}));
+  event.respondWith(cached.then(hit => hit ?? network));
 });
