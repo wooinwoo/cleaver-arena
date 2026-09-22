@@ -14,7 +14,8 @@
     "test:splendor": "tsx tests/splendor-browser.ts",
     "test:splendor:edges": "tsx tests/splendor-edge-browser.ts",
     "test:reconnect": "tsx tests/reconnect-browser.ts",
-    "test:responsive": "tsx tests/responsive.ts"
+    "test:responsive": "tsx tests/responsive.ts",
+    "test:fit": "tsx tests/fit-browser.ts"
   },
   "dependencies": {
     "@babylonjs/core": "9.25.0",

@@ -29,6 +29,8 @@ function amount(color: number, count: number, label: string) {
 export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splendorView>, me: number,
   playerName: (seat: number) => string, active: boolean, send: (action: Action) => void, round: number) {
   const revision = `${round}:${game.revision}`;
+  const keptTier = board.querySelector<HTMLInputElement>('input[name="sp-tier"]:checked')?.value ?? '2';
+  const keptPane = board.querySelector<HTMLInputElement>('input[name="sp-pane"]:checked')?.value ?? 'market';
   const animate = board.dataset.revision !== undefined && board.dataset.revision !== revision && !matchMedia('(prefers-reduced-motion: reduce)').matches;
   const flights: { element: HTMLElement; from: DOMRect; scale: number }[] = [];
   if (animate && game.last) {
@@ -77,12 +79,27 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
     }
     details.append(list); row.append(heading, tokens, bonuses, details); standings.append(row);
   }); board.append(standings);
-  if (game.finalRound) board.append(node('p', 'sp-final', game.winner !== null || game.draw ? '경기 종료 · 최종 결과를 확인해 주세요.' : '마지막 라운드 · 마지막 참가자의 차례까지 진행해요.'));
+  const infoPane = node('div', 'sp-pane'); infoPane.dataset.pane = 'info';
+  infoPane.append(standings);
+  if (game.finalRound) infoPane.append(node('p', 'sp-final', game.winner !== null || game.draw ? '경기 종료 · 최종 결과를 확인해 주세요.' : '마지막 라운드 · 마지막 참가자의 차례까지 진행해요.'));
 
   const control = node('section', 'sp-control'); control.setAttribute('aria-label', '내 행동');
   const hint = node('p', 'sp-hint'); hint.id = 'sp-hint'; hint.setAttribute('role', 'status');
   const choice = node('div', 'sp-choice'); choice.id = 'sp-choice';
   control.append(hint, choice); board.append(control);
+  const paneTabs = node('div', 'sp-pane-tabs'); paneTabs.setAttribute('role', 'radiogroup'); paneTabs.setAttribute('aria-label', '보드 영역');
+  for (const [value, label] of [['market', '카드 시장'], ['info', '참가자·은행']] as const) {
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'sp-pane'; radio.value = value; radio.id = `sp-pane-${value}`;
+    radio.checked = value === keptPane;
+    radio.setAttribute('aria-label', label);
+    const tab = document.createElement('label'); tab.htmlFor = radio.id; tab.textContent = label;
+    radio.onchange = () => {
+      board.querySelectorAll<HTMLElement>('.sp-pane').forEach(pane => { pane.hidden = pane.dataset.pane !== radio.value; });
+    };
+    paneTabs.append(radio, tab);
+  }
+  board.append(paneTabs);
   const bank = node('div', 'sp-bank'); bank.setAttribute('aria-label', '공용 보석 공급처');
   const picked = [0, 0, 0, 0, 0];
   const bankButtons: HTMLButtonElement[] = [];
@@ -97,7 +114,7 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
       button.querySelector('small')!.textContent = picked[color] ? `선택 ${picked[color]}` : '';
       chooseGems();
     }; bankButtons.push(button); bank.append(button);
-  }); board.append(bank, node('p', 'sp-muted', '황금은 카드·더미 예약으로만 가져와요.'));
+  }); infoPane.append(bank, node('p', 'sp-muted', '황금은 카드·더미 예약으로만 가져와요.'));
   function clearPick() {
     picked.fill(0);
     for (const button of bankButtons) { button.classList.remove('is-picked'); button.setAttribute('aria-pressed', 'false'); button.querySelector('small')!.textContent = ''; }
@@ -174,9 +191,24 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
       control.scrollIntoView({ block: 'nearest', behavior: 'instant' });
     };
     nobles.append(tile);
-  } board.append(nobles);
+  } infoPane.append(nobles);
+  const marketPane = node('div', 'sp-pane'); marketPane.dataset.pane = 'market';
   const market = node('section', 'sp-market'); market.setAttribute('aria-label', '공개 카드 시장');
+  const tabs = node('div', 'sp-tier-tabs'); tabs.setAttribute('role', 'radiogroup'); tabs.setAttribute('aria-label', '공개 카드 단계');
   for (const tier of [2, 1, 0]) {
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'sp-tier'; radio.value = String(tier); radio.id = `sp-tier-${tier}`;
+    radio.checked = String(tier) === keptTier;
+    radio.setAttribute('aria-label', `${tier + 1}단계`);
+    const label = document.createElement('label'); label.htmlFor = radio.id; label.textContent = `${tier + 1}단계`;
+    radio.onchange = () => {
+      market.querySelectorAll<HTMLElement>('[data-pane]').forEach(pane => { pane.hidden = pane.dataset.pane !== radio.value; });
+    };
+    tabs.append(radio, label);
+  }
+  market.append(tabs);
+  for (const tier of [2, 1, 0]) {
+    const pane = node('div', 'sp-tier-pane'); pane.dataset.pane = String(tier); pane.hidden = String(tier) !== keptTier;
     const header = node('div', 'sp-tier-heading'); header.append(node('h2', '', `${tier + 1}단계`), button(`더미 예약 · ${game.remaining[tier]}장`, () => {
       clearPick(); hint.textContent = `${tier + 1}단계 맨 위 카드를 나만 보이게 예약해요.${game.bank[5] ? ' 황금 1개도 가져와요.' : ' 남은 황금은 없어요.'}`;
       choice.replaceChildren(button('더미에서 예약', () => submit({ type: 'reserve', tier }), false, true), button('선택 취소', chooseGems));
@@ -184,14 +216,17 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
     }, !active || game.stage !== 'action' || player.reserved.length >= 3 || !game.remaining[tier]));
     const row = node('div', 'sp-market-row'); row.dataset.tier = String(tier);
     for (const id of game.market[tier]) row.append(id === null ? node('div', 'sp-empty-slot', '소진') : cardFace(id, active && game.stage === 'action'));
-    market.append(header, row);
-  } board.append(market);
+    pane.append(header, row); market.append(pane);
+  } marketPane.append(market);
   const hand = node('section', 'sp-hand'); hand.setAttribute('aria-label', '내 예약 카드');
   hand.append(node('h2', '', `내 예약 카드 ${player.reserved.length}/3`), node('p', 'sp-muted', '다른 사람에게는 카드 내용이 보이지 않아요.'));
   const reservedRow = node('div', 'sp-market-row');
   for (const id of player.reserved) if (id !== null) reservedRow.append(cardFace(id, active && game.stage === 'action'));
   if (!player.reserved.length) reservedRow.append(node('p', 'sp-muted', '마음에 드는 카드를 예약하고 다음 차례에 구매할 수 있어요.'));
-  hand.append(reservedRow); board.append(hand);
+  hand.append(reservedRow); hand.hidden = player.reserved.length === 0; marketPane.append(hand);
+  marketPane.hidden = keptPane !== 'market';
+  infoPane.hidden = keptPane !== 'info';
+  board.append(marketPane, infoPane);
   if (!active) hint.textContent = game.winner !== null || game.draw ? '경기가 끝났어요. 방 정보에서 다시 준비할 수 있어요.' : '다른 참가자의 차례 또는 재접속을 기다리는 중이에요.';
   else if (game.stage === 'return') {
     const excess = player.tokens.reduce((sum, count) => sum + count, 0) - 10;

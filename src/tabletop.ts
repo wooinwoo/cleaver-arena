@@ -450,6 +450,13 @@ export function initTabletop(kind: TableId) {
       const coins = document.createElement('span');
       coins.textContent = `${game.players[seat].coins}코인`;
       heading.append(title, coins);
+      const revealedNames = game.players[seat].influence.filter(card => card.revealed && card.role).map(card => COUP_ROLE_NAME[card.role!]);
+      if (revealedNames.length) {
+        const names = document.createElement('small');
+        names.className = 'coup-revealed-names';
+        names.textContent = `공개: ${revealedNames.join('·')}`;
+        heading.append(names);
+      }
       row.append(heading);
       const cards = document.createElement('div'); cards.className = 'coup-cards';
       game.players[seat].influence.forEach((card, index) => {
@@ -500,12 +507,12 @@ export function initTabletop(kind: TableId) {
   }
   function drawQuoridor(game: QuoridorState) {
     const toolbar = $('t-toolbar'); toolbar.hidden = false; toolbar.replaceChildren();
-    for (const [mode, label] of [['move', '말 이동'], ['h', '가로 벽'], ['v', '세로 벽']] as const) {
-      const button = document.createElement('button'); button.textContent = label;
+    for (const [mode, label, hint] of [['move', '말 이동', '인접한 칸으로 이동해요'], ['h', '가로 벽', '칸 아래에 가로 벽 · 길을 완전히 막는 벽은 안 돼요'], ['v', '세로 벽', '칸 오른쪽에 세로 벽 · 길을 완전히 막는 벽은 안 돼요']] as const) {
+      const button = document.createElement('button'); button.textContent = label; button.title = hint;
       button.classList.toggle('selected', wallMode === mode); button.disabled = !canAct();
       button.onclick = () => { wallMode = mode; pending = null; render(); }; toolbar.append(button);
     }
-    const counts = document.createElement('span'); counts.textContent = `남은 벽 · 나 ${game.remaining[room!.me]} / 상대 ${game.remaining[1 - room!.me]} · 길을 완전히 막는 벽은 안 돼요`; toolbar.append(counts);
+    const counts = document.createElement('span'); counts.textContent = wallMode === 'move' ? `남은 벽 · 나 ${game.remaining[room!.me]} / 상대 ${game.remaining[1 - room!.me]}` : `나 ${game.remaining[room!.me]} · 상대 ${game.remaining[1 - room!.me]}`; toolbar.append(counts);
     const board = $('t-board'); board.className = 'quoridor-board';
     for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
       const button = cell(`${r + 1}행 ${c + 1}열`, r * 9 + c);
@@ -563,6 +570,7 @@ export function initTabletop(kind: TableId) {
         button.onclick = () => { drop = piece; selectedPiece = null; pending = null; $('t-choice').textContent = `${PIECES[piece]} 투입 · 빈칸을 고르세요`; $<HTMLButtonElement>('t-confirm').disabled = true; }; hand.append(button);
       }); $('t-hands').append(hand);
     }
+    $('t-hands').hidden = game.hands.every(hand => !hand.length);
   }
   function drawPoker(game: PublicPoker) {
     const board = $('t-board'); board.className = 'poker-table poker-3d-table';
@@ -655,7 +663,7 @@ export function initTabletop(kind: TableId) {
       n: 'M13 9l5 3 7-5 4 13-5 4 1 6H13l3-10-7 2-3-5Z M12 30h16l3 5H9Z M22 15h1',
       p: 'M26 12a6 6 0 1 1-12 0a6 6 0 1 1 12 0Z M17 19h6l3 11H14Z M12 30h16l3 5H9Z',
     };
-    const toolbar = $('t-toolbar'); toolbar.hidden = false; toolbar.replaceChildren();
+    const toolbar = $('t-toolbar'); toolbar.hidden = !game.legal.some(move => move.promotion); toolbar.replaceChildren();
     const label = document.createElement('label'); label.htmlFor = 't-promotion'; label.textContent = '폰 승격';
     const select = document.createElement('select'); select.id = 't-promotion'; select.setAttribute('aria-label', '폰 승격 기물');
     for (const [value, name] of [['q', '퀸'], ['r', '룩'], ['b', '비숍'], ['n', '나이트']]) {

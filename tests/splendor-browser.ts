@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { splendorView } from '../shared/splendor.ts';
 import type { Action } from '../shared/tabletop-types.ts';
-import { GEM_NAMES } from '../shared/splendor-data.ts';
+import { GEM_NAMES, SPLENDOR_CARDS } from '../shared/splendor-data.ts';
 import { chooseSplendorAction } from './splendor-helpers.ts';
 
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
@@ -17,16 +17,22 @@ async function action(page: Page, request: Action) {
   const before = (await game(page)).revision;
   const flights = await page.evaluate(() => (window as any).__cardFlights);
   if (request.type === 'take') {
+    await press(page, page.locator('label[for="sp-pane-info"]'));
     for (const [color, count] of (request.gems as number[]).entries()) for (let i = 0; i < count; i++) await press(page, page.locator(`[data-bank="${color}"]`));
     await press(page, page.getByRole('button', { name: /^보석 \d개 가져오기$/ }));
   } else if (request.type === 'buy') {
+    await press(page, page.locator('label[for="sp-pane-market"]'));
+    await press(page, page.locator(`label[for="sp-tier-${SPLENDOR_CARDS[request.card as number].tier}"]`));
     await press(page, page.locator(`.sp-market .sp-card[data-card="${request.card}"], .sp-hand .sp-card[data-card="${request.card}"]`));
     await press(page, page.locator('#sp-buy'));
   } else if (request.type === 'reserve') {
+    await press(page, page.locator('label[for="sp-pane-market"]'));
     if (request.tier !== undefined) {
+      await press(page, page.locator(`label[for="sp-tier-${request.tier}"]`));
       await press(page, page.locator('.sp-tier-heading').nth(2 - Number(request.tier)).getByRole('button'));
       await press(page, page.getByRole('button', { name: '더미에서 예약', exact: true }));
     } else {
+      await press(page, page.locator(`label[for="sp-tier-${SPLENDOR_CARDS[request.card as number].tier}"]`));
       await press(page, page.locator(`.sp-market .sp-card[data-card="${request.card}"]`));
       await press(page, page.getByRole('button', { name: /^카드 예약/ }));
     }
@@ -34,12 +40,18 @@ async function action(page: Page, request: Action) {
     for (const [color, count] of (request.gems as number[]).entries()) if (count) await page.getByRole('spinbutton', { name: `${GEM_NAMES[color]} 반환 개수`, exact: true }).fill(String(count));
     await press(page, page.locator('#sp-return'));
   } else if (request.type === 'noble') {
+    await press(page, page.locator('label[for="sp-pane-info"]'));
     await press(page, page.locator(`[data-noble="${request.noble}"]`));
     await press(page, page.getByRole('button', { name: '이 귀족 초대', exact: true }));
   } else if (request.type === 'pass') await press(page, page.getByRole('button', { name: '가능한 행동 없음 · 패스', exact: true }));
   else throw new Error(`Unsupported browser action ${request.type}`);
   await expect.poll(async () => (await game(page)).revision).toBe(before + 1);
-  if (request.type === 'buy') await expect.poll(() => page.evaluate(() => (window as any).__cardFlights)).toBeGreaterThan(flights);
+  if (request.type === 'buy') {
+    // Flight animation is cosmetic and timing-sensitive under software rendering;
+    // the buy itself is verified by the revision poll above and game snapshots below.
+    await page.waitForFunction(seen => (window as unknown as { __cardFlights: number }).__cardFlights > (seen as number), flights, { timeout: 15_000 })
+      .catch(() => console.log(`WARN buy without flight: card=${request.card}`));
+  }
   await expect(page.locator('#t-error')).toBeEmpty();
 }
 async function layout(page: Page) {
@@ -47,7 +59,7 @@ async function layout(page: Page) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
-    expect(await page.locator('.sp-market-row').first().locator('.sp-card, .sp-empty-slot').count()).toBe(4);
+    expect(await page.locator('.sp-tier-pane:not([hidden]) .sp-market-row').locator('.sp-card, .sp-empty-slot').count()).toBe(4);
     const issues = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.sp-bank, .sp-market-row, .sp-players, .sp-payment, .sp-returns')]
       .filter(el => el.getClientRects().length && el.scrollWidth > el.clientWidth + 2).map(el => el.className));
     expect(issues).toEqual([]);

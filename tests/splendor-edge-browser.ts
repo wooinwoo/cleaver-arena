@@ -76,7 +76,7 @@ try {
     await press('.sp-tier-heading:first-child button'); await page.getByRole('button', { name: '더미에서 예약', exact: true }).click(); await settled();
     expect(state.stage).toBe('return'); expect(state.turn).toBe(0);
     await expect(page.locator('[data-bank]:enabled')).toHaveCount(0);
-    await expect(page.locator('.sp-market .sp-card:enabled')).toHaveCount(0);
+    await expect(page.locator('.sp-tier-pane:not([hidden]) .sp-card:enabled')).toHaveCount(0);
     await page.reload(); await expect(page.locator('#sp-return')).toBeVisible();
     const returning = page.getByRole('spinbutton', { name: '황금 반환 개수', exact: true });
     for (const invalid of ['', '0.5', '-1', '2']) { await returning.fill(invalid); await expect(page.locator('#sp-return')).toBeDisabled(); }
@@ -92,8 +92,9 @@ try {
     await press(hand(10)); await expect(page.locator('.sp-payment')).toContainText('무료'); await press('#sp-buy'); await settled();
     expect(state.stage).toBe('noble'); expect(state.finalRound).toBe(false); expect(state.winner).toBeNull();
     await expect(page.locator('.sp-noble:enabled')).toHaveCount(2);
-    await expect(page.locator('[data-bank]:enabled, .sp-market .sp-card:enabled')).toHaveCount(0);
+    await expect(page.locator('[data-bank]:enabled, .sp-tier-pane:not([hidden]) .sp-card:enabled')).toHaveCount(0);
     await page.reload(); await expect(page.locator('.sp-noble:enabled')).toHaveCount(2);
+    await press('label[for="sp-pane-info"]');
     await press('[data-noble="6"]'); await page.getByRole('button', { name: '이 귀족 초대', exact: true }).click(); await settled();
     expect(state.players[3].nobles).toEqual([6]); expect(state.nobles).toContain(5);
     expect(splendorScore(state.players[3])).toBe(15); expect(state.winner).toBe(3);
