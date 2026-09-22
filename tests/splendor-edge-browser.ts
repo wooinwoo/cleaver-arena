@@ -73,7 +73,8 @@ try {
     // Reserving with ten pieces must pause for a return, including returning the gold just taken.
     state = createSplendor(2); state.revision = 20;
     state.players[0].tokens = [2, 2, 2, 2, 2, 0]; state.bank = [2, 2, 2, 2, 2, 5]; await refresh();
-    await press('.sp-tier-heading:first-child button'); await page.getByRole('button', { name: '더미에서 예약', exact: true }).click(); await settled();
+    await press('label[for="sp-tier-2"]');
+    await press('.sp-tier-pane:not([hidden]) .sp-tier-heading button'); await page.getByRole('button', { name: '더미에서 예약', exact: true }).click(); await settled();
     expect(state.stage).toBe('return'); expect(state.turn).toBe(0);
     await expect(page.locator('[data-bank]:enabled')).toHaveCount(0);
     await expect(page.locator('.sp-tier-pane:not([hidden]) .sp-card:enabled')).toHaveCount(0);

@@ -136,6 +136,8 @@ export function initTabletop(kind: TableId) {
       if (['joined', 'table-state', 'error', 'expired'].includes(data.type)) {
         submitting = false;
         $('t-board').removeAttribute('aria-busy');
+        // Errors leave state unchanged but lock action buttons; force a rebuild.
+        if (data.type === 'error' || data.type === 'expired') lastRenderSig = '';
       }
       if (data.type === 'joined') {
         busy(false); retries = 0;
@@ -164,6 +166,7 @@ export function initTabletop(kind: TableId) {
       submitting = false;
       $('t-board').removeAttribute('aria-busy');
       $<HTMLButtonElement>('t-cancel').disabled = false;
+      lastRenderSig = '';
       $('connection').textContent = '연결 끊김';
       render();
       if (session && retries < 10) {
