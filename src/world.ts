@@ -52,6 +52,7 @@ export class World {
   private destinationMarker?: Mesh;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   onInput = () => {};
+  onMapModel: (status: 'loading' | 'ready' | 'fallback') => void = () => {};
   onFlash = () => {};
   onShot = () => {};
   onHit = () => {};
@@ -195,12 +196,14 @@ export class World {
   private async loadBaron() {
     if (this.baron || this.baronLoading) return;
     this.baronLoading = true;
+    this.onMapModel('loading');
     try {
       const response = await fetch('/models/baron-pit.glb');
       if (!response.ok) throw new Error(`맵 다운로드 실패: ${response.status}`);
       this.baron = await LoadAssetContainerAsync(new Uint8Array(await response.arrayBuffer()), this.scene, { pluginExtension: '.glb' });
       if (this.map === 'baron') this.buildArena();
-    } catch { this.canvas.dataset.mapModel = 'fallback'; }
+      this.onMapModel('ready');
+    } catch { this.canvas.dataset.mapModel = 'fallback'; this.onMapModel('fallback'); }
     finally { this.baronLoading = false; }
   }
 

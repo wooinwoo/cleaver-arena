@@ -460,6 +460,10 @@ if (home) {
 try {
   const { World: GameWorld } = await import('./world.ts');
   world = new GameWorld(canvas);
+  world.onMapModel = status => {
+    if (status === 'loading') toast('바론 둥지 불러오는 중…');
+    else if (status === 'fallback') toast('바론 둥지를 불러오지 못해 기본 지형으로 표시해요.');
+  };
   world.setMap(mapInput.value as ArenaMap);
   world.onShot = () => sound(360, .08);
   world.onConfirm = (damage, x, y) => {
@@ -520,8 +524,9 @@ try {
   }
   world.onInput = updateInput;
   setInterval(() => {
+    if (document.hidden) return;
     updateInput();
-    if (session && !document.hidden) send({ type: 'input', input: latestInput });
+    if (session) send({ type: 'input', input: latestInput });
   }, 50);
   setInterval(() => { if (session) send({ type: 'ping', time: Date.now() }); }, 3000);
 } catch (cause) {
