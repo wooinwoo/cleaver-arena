@@ -22,13 +22,18 @@ async function peer(path: string, request: object) {
   return ws;
 }
 async function check(page: Page, surface: string, hud = false) {
+  // Installed-app eligibility adds a real header control absent in headless Chrome.
+  if (!hud) await page.evaluate(() => { document.getElementById('install-app')!.hidden = false; });
   for (const [width, height] of sizes) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => new Promise(requestAnimationFrame));
-    const issues = await page.evaluate(({ hud }) => {
+    const issues = await page.evaluate(({ hud, fitPage }) => {
       const found: string[] = [];
       if (document.documentElement.scrollWidth > innerWidth + 1) found.push('page horizontal overflow');
+      if (fitPage && document.documentElement.scrollHeight > innerHeight + 1) found.push(`page vertical overflow ${document.documentElement.scrollHeight} > ${innerHeight}`);
+      const hub = document.querySelector<HTMLElement>('#hub');
+      if (fitPage && document.body.classList.contains('in-hub') && hub && hub.scrollHeight > hub.clientHeight + 1) found.push('game finder vertical overflow');
       const visible = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
       for (const selector of ['header', '#hub', '#lobby', '#t-board-wrap', '#t-players', '.table-status', '.poker-table', '#t-toolbar', '#t-action-bar', '.coup-board', '.davinci-board', '.poker-bet-size', '.table-invite', '.spell-settings']) {
         const el = document.querySelector<HTMLElement>(selector);
@@ -66,7 +71,7 @@ async function check(page: Page, surface: string, hud = false) {
         if (rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1)) found.push(`button outside viewport: ${(button.textContent ?? '').trim().slice(0, 24)}`);
       }
       return found;
-    }, { hud });
+    }, { hud, fitPage: width <= 480 && height >= 568 && (surface === 'hub' || /entry|room|result/.test(surface)) });
     failures.push(...issues.map(issue => `${surface} ${width}x${height}: ${issue}`));
     if ([320, 667, 768, 1440].includes(width)) await page.screenshot({ path: `${output}${surface}-${width}x${height}.png`, fullPage: !hud });
   }
@@ -76,7 +81,7 @@ try {
   await context.addInitScript('window.__name = (fn) => fn;');
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
-  for (const kind of (process.env.CLEAVER_ONLY === '1' ? [] : ['gomoku', 'quoridor', 'janggi', 'poker', 'chess'])) {
+  for (const kind of (process.env.CLEAVER_ONLY === '1' ? [] : ['gomoku', 'quoridor', 'janggi', 'poker', 'chess', 'davinci', 'coup', 'splendor'])) {
     await page.goto(`${base}/?game=${kind}`);
     await check(page, `${kind}-entry`);
     await page.locator('#t-name').fill('가나다라마바사아자차카타');
@@ -108,7 +113,25 @@ try {
   for (const view of ['top', 'fps']) {
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#choose-cleaver')).toBeEnabled({ timeout: 60_000 });
-    if (view === 'top') await check(page, 'hub');
+    if (view === 'top') {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(6);
+      await page.setViewportSize({ width: 667, height: 375 });
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(6);
+      await page.locator('#game-next').click();
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(3);
+      await page.locator('#game-previous').click();
+      await check(page, 'hub');
+      await page.locator('#game-search').fill('숫자');
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(1);
+      await page.locator('#game-search').fill('');
+      await page.locator('.game-filters [data-filter="mind"]').click();
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(3);
+      await page.locator('#game-search').fill('없는게임');
+      await expect(page.locator('#game-empty')).toBeVisible();
+      await page.locator('#game-reset').click();
+      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(9);
+    }
     await page.locator('#choose-cleaver').click();
     await page.locator('#loading').waitFor({ state: 'hidden', timeout: 60_000 });
     if (view === 'top') await check(page, 'cleaver-entry');

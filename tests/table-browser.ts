@@ -215,6 +215,11 @@ try {
       await expect(page.locator('#t-error')).toBeEmpty();
     }
     const resultLabel = variant ? `${kind}-${variant}` : kind;
+    await expect(b.locator('#t-board-wrap')).toBeHidden();
+    await b.locator('#t-result-review').click();
+    await expect(b.locator('#t-board-wrap')).toBeVisible();
+    await b.locator('#t-result-review').click();
+    expect(await b.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true);
     await a.screenshot({ path: output + `${resultLabel}-finished-desktop.png`, fullPage: true });
     await b.screenshot({ path: output + `${resultLabel}-finished-mobile.png`, fullPage: true });
     await a.locator('#t-ready').click(); await b.locator('#t-ready').tap();

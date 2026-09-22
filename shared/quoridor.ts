@@ -30,7 +30,8 @@ function open(walls: Wall[], from: Position, to: Position): boolean {
       && (wall.r === from.r || wall.r + 1 === from.r));
 }
 
-function moves(state: QuoridorState, seat: number): Position[] {
+/** Legal pawn targets: one step, a jump over a facing opponent, or the diagonal side-steps when the jump is blocked. */
+export function quoridorMoves(state: QuoridorState, seat: number): Position[] {
   const from = state.pawns[seat];
   const opponent = state.pawns[1 - seat];
   const legal: Position[] = [];
@@ -78,7 +79,7 @@ export function actQuoridor(state: QuoridorState, seat: number, action: Action):
   const { r, c } = action;
   if (action.type === 'move') {
     if (!integer(r, 0, 8) || !integer(c, 0, 8)) return '올바른 칸을 선택하세요.';
-    if (!moves(state, seat).some(to => same(to, { r, c }))) return '그 칸으로 이동할 수 없습니다.';
+    if (!quoridorMoves(state, seat).some(to => same(to, { r, c }))) return '그 칸으로 이동할 수 없습니다.';
     state.pawns[seat] = { r, c };
     state.log = `${seat + 1}번 플레이어가 말을 움직였습니다.`;
     if (r === (seat === 0 ? 0 : 8)) {

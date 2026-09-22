@@ -1,7 +1,7 @@
 import { TABLE_GAMES, POKER_VARIANTS, type PokerVariant, type TableId } from '../shared/catalog.ts';
 import type { Action } from '../shared/tabletop-types.ts';
 import type { GomokuState } from '../shared/gomoku.ts';
-import type { QuoridorState } from '../shared/quoridor.ts';
+import { quoridorMoves, type QuoridorState } from '../shared/quoridor.ts';
 import { JANGGI_VARIANTS, janggiTargets, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
 import type { pokerView } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
@@ -12,6 +12,8 @@ import { COUP_ACTION_NAME, COUP_ACTION_COST, COUP_ACTION_RULE, COUP_CLAIM, COUP_
 import type { PokerWorld } from './poker-world.ts';
 import type { splendorView } from '../shared/splendor.ts';
 import { renderSplendor } from './splendor.ts';
+import { gameWaiting, gameAccent, gameIdentity } from './ui/game-art.ts';
+import { openRules } from './ui/rules-dialog.ts';
 
 type PublicPoker = ReturnType<typeof pokerView>;
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView> | DaVinciView | CoupView;
@@ -24,6 +26,7 @@ export function initTabletop(kind: TableId) {
   const config = TABLE_GAMES[kind];
   const variants: Record<string, { title: string; rules: string }> | null = kind === 'janggi' ? JANGGI_VARIANTS : kind === 'poker' ? POKER_VARIANTS : null;
   document.body.classList.add('in-table');
+  document.body.style.setProperty('--game-accent', gameAccent(kind));
   if (kind === 'splendor') document.body.classList.add('in-splendor');
   $('hub').hidden = true; $('lobby').hidden = true; $('loading').hidden = true;
   $('game').hidden = true;
@@ -33,7 +36,7 @@ export function initTabletop(kind: TableId) {
   const section = document.createElement('section'); section.id = 'table-page';
   section.innerHTML = `
     <aside class="table-sidebar">
-      <h1>${config.title}</h1><p class="table-description">${config.description}</p>
+      ${gameIdentity(kind, config.title, config.description)}
       <form id="t-entry"><label for="t-name">내 닉네임</label><input id="t-name" maxlength="12" autocomplete="nickname" placeholder="친구들이 알아볼 이름" required />
         ${variants ? `<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note">${Object.entries(variants).map(([value, rule]) => `<option value="${value}">${rule.title}</option>`).join('')}</select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>` : ''}
         <button class="primary" type="submit">방 만들기</button><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="방 코드 6자리"/><button type="button" id="t-join">입장</button></div></form>
@@ -43,11 +46,19 @@ export function initTabletop(kind: TableId) {
       <button id="t-leave" class="text-button">다른 게임 고르기</button>
     </aside>
     <div class="table-stage"><div class="table-status"><span id="t-round">친구를 기다리는 중</span><strong id="t-turn" role="status">방을 만들거나 입장해 주세요</strong></div>
-      <div id="t-toolbar" hidden></div><div id="t-hands"></div><div id="t-board-wrap"><div id="t-board" class="empty-board"><strong>같이 하면 더 재밌으니까.</strong><p>친구에게 초대 링크를 보내고<br />모두 준비를 눌러 주세요.</p></div></div>
+      <button id="t-result-review" type="button" aria-expanded="false" aria-controls="t-board-wrap" hidden>마지막 보드 보기</button>
+      <div id="t-toolbar" hidden></div><div id="t-hands"></div><div id="t-board-wrap"><div id="t-board" class="empty-board">${gameWaiting(kind, config.title)}</div></div>
       <div id="t-action-bar" hidden><span id="t-choice">칸을 선택하세요</span><button id="t-confirm" class="primary" disabled>선택한 수 확정</button><button id="t-cancel">취소</button></div>
       <p id="t-log" role="status"></p>
     </div>`;
   document.body.append(section);
+  const resultReview = $<HTMLButtonElement>('t-result-review');
+  resultReview.onclick = () => {
+    const open = !document.body.hasAttribute('data-result-review');
+    document.body.toggleAttribute('data-result-review', open);
+    resultReview.setAttribute('aria-expanded', String(open));
+    resultReview.textContent = open ? '보드 접기' : '마지막 보드 보기';
+  };
   let ws: WebSocket | null = null, room: RoomState | null = null;
   let session: { code: string; token: string } | null = null;
   let intentional = false, connecting = false, retries = 0, timer: ReturnType<typeof setTimeout>;
@@ -80,7 +91,14 @@ export function initTabletop(kind: TableId) {
   }
   if (variant) variant.onchange = renderRules;
   renderRules();
-  rules.open = !compact.matches;
+  rules.open = false;
+  // The sidebar row never expands in place: any toggle opens the centred rules dialog instead.
+  rules.addEventListener('toggle', () => {
+    if (!rules.open) return;
+    rules.open = false;
+    const selected = variants ? variants[room?.variant ?? variant.value] : null;
+    openRules(kind, config.title, selected ? selected.rules : config.rules, selected?.title);
+  });
   compact.addEventListener('change', () => {
     roomDetails.open = room?.phase !== 'playing' || !compact.matches;
     if (room?.phase === 'playing' && compact.matches) rules.open = false;
@@ -216,10 +234,14 @@ export function initTabletop(kind: TableId) {
     lastRenderSig = sig;
     if (document.body.dataset.tablePhase !== room.phase) {
       document.body.dataset.tablePhase = room.phase;
+      document.body.removeAttribute('data-result-review');
+      resultReview.setAttribute('aria-expanded', 'false');
+      resultReview.textContent = '마지막 보드 보기';
       roomDetails.open = room.phase !== 'playing' || !compact.matches;
       if (room.phase === 'playing' && compact.matches) rules.open = false;
     }
     const me = room.players.find(p => p.seat === room!.me)!;
+    resultReview.hidden = room.phase !== 'finished';
     $('t-ready').hidden = room.phase === 'playing';
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? '다시 준비하기' : '준비하기';
     const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
@@ -237,7 +259,7 @@ export function initTabletop(kind: TableId) {
     if (!room.game) {
       disposePoker();
       $('t-board').className = 'empty-board';
-      $('t-board').textContent = '친구가 모이면 모두 준비를 눌러 주세요.';
+      $('t-board').innerHTML = gameWaiting(kind, config.title);
       $('t-hands').replaceChildren(); $('t-log').textContent = '';
       $('t-toolbar').hidden = true; $('t-action-bar').hidden = true;
       return;
@@ -511,16 +533,30 @@ export function initTabletop(kind: TableId) {
   }
   function drawQuoridor(game: QuoridorState) {
     const toolbar = $('t-toolbar'); toolbar.hidden = false; toolbar.replaceChildren();
-    for (const [mode, label, hint] of [['move', '말 이동', '인접한 칸으로 이동해요'], ['h', '가로 벽', '칸 아래에 가로 벽 · 길을 완전히 막는 벽은 안 돼요'], ['v', '세로 벽', '칸 오른쪽에 세로 벽 · 길을 완전히 막는 벽은 안 돼요']] as const) {
+    for (const [mode, label, hint] of [['move', '말 이동', '초록 칸으로 한 칸 이동 · 상대와 마주 보면 뛰어넘어요'], ['h', '가로 벽', '칸 아래에 가로 벽 · 길을 완전히 막는 벽은 안 돼요'], ['v', '세로 벽', '칸 오른쪽에 세로 벽 · 길을 완전히 막는 벽은 안 돼요']] as const) {
       const button = document.createElement('button'); button.textContent = label; button.title = hint;
       button.classList.toggle('selected', wallMode === mode); button.disabled = !canAct();
       button.onclick = () => { wallMode = mode; pending = null; render(); }; toolbar.append(button);
     }
     const counts = document.createElement('span'); counts.textContent = wallMode === 'move' ? `남은 벽 · 나 ${game.remaining[room!.me]} / 상대 ${game.remaining[1 - room!.me]}` : `나 ${game.remaining[room!.me]} · 상대 ${game.remaining[1 - room!.me]}`; toolbar.append(counts);
     const board = $('t-board'); board.className = 'quoridor-board';
+    // Moving: only legal targets stay clickable, and jumps or side-steps around the opponent are labelled.
+    const moving = wallMode === 'move' && canAct();
+    const mine = game.pawns[room!.me];
+    const legal = moving ? quoridorMoves(game, room!.me) : [];
+    const facing = legal.some(t => Math.abs(t.r - mine.r) + Math.abs(t.c - mine.c) === 2);
+    if (moving) $('t-choice').textContent = facing ? '상대와 마주 보고 있어요 · 점프 칸을 누르면 뛰어넘어요' : '초록 칸을 눌러 한 칸 이동해요 · 상대와 마주 보면 뛰어넘어요';
     for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
       const button = cell(`${r + 1}행 ${c + 1}열`, r * 9 + c);
       if (wallMode !== 'move' && (r === 8 || c === 8)) { button.disabled = true; button.title = '벽의 시작점은 마지막 행·열을 제외한 칸을 골라 주세요.'; }
+      if (moving) {
+        const target = legal.find(t => t.r === r && t.c === c);
+        if (target) {
+          button.classList.add('legal-move');
+          const distance = Math.abs(r - mine.r) + Math.abs(c - mine.c);
+          if (distance === 2) { const straight = r === mine.r || c === mine.c; button.classList.add(straight ? 'legal-jump' : 'legal-side'); button.setAttribute('aria-label', `${r + 1}행 ${c + 1}열 · ${straight ? '상대를 뛰어넘기' : '상대 옆으로 비켜 가기'}`); }
+        } else { button.disabled = true; button.classList.add('no-move'); button.title = '이 칸으로는 갈 수 없어요. 초록 칸을 골라 주세요.'; }
+      }
       const owner = game.pawns.findIndex(p => p.r === r && p.c === c);
       if (owner >= 0) { const pawn = document.createElement('span'); pawn.className = `pawn seat-${owner}`; pawn.textContent = owner === room!.me ? '나' : '상대'; button.append(pawn); }
       button.onclick = () => {
@@ -593,7 +629,7 @@ export function initTabletop(kind: TableId) {
         await world.ready;
         if (version !== pokerLoadVersion || pokerWorld !== world || !room || room.game?.kind !== 'poker') return;
         world.update(room.game, room.me, room.players, room.round);
-        pokerHint.textContent = '내 눈높이 · 좌우로 드래그해 둘러보기 · 내 카드는 공개 전까지 비공개';
+        pokerHint.textContent = '좌우로 둘러보기 · 내 카드는 공개 전까지 비밀';
       }).catch(() => {
         if (version !== pokerLoadVersion) return;
         pokerWorld?.dispose(); pokerWorld = null;

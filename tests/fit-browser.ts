@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import { strict as assert } from 'node:assert';
 import { WebSocket } from 'ws';
+import { mkdir } from 'node:fs/promises';
 import type { TableId } from '../shared/catalog.ts';
 
 // Playing state must fit the viewport without scrolling on phones or desktop.
@@ -18,6 +19,8 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
   args: ['--no-sandbox'],
 });
+await mkdir('artifacts', { recursive: true });
+const layoutIssues: string[] = [];
 try {
   for (const [width, height] of viewports) {
     for (const { kind, seats } of cases) {
@@ -38,7 +41,8 @@ try {
         }
         for (const ws of rivals) ws.send(JSON.stringify({ type: 'ready' }));
         await page.locator('#t-ready').click();
-        await page.waitForTimeout(2500);
+        await page.waitForFunction(() => document.body.dataset.tablePhase === 'playing');
+        await page.waitForTimeout(200);
         await page.evaluate(() => document.fonts.ready);
         await page.evaluate(() => new Promise(requestAnimationFrame));
         const measured = await page.evaluate(() => ({
@@ -47,8 +51,13 @@ try {
           innerWidth: window.innerWidth,
           innerHeight: window.innerHeight,
         }));
-        assert.ok(measured.scrollWidth <= measured.innerWidth + 1, `${width}x${height} ${kind}x${seats}: horizontal overflow ${measured.scrollWidth} > ${measured.innerWidth}`);
-        assert.ok(measured.scrollHeight <= measured.innerHeight + 1, `${width}x${height} ${kind}x${seats}: vertical scroll ${measured.scrollHeight} > ${measured.innerHeight}`);
+        if (measured.scrollWidth > measured.innerWidth + 1) layoutIssues.push(`${width}x${height} ${kind}x${seats}: horizontal overflow ${measured.scrollWidth} > ${measured.innerWidth}`);
+        if (measured.scrollHeight > measured.innerHeight + 1) layoutIssues.push(`${width}x${height} ${kind}x${seats}: vertical scroll ${measured.scrollHeight} > ${measured.innerHeight}`);
+        if (kind === 'coup' || kind === 'davinci') {
+          const namesVisible = await page.locator(kind === 'coup' ? '.coup-player > header' : '.davinci-rack > header').evaluateAll(headers => headers.length > 0 && headers.every(header => header.getBoundingClientRect().height > 0));
+          assert.ok(namesVisible, `${kind}: player identities must remain visible during play`);
+        }
+        if (width === 320) await page.screenshot({ path: `artifacts/fit-${kind}-${seats}.png` });
         console.log(`FIT ${width}x${height} ${kind}x${seats}`);
         for (const ws of rivals) { try { ws.send(JSON.stringify({ type: 'leave' })); ws.close(); } catch { /* noop */ } }
       } finally {
@@ -56,6 +65,7 @@ try {
       }
     }
   }
+  assert.deepEqual(layoutIssues, [], 'All game layouts must fit.');
   console.log('PASS fit: every game fits its viewport while playing.');
 } finally {
   await browser.close();

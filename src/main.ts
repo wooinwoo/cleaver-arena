@@ -4,6 +4,10 @@ import { COLORS } from './palette.ts';
 import { isTableId } from '../shared/catalog.ts';
 import { initTabletop } from './tabletop.ts';
 import type { ArenaMap, Game, Input } from '../shared/game.ts';
+import { initGameFinder } from './ui/game-finder.ts';
+import { gameArt } from './ui/game-art.ts';
+import './ui/app.css';
+import { openRules } from './ui/rules-dialog.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
@@ -55,6 +59,10 @@ $('choose-cleaver').onclick = openGame;
 document.querySelectorAll<HTMLButtonElement>('[data-game]').forEach(button => {
   button.onclick = () => location.assign(`/?game=${button.dataset.game}`);
 });
+initGameFinder();
+document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
+const CLEAVER_RULES = '경기장에 따라 1:1 반원 대결, 개인전, 팀전(2·4·6명, 최대 3:3)으로 붙어요. 중앙 와드가 있는 경기장에서는 와드 선을 넘지 않고 각자 반원 안에서만 움직여요. PC는 우클릭으로 이동하고 좌클릭 또는 Q로 식칼을 던져요. 모바일은 왼쪽 패드로 이동, 오른쪽 패드로 조준하고 손을 떼면 발사해요. 식칼에 맞으면 체력이 줄고 0이 되면 탈락해요. 점멸(F)은 마우스 방향으로 순간이동, 유체화(D)는 잠시 빠르게 달려요. 주문 대기시간은 방장이 경기 설정에서 정해요. 시점은 탑뷰(롤 시점)와 1인칭 중 방장이 고르고 참가자 모두 같은 시점으로 해요. 마지막까지 살아남은 사람 또는 팀이 이겨요.';
+$('rules-open').onclick = () => openRules('cleaver', '문도피구', CLEAVER_RULES);
 $('games-menu').onclick = () => { if (session) leave(); else location.assign('/'); };
 
 function toast(message: string) {
@@ -192,6 +200,7 @@ function renderState() {
     $<HTMLInputElement>('flash-cooldown').value = String(state.spellCooldowns.flash);
     $<HTMLInputElement>('ghost-cooldown').value = String(state.spellCooldowns.ghost);
     $<HTMLFieldSetElement>('room-settings').disabled = !host || active;
+    $('settings-summary').textContent = `${state.view === 'fps' ? '1인칭' : '롤 시점'} · 점멸 ${state.spellCooldowns.flash}초 / 유체화 ${state.spellCooldowns.ghost}초`;
     $('settings-note').textContent = host ? '설정을 적용하면 준비가 초기화돼요. 시작 후에는 바꿀 수 없어요.' : '방장이 시작 전에 설정해요. 참가자 모두 같은 설정으로 플레이해요.';
   }
   const nextPhaseKey = `${state.phase}:${state.round}`;
@@ -255,7 +264,7 @@ function renderState() {
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
     $('room-mode').textContent = `${state.map === 'baron' ? '바론 둥지' : state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
+    if (state.phase === 'lobby') $('ready-help').textContent = state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.';
   }
 }
 

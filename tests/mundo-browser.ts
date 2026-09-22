@@ -91,6 +91,7 @@ try {
   for (const id of ['room-view', 'flash-cooldown', 'ghost-cooldown']) await expect(b.locator(`#${id}`)).toBeDisabled();
   await b.locator('#ready').tap();
   await expect(b.locator('#ready')).toHaveText('준비 취소');
+  await a.locator('.settings-disclosure > summary').click();
   await a.locator('#flash-cooldown').fill('3');
   await a.locator('#ghost-cooldown').fill('6');
   await a.locator('#apply-settings').click();
