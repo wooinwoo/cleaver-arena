@@ -40,7 +40,7 @@ function harness() {
 
 test('warm hashed assets return from cache without a network request', async () => {
   const h = harness();
-  const cache = await h.caches.open('cleaver-arena-v2');
+  const cache = await h.caches.open('cleaver-arena-v3');
   await cache.put('/assets/index-abc123.js', new Response('cached'));
   h.setFetch(() => new Promise(() => {}));
   const event = h.dispatch('fetch', '/assets/index-abc123.js');
@@ -51,15 +51,15 @@ test('warm hashed assets return from cache without a network request', async () 
 
 test('static cache hits do not wait for revalidation and misses return a response', async () => {
   const h = harness();
-  const cache = await h.caches.open('cleaver-arena-v2');
-  await cache.put('/club.woff2', new Response('old'));
+  const cache = await h.caches.open('cleaver-arena-v3');
+  await cache.put('/fonts/club-kr.woff2', new Response('old'));
   let resolve!: (response: Response) => void;
   h.setFetch(() => new Promise(done => { resolve = done; }));
-  const event = h.dispatch('fetch', '/club.woff2');
+  const event = h.dispatch('fetch', '/fonts/club-kr.woff2');
   assert.equal(await (await event.response!).text(), 'old');
   resolve(new Response('new'));
   await event.done();
-  assert.equal(await (await h.caches.match('/club.woff2', { cacheName: 'cleaver-arena-v2' }))!.text(), 'new');
+  assert.equal(await (await h.caches.match('/fonts/club-kr.woff2', { cacheName: 'cleaver-arena-v3' }))!.text(), 'new');
   h.setFetch(async () => new Response('model'));
   const miss = h.dispatch('fetch', '/models/mundo.glb');
   assert.equal(await (await miss.response!).text(), 'model');
@@ -77,7 +77,7 @@ test('navigation fallback preserves the shell and failed responses never poison 
   const invite = h.dispatch('fetch', '/?room=ABC123', true);
   assert.equal(await (await invite.response!).text(), 'invite');
   await invite.done();
-  assert.equal(await (await h.caches.match('/', { cacheName: 'cleaver-arena-v2' }))!.text(), 'shell');
+  assert.equal(await (await h.caches.match('/', { cacheName: 'cleaver-arena-v3' }))!.text(), 'shell');
   h.setFetch(async () => { throw new Error('offline'); });
   const offline = h.dispatch('fetch', '/', true);
   assert.equal(await (await offline.response!).text(), 'shell');
@@ -89,8 +89,9 @@ test('activation preserves unrelated caches and unknown requests bypass the work
   await h.caches.open('unrelated');
   await h.caches.open('cleaver-arena-v1');
   await h.caches.open('cleaver-arena-v2');
+  await h.caches.open('cleaver-arena-v3');
   await h.dispatch('activate').done();
-  assert.deepEqual(await h.caches.keys(), ['unrelated', 'cleaver-arena-v2']);
+  assert.deepEqual(await h.caches.keys(), ['unrelated', 'cleaver-arena-v3']);
   for (const path of ['/health', '/ws', '/table-ws', '/api/state', '/sw.js']) assert.equal(h.dispatch('fetch', path).response, undefined);
   assert.equal(h.calls.length, 0);
 });

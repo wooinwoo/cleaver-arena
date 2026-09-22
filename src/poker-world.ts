@@ -19,6 +19,7 @@ import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera.js';
 import type { PokerState } from '../shared/poker.ts';
+import { pickQuality } from './quality.ts';
 
 export type PokerSceneState = Pick<PokerState, 'chips' | 'bets' | 'folded' | 'pot' | 'turn' | 'winner' | 'draw' | 'stage' | 'hand'> & { cards: (number | null)[]; remaining: number[] };
 type Person = { root: TransformNode; arm: TransformNode; card: Mesh; marker: Mesh };
@@ -57,7 +58,9 @@ export class PokerWorld {
 
   constructor(private canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false, doNotHandleTouchAction: true }, true);
-    this.engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 1.5));
+    const quality = pickQuality();
+    this.engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, quality.pixelCap));
+    canvas.dataset.quality = quality.tier;
     this.scene = new Scene(this.engine);
     this.scene.clearColor = Color4.FromHexString('#101d1cff');
     this.scene.imageProcessingConfiguration.toneMappingEnabled = true;
@@ -68,7 +71,7 @@ export class PokerWorld {
     const warm = new DirectionalLight('table-light', new Vector3(.3, -1, .35), this.scene);
     warm.position.set(-3, 7, -3); warm.diffuse = Color3.FromHexString('#ffe0aa'); warm.intensity = 2.2;
     warm.shadowMinZ = .1; warm.shadowMaxZ = 18; warm.autoCalcShadowZBounds = true;
-    this.shadows = new ShadowGenerator(1024, warm);
+    this.shadows = new ShadowGenerator(quality.shadowMap, warm);
     this.shadows.usePercentageCloserFiltering = true; this.shadows.bias = .002; this.shadows.normalBias = .015;
     this.camera = new FreeCamera('seated-eyes', new Vector3(0, 2.02, -3), this.scene);
     this.camera.inputs.clear(); this.camera.minZ = .06; this.camera.maxZ = 35; this.camera.fov = .82;

@@ -13,6 +13,7 @@ import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader.js';
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer.js';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup.js';
+import { pickQuality } from './quality.ts';
 import '@babylonjs/loaders/glTF/2.0/glTFLoader.js';
 import '@babylonjs/loaders/glTF/glTFFileLoader.js';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_unlit.js';
@@ -58,7 +59,9 @@ export class World {
 
   constructor(private canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: false, preserveDrawingBuffer: false }, true);
-    this.engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, 1.5));
+    const quality = pickQuality();
+    this.engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, quality.pixelCap));
+    canvas.dataset.quality = quality.tier;
     this.scene = new Scene(this.engine);
     this.scene.skipPointerMovePicking = true;
     this.scene.skipPointerDownPicking = true;

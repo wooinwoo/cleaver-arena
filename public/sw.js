@@ -1,5 +1,5 @@
 const PREFIX = 'cleaver-arena-';
-const CACHE = `${PREFIX}v2`;
+const CACHE = `${PREFIX}v3`;
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png'];
 
 self.addEventListener('install', event => {
@@ -33,7 +33,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   const immutable = /^\/assets\/[^/]+-[\w-]+\.(js|css)$/.test(url.pathname);
-  const staticFile = url.pathname === '/club.woff2' || url.pathname === '/manifest.webmanifest' || /^\/icons\/[^/]+\.png$/.test(url.pathname) || /^\/models\/[^/]+\.glb$/.test(url.pathname);
+  const staticFile = url.pathname === '/manifest.webmanifest' || /^\/fonts\/[^/]+\.woff2$/.test(url.pathname) || /^\/icons\/[^/]+\.png$/.test(url.pathname) || /^\/models\/[^/]+\.glb$/.test(url.pathname);
   if (!immutable && !staticFile) return;
   const cached = caches.match(request, { cacheName: CACHE });
   const network = cached.then(hit => {

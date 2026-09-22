@@ -56,6 +56,7 @@ export function initTabletop(kind: TableId) {
   let davinciPick: { target: number; tile: number; num: number | null } | null = null;
   let coupTargeting: CoupActionKind | null = null;
   let coupKeep: string[] = [];
+  let lastRenderSig = '';
   let promotion = 'q';
   let pokerWorld: PokerWorld | null = null;
   let pokerLoading = false, pokerFailed = false, pokerLoadVersion = 0;
@@ -112,7 +113,7 @@ export function initTabletop(kind: TableId) {
   }
   function resetEntry(message: string) {
     disposePoker();
-    session = null; sessionStorage.removeItem(key); room = null;
+    session = null; sessionStorage.removeItem(key); room = null; lastRenderSig = '';
     delete document.body.dataset.tablePhase;
     $('t-entry').hidden = false; $('t-room').hidden = true;
     $('t-error').textContent = message; $('t-turn').textContent = '다시 입장해 주세요';
@@ -203,6 +204,11 @@ export function initTabletop(kind: TableId) {
   function render() {
     if (!room) return;
     renderRules();
+    const sig = JSON.stringify([room.phase, room.round, room.game, room.players, room.me, room.result, room.variant,
+      ws?.readyState, submitting, compact.matches, pokerLoading, pokerFailed,
+      pending, selectedPiece, drop, wallMode, davinciPick, coupTargeting, coupKeep, promotion]);
+    if (sig === lastRenderSig) return;
+    lastRenderSig = sig;
     if (document.body.dataset.tablePhase !== room.phase) {
       document.body.dataset.tablePhase = room.phase;
       roomDetails.open = room.phase !== 'playing' || !compact.matches;
