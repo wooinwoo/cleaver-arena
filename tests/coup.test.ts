@@ -176,6 +176,7 @@ test('ambassador exchange swaps exactly the live cards and hides options from ot
   const mine = coupView(state, 0);
   const other = coupView(state, 1);
   assert.ok(mine.stage.kind === 'exchange' && mine.stage.options && mine.stage.options.length === 4);
+  assert.deepEqual(mine.stage.kind === 'exchange' ? mine.stage.options!.map(card => card.mine).sort() : [], [false, false, true, true]);
   assert.ok(other.stage.kind === 'exchange' && (other.stage as { options?: unknown }).options === undefined);
   const keep = mine.stage.kind === 'exchange' ? mine.stage.options!.map(card => card.id).slice(0, 2) : [];
   assert.equal(actCoup(state, 0, { type: 'keep', cards: keep }), null);

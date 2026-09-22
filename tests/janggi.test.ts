@@ -170,3 +170,23 @@ test('genius permits ignoring an attack and ends only when the king is captured'
   assert.equal(actJanggi(state, 1, { type: 'move', from: 7, to: 10 }), null);
   assert.equal(state.winner, 1);
 });
+
+test('janggiTargets mirrors server rules for moves and drops', async () => {
+  const { janggiTargets } = await import('../shared/janggi.ts');
+  // Pawn steps forward only; own pieces excluded.
+  const pawn = position([[7, { owner: 0, kind: 'pawn' }], [10, { owner: 0, kind: 'king' }], [1, { owner: 1, kind: 'king' }]]);
+  assert.deepEqual(janggiTargets(pawn.board, pawn.hands, pawn.variant, 0, 7, null), [4]);
+  // King reaches all neighbors but not its own piece.
+  const king = position([[10, { owner: 0, kind: 'king' }], [9, { owner: 0, kind: 'pawn' }], [1, { owner: 1, kind: 'king' }]]);
+  assert.deepEqual(janggiTargets(king.board, king.hands, king.variant, 0, 10, null).sort((a, b) => a - b), [6, 7, 8, 11]);
+  // Animal endangers-king moves are hidden; genius shows them.
+  const danger = position([[10, { owner: 0, kind: 'king' }], [4, { owner: 0, kind: 'rook' }], [1, { owner: 1, kind: 'king' }], [7, { owner: 1, kind: 'rook' }]]);
+  assert.ok(!janggiTargets(danger.board, danger.hands, 'animal', 0, 4, null).includes(3));
+  assert.ok(janggiTargets(danger.board, danger.hands, 'genius', 0, 4, null).includes(3));
+  // Drops need empty cells and skip the genius home row.
+  const drop = position([[10, { owner: 0, kind: 'king' }], [1, { owner: 1, kind: 'king' }]]);
+  drop.hands[0] = ['pawn'];
+  assert.ok(janggiTargets(drop.board, drop.hands, 'animal', 0, null, 'pawn').includes(7));
+  assert.ok(!janggiTargets(drop.board, drop.hands, 'genius', 0, null, 'pawn').includes(0));
+  assert.ok(!janggiTargets(drop.board, [[], []], 'animal', 0, null, 'pawn').length);
+});

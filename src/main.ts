@@ -214,6 +214,7 @@ function renderState() {
         if (head !== state.winner) { const tail = document.createElement('span'); tail.className = 'title-suffix'; tail.textContent = ' 승리'; title.append(tail); }
         $('ready-help').textContent = '한 판 더? 모두 다시 준비하면 시작해요.';
         sound(me.hp > 0 ? 650 : 180, .3);
+        toast(`${state.winner} · 다시 준비를 눌러 주세요`);
       }
     }
     world.engine.resize();
@@ -254,19 +255,21 @@ function renderState() {
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
     $('room-mode').textContent = `${state.map === 'baron' ? '바론 둥지' : state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
+    if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.');
   }
 }
 
-function nickname() {
+function nickname(save = true) {
   const name = nameInput.value.trim();
   if (!name) { nameInput.reportValidity(); nameInput.focus(); return null; }
-  localStorage.setItem('cleaver-name', name);
+  if (save) localStorage.setItem('cleaver-name', name);
   return name;
 }
 
 function enter(practice = false) {
   if (connecting) return;
+  for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = false;
+  $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
   const name = nickname();
   if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, view: world.view, practice });
 }
@@ -279,7 +282,15 @@ mapInput.onchange = () => {
 };
 
 $('entry-form').addEventListener('submit', event => { event.preventDefault(); enter(); });
-$('practice').onclick = () => { if (!nameInput.value.trim()) nameInput.value = '연습생'; enter(true); };
+$('practice').onclick = () => {
+  const auto = !nameInput.value.trim();
+  if (auto) nameInput.value = '연습생';
+  for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = false;
+  $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
+  if (connecting) return;
+  const name = nickname(!auto);
+  if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, view: world.view, practice: true });
+};
 $('join').onclick = () => {
   if (connecting) return;
   const name = nickname();
@@ -516,9 +527,11 @@ try {
   }
   if (roomCode) {
     codeInput.value = roomCode.toUpperCase().slice(0, 6);
-    document.querySelector('#entry .fineprint')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요`;
+    document.querySelector('#entry .fineprint')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요 · 방장의 시점 설정을 따라가요`;
     toast('초대받았어요! 닉네임을 입력하고 입장을 눌러 주세요.');
     nameInput.focus({ preventScroll: true });
+    for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = true;
+    $('view-note').textContent = '방장의 시점 설정을 따라가요';
   }
   try {
     const saved = JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null');

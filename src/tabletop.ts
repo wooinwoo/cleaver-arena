@@ -2,7 +2,7 @@ import { TABLE_GAMES, POKER_VARIANTS, type PokerVariant, type TableId } from '..
 import type { Action } from '../shared/tabletop-types.ts';
 import type { GomokuState } from '../shared/gomoku.ts';
 import type { QuoridorState } from '../shared/quoridor.ts';
-import { JANGGI_VARIANTS, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
+import { JANGGI_VARIANTS, janggiTargets, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
 import type { pokerView } from '../shared/poker.ts';
 import type { ChessState } from '../shared/chess.ts';
 import type { DaVinciView } from '../shared/davinci.ts';
@@ -248,7 +248,7 @@ export function initTabletop(kind: TableId) {
     $('t-toolbar').hidden = true;
     $('t-action-bar').hidden = !canAct() || kind === 'poker' || kind === 'splendor' || kind === 'coup';
     $('t-choice').textContent = room.phase === 'playing' && !canAct() ? '상대 차례 — 구경 중이에요'
-      : kind === 'janggi' ? '움직일 말 또는 보유 말을 선택하세요'
+      : kind === 'janggi' ? ((room?.game as JanggiState | null)?.variant === 'genius' ? '움직일 말 또는 보유 말을 선택하세요 · 끝줄 투입 금지' : '움직일 말 또는 보유 말을 선택하세요')
       : kind === 'davinci' ? '상대 타일을 고르고 숫자를 골라 주세요'
       : kind === 'gomoku' ? `당신은 ${room.me === 0 ? '흑' : '백'} · 칸을 선택한 뒤 확정하세요`
       : '칸을 선택한 뒤 확정하세요';
@@ -367,9 +367,10 @@ export function initTabletop(kind: TableId) {
         toolbar.append(hint);
         for (const card of stage.options) {
           const button = document.createElement('button');
-          button.className = `coup-keep-card${coupKeep.includes(card.id) ? ' selected' : ''}`;
+          button.className = `coup-keep-card${coupKeep.includes(card.id) ? ' selected' : ''}${card.mine ? '' : ' coup-drawn'}`;
           button.dataset.id = String(card.id);
           button.textContent = COUP_ROLE_NAME[card.role];
+          button.title = card.mine ? '원래 내 카드' : '더미에서 새로 뽑은 카드';
           button.onclick = () => {
             coupKeep = coupKeep.includes(card.id) ? coupKeep.filter(id => id !== card.id) : [...coupKeep, card.id];
             render();
@@ -559,7 +560,8 @@ export function initTabletop(kind: TableId) {
         if (drop) { choose({ type: 'drop', piece: drop, to: i }, `${PIECES[drop]} 투입`, button); }
         else if (piece?.owner === room!.me) {
           selectedPiece = i; pending = null;
-          board.querySelectorAll('.pending').forEach(b => b.classList.remove('pending')); button.classList.add('pending');
+          board.querySelectorAll('.pending,.legal-move').forEach(b => b.classList.remove('pending', 'legal-move')); button.classList.add('pending');
+          for (const target of janggiTargets(game.board, game.hands, game.variant, room!.me as 0 | 1, i, null)) board.querySelector(`[data-cell="${target}"]`)?.classList.add('legal-move');
           $('t-choice').textContent = `${PIECES[piece.kind]} 선택 · 도착 칸을 고르세요`; $<HTMLButtonElement>('t-confirm').disabled = true;
         } else if (selectedPiece !== null) choose({ type: 'move', from: selectedPiece, to: i }, '선택한 말 이동', button);
       }; board.append(button);
@@ -570,7 +572,9 @@ export function initTabletop(kind: TableId) {
       if (!game.hands[seat].length) { const empty = document.createElement('small'); empty.textContent = '없음'; hand.append(empty); }
       game.hands[seat].forEach(piece => {
         const button = document.createElement('button'); button.textContent = PIECES[piece]; button.disabled = !canAct() || seat !== room!.me;
-        button.onclick = () => { drop = piece; selectedPiece = null; pending = null; $('t-choice').textContent = `${PIECES[piece]} 투입 · 빈칸을 고르세요`; $<HTMLButtonElement>('t-confirm').disabled = true; }; hand.append(button);
+        button.onclick = () => { drop = piece; selectedPiece = null; pending = null; $('t-choice').textContent = `${PIECES[piece]} 투입 · 빈칸을 고르세요`; $<HTMLButtonElement>('t-confirm').disabled = true;
+          board.querySelectorAll('.legal-move').forEach(b => b.classList.remove('legal-move'));
+          for (const target of janggiTargets(game.board, game.hands, game.variant, room!.me as 0 | 1, null, piece)) board.querySelector(`[data-cell="${target}"]`)?.classList.add('legal-move'); }; hand.append(button);
       }); $('t-hands').append(hand);
     }
     $('t-hands').hidden = game.hands.every(hand => !hand.length);
@@ -628,6 +632,9 @@ export function initTabletop(kind: TableId) {
     if (canAct() && game.stage === 'betting') {
       const actions = document.createElement('div'); actions.className = 'poker-actions';
       const cost = game.bet - game.bets[room!.me];
+      const summary = document.createElement('span'); summary.className = 'poker-summary';
+      summary.textContent = `내 칩 ${game.chips[room!.me]} · ${cost ? `콜 ${cost}칩 → ${game.chips[room!.me] - cost}칩 남음` : '추가 없이 체크 가능'}`;
+      actions.append(summary);
       const raiseMax = Math.min(...game.chips.map((chips, i) => game.folded[i] ? Infinity : chips + game.bets[i])) - game.bet;
       let amount: HTMLInputElement | undefined;
       if (game.variant === 'duel') {

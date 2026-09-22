@@ -63,6 +63,29 @@ function movedBoard(board: (Piece | null)[], from: number, to: number): (Piece |
   return next;
 }
 
+// 선택 힌트용으로 서버와 같은 규칙을 미리 계산한다. 최종 판단은 actJanggi가 한다.
+export function janggiTargets(board: (Piece | null)[], hands: PieceKind[][], variant: JanggiVariant, seat: 0 | 1, from: number | null, drop: PieceKind | null): number[] {
+  const targets: number[] = [];
+  for (let to = 0; to < 12; to++) {
+    if (from !== null) {
+      const piece = board[from];
+      if (!piece || piece.owner !== seat || !canStep(piece, from, to) || board[to]?.owner === seat) continue;
+      if (variant === 'animal' && !safe(movedBoard(board, from, to), seat)) continue;
+      targets.push(to);
+    } else if (drop) {
+      if (board[to] || !hands[seat].includes(drop)) continue;
+      if (variant === 'genius' && row(to) === farRow(seat)) continue;
+      if (variant === 'animal') {
+        const next = board.slice();
+        next[to] = { owner: seat, kind: drop };
+        if (!safe(next, seat)) continue;
+      }
+      targets.push(to);
+    }
+  }
+  return targets;
+}
+
 function hasLegalAction(state: JanggiState, seat: 0 | 1): boolean {
   for (let to = 0; to < 12; to++) {
     if (state.board[to]?.owner === seat) continue;

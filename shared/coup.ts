@@ -324,7 +324,7 @@ export interface CoupView extends Omit<BaseState, 'kind'> {
     | { kind: 'react'; action: CoupDeclared; step: number; reactor: number }
     | { kind: 'blockReact'; action: CoupDeclared; blocker: number; role: CoupRole; step: number; reactor: number }
     | { kind: 'reveal'; seat: number; cause: string }
-    | { kind: 'exchange'; seat: number; options?: { id: string; role: CoupRole }[] };
+    | { kind: 'exchange'; seat: number; options?: { id: string; role: CoupRole; mine: boolean }[] };
 }
 
 export function coupView(state: CoupState, seat: number): CoupView {
@@ -344,7 +344,7 @@ export function coupView(state: CoupState, seat: number): CoupView {
       : state.stage.kind === 'blockReact' ? { kind: 'blockReact', action: state.stage.action, blocker: state.stage.blocker, role: state.stage.role, step: state.stage.step, reactor: reactors(state, state.stage.blocker)[state.stage.step] ?? -1 }
       : state.stage.kind === 'reveal' ? { kind: 'reveal', seat: state.stage.seat, cause: state.stage.cause }
       : state.stage.kind === 'exchange'
-        ? { kind: 'exchange', seat: state.stage.seat, ...(seat === state.stage.seat ? { options: [...state.players[seat].influence.filter(influence => !influence.revealed).map(influence => influence.card), ...state.stage.drawn].map(card => ({ id: card.id, role: card.role })) } : {}) }
+        ? { kind: 'exchange', seat: state.stage.seat, ...(seat === state.stage.seat ? { options: [...state.players[seat].influence.filter(influence => !influence.revealed).map(influence => ({ ...influence.card, mine: true })), ...state.stage.drawn.map(card => ({ ...card, mine: false }))] } : {}) }
         : { kind: 'action' },
   };
 }

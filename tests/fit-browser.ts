@@ -39,6 +39,8 @@ try {
         for (const ws of rivals) ws.send(JSON.stringify({ type: 'ready' }));
         await page.locator('#t-ready').click();
         await page.waitForTimeout(2500);
+        await page.evaluate(() => document.fonts.ready);
+        await page.evaluate(() => new Promise(requestAnimationFrame));
         const measured = await page.evaluate(() => ({
           scrollWidth: document.documentElement.scrollWidth,
           scrollHeight: document.documentElement.scrollHeight,
