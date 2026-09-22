@@ -7,7 +7,7 @@ const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
 const audit = process.env.LAYOUT_AUDIT === '1';
 const output = fileURLToPath(new URL(`../artifacts/responsive-${audit ? 'before' : 'after'}/`, import.meta.url));
 await mkdir(output, { recursive: true });
-const sizes = [[320, 300], [390, 300], [320, 568], [390, 844], [568, 320], [667, 375], [844, 390], [768, 1024], [1024, 768], [1440, 900]];
+const sizes = [[320, 300], [390, 300], [320, 568], [360, 640], [375, 667], [390, 844], [412, 915], [568, 320], [667, 375], [844, 390], [1024, 600], [768, 1024], [820, 1180], [1024, 768], [1440, 900]];
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
@@ -30,7 +30,7 @@ async function check(page: Page, surface: string, hud = false) {
       const found: string[] = [];
       if (document.documentElement.scrollWidth > innerWidth + 1) found.push('page horizontal overflow');
       const visible = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-      for (const selector of ['header', '#hub', '#lobby', '#t-board-wrap', '#t-players', '.table-status', '.poker-table']) {
+      for (const selector of ['header', '#hub', '#lobby', '#t-board-wrap', '#t-players', '.table-status', '.poker-table', '#t-toolbar', '#t-action-bar', '.coup-board', '.davinci-board', '.poker-bet-size', '.table-invite', '.spell-settings']) {
         const el = document.querySelector<HTMLElement>(selector);
         if (!el || !visible(el)) continue;
         if (el.scrollWidth > el.clientWidth + 2) found.push(`${selector} clipped content`);
@@ -60,6 +60,11 @@ async function check(page: Page, surface: string, hud = false) {
         }
       }
       for (const input of document.querySelectorAll('input, select')) if (visible(input) && parseFloat(getComputedStyle(input).fontSize) < 16) found.push(`${input.id} triggers mobile focus zoom`);
+      for (const button of document.querySelectorAll('button')) {
+        if (!visible(button)) continue;
+        const rect = button.getBoundingClientRect();
+        if (rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1)) found.push(`button outside viewport: ${(button.textContent ?? '').trim().slice(0, 24)}`);
+      }
       return found;
     }, { hud });
     failures.push(...issues.map(issue => `${surface} ${width}x${height}: ${issue}`));

@@ -97,7 +97,7 @@ export function renderSplendor(board: HTMLElement, game: ReturnType<typeof splen
       button.querySelector('small')!.textContent = picked[color] ? `선택 ${picked[color]}` : '';
       chooseGems();
     }; bankButtons.push(button); bank.append(button);
-  }); board.append(bank);
+  }); board.append(bank, node('p', 'sp-muted', '황금은 카드·더미 예약으로만 가져와요.'));
   function clearPick() {
     picked.fill(0);
     for (const button of bankButtons) { button.classList.remove('is-picked'); button.setAttribute('aria-pressed', 'false'); button.querySelector('small')!.textContent = ''; }

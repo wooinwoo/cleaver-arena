@@ -25,6 +25,8 @@ let intentionalClose = false;
 let connecting = false;
 let rosterKey = '';
 let phaseKey = '';
+let lastPhase = '';
+let lastAliveIds = '';
 let settingsKey = '';
 let mouseFire = false;
 let pulseUntil = 0;
@@ -128,6 +130,7 @@ function connect(request: Record<string, unknown>) {
         $('touch-controls').hidden = true;
         document.body.classList.remove('in-match');
         state = null; phaseKey = ''; myId = '';
+        lastPhase = ''; lastAliveIds = '';
         world.reset(); setView('top');
         if (document.pointerLockElement) document.exitPointerLock();
       }
@@ -156,6 +159,7 @@ function connect(request: Record<string, unknown>) {
         $('hud').hidden = true; $('touch-controls').hidden = true;
         document.body.classList.remove('in-match');
         state = null; phaseKey = ''; myId = '';
+        lastPhase = ''; lastAliveIds = '';
         world.reset(); setView('top');
         if (document.pointerLockElement) document.exitPointerLock();
       }
@@ -168,6 +172,14 @@ function renderState() {
   if (!state) return;
   const me = state.players.find(p => p.id === myId);
   if (!me) return;
+  if (lastPhase === 'countdown' && state.phase === 'playing') { toast('시작! 식칼을 던져요'); sound(880, .15); }
+  lastPhase = state.phase;
+  const aliveIds = state.players.filter(p => p.hp > 0 && p.connected).map(p => p.id);
+  if (state.phase === 'playing' && lastAliveIds && aliveIds.length < lastAliveIds.split(',').length) {
+    const gone = state.players.filter(p => p.hp <= 0 && lastAliveIds.split(',').includes(p.id)).map(p => p.name);
+    if (gone.length) toast(`${gone.join(', ')} 탈락!`);
+  }
+  lastAliveIds = aliveIds.join(',');
   const active = state.phase === 'playing' || state.phase === 'countdown';
   if ($('fps-view').getAttribute('aria-pressed') !== String(state.view === 'fps')) setView(state.view);
   for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = true;
@@ -210,18 +222,21 @@ function renderState() {
   $('health-fill').style.transform = `scaleX(${me.hp / 100})`;
   $('health-fill').classList.toggle('low', me.hp > 0 && me.hp <= 25);
   $('spell-feedback').classList.toggle('ghost', state.phase === 'playing' && me.hp > 0 && me.ghostTime > 0);
-  $('my-name').textContent = `${me.name}${me.hp <= 0 ? ' · 탈락' : ''}`;
+  $('my-name').textContent = `${me.name}${state.mode === 'teams' ? (me.team === 0 ? ' · 민트' : ' · 코랄') : ''}${me.hp <= 0 ? ' · 탈락' : ''}`;
   $('round').textContent = `ROUND ${state.round}`;
   const seconds = Math.ceil(state.time);
   $('timer').textContent = `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
-  $('alive').textContent = `${state.players.filter(p => p.hp > 0 && p.connected).length}명 생존`;
+  $('timer').classList.toggle('low', state.phase === 'playing' && seconds <= 15);
+  const survivors = state.players.filter(p => p.hp > 0 && p.connected).length;
+  $('alive').textContent = `${survivors}명 생존`;
   for (const spell of ['flash', 'ghost'] as const) {
     const cooldown = me[spell === 'flash' ? 'flashCooldown' : 'ghostCooldown'];
     $<HTMLButtonElement>(spell).disabled = state.phase !== 'playing' || me.hp <= 0 || !me.connected || cooldown > 0;
     $(`${spell}-status`).textContent = spell === 'ghost' && me.ghostTime > 0 ? `가속 ${Math.ceil(me.ghostTime)}초` : cooldown > 0 ? `${Math.ceil(cooldown)}초` : '준비';
   }
   $('announcement').textContent = state.phase === 'countdown' ? `${Math.max(1, Math.ceil(state.countdown))}\n준비, 식칼!` :
-    me.hp <= 0 ? '이번 판은 여기까지!\n남은 경기를 구경해요.' : '';
+    me.hp <= 0 ? `이번 판은 여기까지!\n생존 ${survivors}명 구경 중` : '';
+  $('touch-controls').classList.toggle('spectating', state.phase === 'playing' && me.hp <= 0);
   const nextRoster = JSON.stringify(state.players.map(p => [p.id, p.name, p.ready, p.connected, p.team])) + state.phase;
   if (nextRoster !== rosterKey) {
     rosterKey = nextRoster;
@@ -499,7 +514,12 @@ try {
     document.body.classList.add('in-hub');
     document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   }
-  if (roomCode) { codeInput.value = roomCode.toUpperCase().slice(0, 6); toast('초대받았어요! 닉네임을 입력하고 입장을 눌러 주세요.'); }
+  if (roomCode) {
+    codeInput.value = roomCode.toUpperCase().slice(0, 6);
+    document.querySelector('#entry .fineprint')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요`;
+    toast('초대받았어요! 닉네임을 입력하고 입장을 눌러 주세요.');
+    nameInput.focus({ preventScroll: true });
+  }
   try {
     const saved = JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null');
     if (saved?.code && saved?.token && (!roomCode || saved.code === roomCode.toUpperCase())) {

@@ -138,12 +138,12 @@ function resolveAction(state: CoupState, action: CoupDeclared) {
   switch (action.kind) {
     case 'tax':
       actor.coins += 3;
-      state.log += ` 세금으로 +3코인.`;
+      state.log += ` ${action.actor + 1}번이 세금 +3코인.`;
       nextTurn(state);
       break;
     case 'aid':
       actor.coins += 2;
-      state.log += ' 해외 원조 +2코인.';
+      state.log += ` ${action.actor + 1}번이 해외 원조 +2코인.`;
       nextTurn(state);
       break;
     case 'steal':
@@ -151,7 +151,7 @@ function resolveAction(state: CoupState, action: CoupDeclared) {
         const gain = Math.min(2, target.coins);
         target.coins -= gain;
         actor.coins += gain;
-        state.log += ` ${gain}코인 강탈.`;
+        state.log += ` ${action.actor + 1}번이 ${gain}코인 강탈.`;
       }
       nextTurn(state);
       break;
@@ -162,7 +162,7 @@ function resolveAction(state: CoupState, action: CoupDeclared) {
         return;
       }
       actor.coins -= 3;
-      state.log += ` 암살 실행!`;
+      state.log += ` ${action.actor + 1}번이 ${action.target + 1}번 암살 실행!`;
       loseInfluence(state, action.target, '암살당했어요. 공개할 카드를 골라 주세요.', { after: 'nextTurn' });
       break;
     case 'exchange': {
@@ -221,13 +221,13 @@ export function actCoup(state: CoupState, seat: number, action: Action): string 
     const declared: CoupDeclared = { kind: kind as CoupActionKind, actor: seat, ...(target !== undefined ? { target } : {}) };
     if (kind === 'income') {
       me.coins++;
-      state.log += ` 수입 +1코인.`;
+      state.log += ` ${seat + 1}번이 수입 +1코인.`;
       nextTurn(state);
       return null;
     }
     if (kind === 'coup') {
       me.coins -= 7;
-      state.log += ` 쿠! ${target! + 1}번의 영향력 1장이 공개돼요.`;
+      state.log += ` ${seat + 1}번이 쿠! ${target! + 1}번의 영향력 1장이 공개돼요.`;
       loseInfluence(state, target!, '쿠를 당했어요. 공개할 카드를 골라 주세요.', { after: 'nextTurn' });
       return null;
     }
@@ -307,7 +307,7 @@ export function actCoup(state: CoupState, seat: number, action: Action): string 
     shuffle(state.deck);
     const revealedOld = mine.influence.filter(influence => influence.revealed);
     mine.influence = [...chosen.map(card => ({ card: card as CoupCard, revealed: false })), ...revealedOld];
-    state.log += ` 카드를 교환했어요.`;
+    state.log += ` ${seat + 1}번이 카드를 교환했어요.`;
     nextTurn(state);
     return null;
   }

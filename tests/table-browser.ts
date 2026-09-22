@@ -136,10 +136,16 @@ try {
         const page = await actorPage();
         if ((await page.locator('#t-turn').textContent())?.includes('승리')) break;
         const reveal = page.locator('.coup-card:enabled');
-        if (await reveal.count()) { await reveal.first().click(); await page.waitForTimeout(90); continue; }
+        if (await reveal.count()) {
+          await reveal.first().click();
+          await page.waitForTimeout(60);
+          await reveal.first().click();
+          await page.waitForTimeout(90);
+          continue;
+        }
         const keep = page.locator('.coup-keep-card');
         if (await keep.count()) {
-          const need = Number((await page.locator('#t-coup-keep').textContent())?.match(/유지할 (\d)장/)?.[1] ?? 2);
+          const need = Number((await page.locator('#t-coup-keep').textContent())?.match(/유지 \d\/(\d)장/)?.[1] ?? 2);
           for (let i = 0; i < need; i++) await keep.nth(i).click();
           await page.locator('#t-coup-keep').click();
           await page.waitForTimeout(90);
