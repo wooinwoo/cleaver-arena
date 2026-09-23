@@ -18,6 +18,7 @@ try {
     browser.newContext({ viewport: { width: 1280, height: 900 } }),
     browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }),
   ]);
+  for (const context of contexts) await context.addInitScript(() => localStorage.setItem('cleaver-name', '민트친구'));
   const pages = await Promise.all(contexts.map(context => context.newPage()));
   const [a, b] = pages;
   const rooms = new Map<Page, Room>();

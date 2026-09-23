@@ -72,13 +72,15 @@ try {
       const mobile = seat % 2 === 1;
       const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 }, isMobile: mobile, hasTouch: true });
       contexts.push(context);
-      await context.addInitScript(`window.__name = fn => fn; window.__cardFlights = 0; new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1 && node.classList.contains('sp-flight') && node.classList.contains('sp-card')) window.__cardFlights++; }))).observe(document, { childList: true, subtree: true }); const Original = window.WebSocket; window.WebSocket = class extends Original { constructor(...args) { super(...args); window.__tableSocket = this; this.addEventListener('message', event => { const data = JSON.parse(event.data); if (data.type === 'table-state') window.__tableRoom = data.room; }); } };`);
+      await context.addInitScript(`window.__name = fn => fn; localStorage.setItem('cleaver-name', '보석친구'); window.__cardFlights = 0; new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1 && node.classList.contains('sp-flight') && node.classList.contains('sp-card')) window.__cardFlights++; }))).observe(document, { childList: true, subtree: true }); const Original = window.WebSocket; window.WebSocket = class extends Original { constructor(...args) { super(...args); window.__tableSocket = this; this.addEventListener('message', event => { const data = JSON.parse(event.data); if (data.type === 'table-state') window.__tableRoom = data.room; }); } };`);
       const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message)); pages.push(page);
     }
     const [a, b] = pages;
-    await a.goto(base); await a.locator('[data-game="splendor"]').click();
-    await a.locator('#t-name').fill('보석친구'); await a.locator('#t-entry button[type=submit]').click();
-    await expect(a.locator('#t-room')).toBeVisible();
+    // 홈 카드 탭 = 방 만들기(생성 의도): 닉네임이 있으면 입장 폼 없이 바로 방으로 간다.
+    await a.goto(base, { waitUntil: 'domcontentloaded' });
+    await expect(a.locator('#nickname-gate')).toBeHidden({ timeout: 15_000 });
+    await a.locator('.game-cell[data-game="splendor"] .game-option').click();
+    await expect(a.locator('#t-room')).toBeVisible({ timeout: 30_000 });
     const code = await a.locator('#t-code').innerText();
     for (let seat = 1; seat < seats; seat++) {
       await pages[seat].goto(`${base}/?game=splendor&room=${code}`);

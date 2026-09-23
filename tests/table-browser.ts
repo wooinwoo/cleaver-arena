@@ -18,6 +18,7 @@ try {
     if (process.argv.includes('--poker-only') && kind !== 'poker') continue;
     const ca = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const cb = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const context of [ca, cb]) await context.addInitScript(() => localStorage.setItem('cleaver-name', '민트친구'));
     const a = await ca.newPage(), b = await cb.newPage();
     for (const page of [a, b]) page.on('pageerror', error => errors.push(error.message));
     if (kind === 'poker') {

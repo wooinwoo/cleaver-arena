@@ -1,0 +1,11 @@
+
+/* Quoridor: show every legal pawn target, and call out jumps and side-steps. */
+.quoridor-board .board-cell.legal-move { background: #d9f7b2; border-color: #7fbf4a; box-shadow: inset 0 0 0 3px #c8ff4d; cursor: pointer; }
+.quoridor-board .board-cell.legal-move:hover { background: #c8ff4d; }
+.quoridor-board .board-cell.legal-move::after { content: ''; position: absolute; width: 26%; height: 26%; border-radius: 50%; background: #3a7a12; opacity: .55; pointer-events: none; }
+.quoridor-board .board-cell.legal-jump::after { content: '점프'; width: auto; height: auto; padding: 2px 6px; border-radius: 999px; background: #1a3a06; color: #c8ff4d; font-size: 10px; font-weight: 800; letter-spacing: .02em; opacity: 1; }
+.quoridor-board .board-cell.legal-side::after { content: '옆으로'; width: auto; height: auto; padding: 2px 6px; border-radius: 999px; background: #1a3a06; color: #c8ff4d; font-size: 10px; font-weight: 800; opacity: 1; }
+.quoridor-board .board-cell.pending.legal-move { background: #c8ff4d; }
+.quoridor-board .board-cell:disabled.no-move { opacity: 1; }
+@media (max-width: 480px) { .quoridor-board .board-cell.legal-jump::after, .quoridor-board .board-cell.legal-side::after { font-size: 8px; padding: 1px 4px; } }
+.quoridor-board .board-cell:disabled.no-move:hover { background: #ebd1a4; }

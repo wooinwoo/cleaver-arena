@@ -18,6 +18,7 @@ try {
     browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }),
   ]);
   for (const context of contexts) await context.addInitScript(() => {
+    localStorage.setItem('cleaver-name', '테스트친구');
     const Original = window.WebSocket;
     window.WebSocket = class extends Original {
       constructor(url: string | URL, protocols?: string | string[]) {

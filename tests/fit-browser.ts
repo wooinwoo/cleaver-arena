@@ -25,6 +25,7 @@ try {
   for (const [width, height] of viewports) {
     for (const { kind, seats } of cases) {
       const context = await browser.newContext({ viewport: { width, height }, isMobile: width < 760, hasTouch: width < 760 });
+      await context.addInitScript(() => localStorage.setItem('cleaver-name', '맞춤검사'));
       const page = await context.newPage();
       try {
         await page.goto(`${base}/?game=${kind}`);

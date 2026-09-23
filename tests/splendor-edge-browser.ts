@@ -21,7 +21,7 @@ function placeOwned(state: SplendorState) {
 try {
   for (const width of [390, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, hasTouch: true, isMobile: width === 390 });
-    await context.addInitScript('window.__name = fn => fn;');
+    await context.addInitScript('window.__name = fn => fn; localStorage.setItem("cleaver-name", "경계검사");');
     let state = createSplendor(2), me = 0, wire: WebSocketRoute;
     const sent: Action[] = [];
     let rejectNext = false;

@@ -1,0 +1,30 @@
+/* Touch HUD uses the same layout on phones, tablets, and touch laptops. */
+body.has-touch.in-match { --pad-size: clamp(88px, 18vmin, 118px); }
+body.has-touch.in-match header { justify-content: flex-end; }
+body.has-touch.in-match .brand { display: none; }
+body.has-touch.in-match #sound { display: inline-block; }
+body.has-touch.in-match #touch-controls.spectating .pad, body.has-touch.in-match #touch-controls.spectating #fire { opacity: .35; }
+#timer.low { color: var(--coral); animation: low-hp .8s ease-in-out infinite; }
+body.has-touch.in-match .match-bar { top: var(--safe-top); left: var(--safe-left); transform: none; padding: 10px 12px; gap: 12px; }
+body.has-touch.in-match .health-panel { top: calc(var(--safe-top) + 62px); bottom: auto; left: var(--safe-left); width: min(210px, calc(100% - 120px)); padding: 12px; }
+body.has-touch.in-match #match-leave { top: calc(var(--safe-top) + 62px); bottom: auto; right: var(--safe-right); }
+body.has-touch.in-match .pad { bottom: var(--safe-bottom); left: var(--safe-left); width: var(--pad-size); height: var(--pad-size); }
+body.has-touch.in-match .aim-pad { left: auto; right: var(--safe-right); }
+body.has-touch.in-match #fire { right: var(--safe-right); bottom: calc(var(--safe-bottom) + var(--pad-size) + 12px); width: 52px; height: 52px; min-height: 52px; font-size: 14px; }
+body.has-touch.in-match .view-dock { position: absolute; left: 50%; bottom: calc(var(--safe-bottom) + var(--pad-size) + 16px); transform: translateX(-50%); margin: 0; padding: 0; }
+body.has-touch.in-match .view-switch button { padding: 10px 14px; font-size: 13px; }
+body.has-touch.in-match .view-switch button span, body.has-touch.in-match #controls-help { display: none; }
+@media (max-height: 350px) {
+  body.has-touch.in-match .view-dock { bottom: calc(var(--safe-bottom) + var(--pad-size) + 4px); }
+}
+@media (max-width: 480px) and (orientation: portrait) {
+  body.has-touch.in-match .match-bar { padding: 8px 12px; gap: 10px; font-size: 11px; }
+  body.has-touch.in-match .match-bar strong { font-size: 20px; }
+  body.has-touch.in-match .health-panel { top: calc(var(--safe-top) + 56px); padding: 10px 12px; font-size: 12px; }
+  body.has-touch.in-match .health-panel strong { font-size: 16px; }
+  body.has-touch.in-match #match-leave { top: calc(var(--safe-top) + 56px); }
+}
+@media (max-height: 550px) {
+  body.has-touch.in-match .health-panel { width: 100px; padding: 8px; font-size: 11px; }
+  body.in-match #announcement { top: calc(var(--safe-top) + 62px); left: calc(var(--safe-left) + 112px); right: calc(var(--safe-right) + 74px); width: auto; transform: none; font-size: clamp(11px, 2.5vw, 14px); line-height: 1.3; }
+}

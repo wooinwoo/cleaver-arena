@@ -11,6 +11,7 @@ import { createChess, actChess } from '../shared/chess.ts';
 import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
 import { createDavinci, actDavinci, davinciView } from '../shared/davinci.ts';
 import { createCoup, actCoup, coupView } from '../shared/coup.ts';
+import { registerRoomSource, tabletopRoom, type RoomRegistry } from './lobby.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
@@ -31,9 +32,10 @@ type Member = { id: string; name: string; seat: number; ready: boolean; connecte
 type Room = { code: string; kind: TableId; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
 type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
 
-export function attachTabletop(server: Server) {
+export function attachTabletop(server: Server, registry: RoomRegistry) {
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
+  registerRoomSource(registry, () => [...rooms.values()].map(room => tabletopRoom(room)));
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
   const send = (ws: WebSocket, message: unknown) => {
     if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 256_000) ws.send(JSON.stringify(message));

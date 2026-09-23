@@ -1,0 +1,66 @@
+/* 친구네 오락실 — "밤의 오락실" 테마.
+   잉크 블랙 바탕 위에 라임 네온 포인트, 유리 질감 패널, 지마켓 산스 제목.
+   레이아웃·반응형 규칙은 그대로 두고 색·타이포·표면만 이 파일에서 관리한다. */
+@font-face { font-family: 'Gmarket Sans'; src: url('/fonts/GmarketSansBold.woff') format('woff'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Gmarket Sans'; src: url('/fonts/GmarketSansMedium.woff') format('woff'); font-weight: 500; font-display: swap; }
+:root {
+  color-scheme: dark;
+  font-family: Club, 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-display: 'Gmarket Sans', Club, 'Pretendard Variable', 'Apple SD Gothic Neo', sans-serif;
+  --game-accent: #4fe3c1;
+  --app-bg: #0b0d14;
+  --app-bg-soft: #10131c;
+  --app-panel: #151925;
+  --app-panel-glass: #12151fee;
+  --app-raised: #1f2434;
+  --app-hover: #2a3044;
+  --app-line: #ffffff1a;
+  --app-line-strong: #ffffff2e;
+  --app-text: #f5f7fb;
+  --app-soft: #cdd3e0;
+  --app-muted: #aeb7ca;
+  --app-faint: #8b95ac;
+  --text-body: 16px;
+  --text-small: 14px;
+  --text-caption: 12px;
+  --app-accent: #c8ff4d;
+  --app-accent-strong: #dbff7a;
+  --app-accent-ink: #101800;
+  --app-accent-glow: #c8ff4d3d;
+  --app-coral: #ff7d5c;
+  --app-coral-soft: #ff7d5c24;
+  --app-violet: #a48bff;
+  --app-radius: 18px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --ink: var(--app-accent-ink);
+  --paper: var(--app-raised);
+  --mint: var(--app-accent);
+  --muted: var(--app-muted);
+  --coral: var(--app-coral);
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+body { background: var(--app-bg); color: var(--app-text); font-weight: 450; }
+body:not(.in-match) {
+  background-color: var(--app-bg);
+  background-image:
+    radial-gradient(900px 520px at 8% -12%, #c8ff4d1c, transparent 62%),
+    radial-gradient(760px 520px at 104% 104%, #a48bff1f, transparent 60%);
+  background-attachment: fixed;
+}
+::selection { background: var(--app-accent); color: var(--app-accent-ink); }
+
+/* Windows scrollbars: reserve the gutter so content never jumps when a bar appears, and keep the bar quiet. */
+html { scrollbar-gutter: stable; scrollbar-color: #3a4156 transparent; }
+body.in-table, body.in-hub #hub { scrollbar-gutter: stable; }
+body.in-match, body.in-hub, body:not(.in-hub):not(.in-table):not(.in-match) { scrollbar-gutter: auto; }
+* { scrollbar-width: thin; scrollbar-color: #3a4156 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a4156; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #4d5570; background-clip: padding-box; }

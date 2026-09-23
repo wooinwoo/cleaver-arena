@@ -1,0 +1,46 @@
+
+/* Tabletop shell and reusable game panels. Board and gem colours remain semantic. */
+body.in-table #table-page { gap: 24px; margin-top: 12px; }
+body.in-table[data-table-phase='playing'] #table-page { margin-top: 0; padding-bottom: 12px; }
+.table-sidebar { background: var(--app-panel); border: 1px solid var(--app-line); border-radius: 20px; padding: 20px; align-self: start; }
+.table-sidebar h1 { font-size: 26px; margin-bottom: 8px; }
+.table-description { font-size: var(--text-small); line-height: 1.6; margin: 0 0 16px; }
+.table-rules { border-color: var(--app-line); margin-top: 16px; padding-top: 8px; }
+.table-rules summary { color: var(--app-text); font-size: var(--text-small); }
+.table-rules p { color: var(--app-soft); line-height: 1.75; }
+.table-status,#t-action-bar,.empty-board,.davinci-rack,.coup-player,.sp-control { background: var(--app-panel); border: 1px solid var(--app-line); border-radius: var(--app-radius); }
+.table-status { min-height: 60px; margin-bottom: 16px; border-left: 4px solid var(--game-accent); box-shadow: inset 4px 0 24px -12px var(--game-accent); }
+.table-status span,.davinci-rack header span { color: var(--app-muted); }
+#t-log,.empty-board p,.coup-log { color: var(--app-soft); }
+.table-status strong,.empty-board strong { color: var(--app-text); }
+#t-result-review { display: none; }
+.empty-board { min-height: 280px; }
+.empty-board strong { font-size: 21px; }
+body .coup-player > header,body .davinci-rack > header { display: flex; position: static; padding: 0; pointer-events: auto; }
+.coup-player.coup-turn,.davinci-rack.davinci-turn { outline: 2px solid var(--game-accent); outline-offset: 0; box-shadow: 0 0 0 4px color-mix(in srgb, var(--game-accent) 18%, transparent); }
+.coup-player header span { color: #ffc46b; }
+#t-toolbar :is(.coup-act,.coup-target,.coup-pass,.coup-accept) { background: var(--app-raised); color: var(--app-text); }
+#t-toolbar :is(.coup-challenge,.coup-block) { background: var(--app-coral-soft); color: #ffb39f; border-color: #ff7d5c59; }
+#t-toolbar :is(.coup-challenge,.coup-block):hover { background: #ff7d5c3d; }
+.poker-scene-hint { background: #0b0d14e6; color: var(--app-soft); border-radius: 10px; border: 1px solid var(--app-line); }
+.poker-seats .poker-player { background: var(--app-raised); border: 1px solid var(--app-line); }
+.poker-seats .poker-player p,.poker-summary,.poker-decks { color: var(--app-soft); }
+.poker-3d-table { background: var(--app-panel); border: 1px solid var(--app-line); border-radius: var(--app-radius); overflow: hidden; }
+.poker-3d-table .pot,.poker-card-value:not(.sr-only) { color: var(--app-accent); }
+.sp-control,.sp-bank-token { background: var(--app-panel); }
+.sp-bank-token { border: 1px solid var(--app-line); color: var(--app-text); }
+.sp-bank-token:not(:disabled):hover { background: var(--app-raised); }
+.sp-pane-tabs label,.sp-tier-tabs label { background: var(--app-raised); color: var(--app-muted); }
+.sp-player { border-color: var(--app-line); }
+.sp-row-label,.sp-muted,.sp-collection summary { color: var(--app-muted); }
+.sp-deck { background: var(--app-raised); color: var(--app-text); }
+#t-toolbar > span { color: var(--app-soft); }
+.splendor-board { color: var(--app-text); }
+.sp-score,.sp-self .sp-player-heading strong,.sp-picked { color: var(--app-accent); }
+.sp-tier-heading button { background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line); }
+.sp-empty-slot { color: var(--app-muted); border-color: var(--app-line-strong); }
+.sp-card { background: #fffdf2; border: 1px solid #e2dfcb; box-shadow: 0 6px 16px #00000059; }
+.sp-hand { border-color: var(--app-line); }
+.roster-heading span,.hand-row > small,.coup-revealed-names { color: var(--app-muted); }
+#t-action-bar > span { color: var(--app-text); }
+#error,#t-error { color: #ff9f88; }

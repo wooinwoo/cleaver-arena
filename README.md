@@ -121,18 +121,18 @@ cloudflared tunnel --url http://127.0.0.1:3186 --protocol http2
 
 ## 검증
 
+기본 확인(빠름):
+
 ```bash
-npm test
 npm run build
-npm run test:browser
-npm run test:tables
-npm run test:splendor
-npm run test:splendor:edges
-npm run test:reconnect
-npm run test:responsive
-npm exec tsx tests/poker-loading-browser.ts
-npm exec tsx tests/poker-duel-browser.ts
-npm exec tsx tests/mundo-browser.ts
+npm run test:quick   # 단위 + test:fit + test:responsive
+```
+
+전체 브라우저 검증(느림, 필요할 때만):
+
+```bash
+npm run test:full
+# 또는 개별: test:browser / test:tables / test:splendor / test:splendor:edges / test:reconnect
 ```
 
 [스플렌더 규칙·실행 검증 기록](docs/splendor-audit.md)에 공식 규칙 대조, 방 예외, 실제 완주 및 희귀 상황 검사 범위를 정리했습니다.

@@ -1,0 +1,25 @@
+/* Cascade order is load-bearing: all layout first, then theme overrides.
+   Do not reorder imports without re-checking responsive/hub tests. */
+@import './layout/base.css';
+@import './layout/hub.css';
+@import './layout/table.css';
+@import './layout/responsive.css';
+@import './layout/touch.css';
+@import './layout/poker.css';
+@import './layout/match-fx.css';
+@import './layout/davinci.css';
+@import './layout/coup.css';
+
+@import './theme/tokens.css';
+@import './theme/type.css';
+@import './theme/header.css';
+@import './theme/controls.css';
+@import './theme/panels.css';
+@import './theme/table.css';
+@import './theme/identity.css';
+@import './theme/match.css';
+@import './theme/responsive.css';
+@import './theme/hub.css';
+@import './theme/entry-room.css';
+@import './theme/rules-dialog.css';
+@import './theme/quoridor.css';

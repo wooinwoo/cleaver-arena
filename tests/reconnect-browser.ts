@@ -32,6 +32,7 @@ const errors: string[] = [];
 try {
   for (const kind of ['gomoku', 'cleaver']) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await context.addInitScript(() => localStorage.setItem('cleaver-name', '복귀 확인'));
     const page = await context.newPage();
     const messages: { type: string }[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -40,6 +41,7 @@ try {
     }));
     await page.goto(`${base}/?game=${kind}`);
     await expect(page.locator('#loading')).toBeHidden({ timeout: 60_000 });
+    await expect(page.locator('#nickname-gate')).toBeHidden();
     await page.locator(kind === 'cleaver' ? '#nickname' : '#t-name').fill('복귀 확인');
     await page.locator(kind === 'cleaver' ? '#create' : '#t-entry button[type=submit]').click();
     const code = page.locator(kind === 'cleaver' ? '#code' : '#t-code');

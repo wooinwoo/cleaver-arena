@@ -1,6 +1,6 @@
 # 공통 앱 UI
 
-색과 간격, 버튼, 패널, 입장·대기실·결과 레이아웃은 `src/ui/app.css`에서 관리합니다. `src/style.css`는 경기장과 보드의 기본 구조를, `src/splendor.css`는 스플렌더의 카드·보석 구조를 담당합니다. 새 화면도 `--app-*`, `--space-*` 토큰과 기존 `.primary`, `.form-field`, `.table-status` 등의 공통 스타일을 사용합니다.
+색과 간격, 버튼, 패널, 입장·대기실·결과 레이아웃은 `src/styles/theme/`에서 관리합니다. `src/styles/layout/`은 경기장과 보드의 기본 구조를, `src/splendor.css`는 스플렌더의 카드·보석 구조를 담당합니다. 진입점은 `src/styles/index.css`이며, **import 순서(layout → theme)가 캐스케이드 우선순위**이므로 순서를 바꾸지 않습니다. 새 화면도 `--app-*`, `--space-*` 토큰과 기존 `.primary`, `.form-field`, `.table-status` 등의 공통 스타일을 사용합니다.
 
 - 테마 "밤의 오락실": 바탕은 잉크 블랙 `#0b0d14`, 패널 `#151925`, 올림 면 `#1f2434`, 선은 흰색 8~15% 투명. 기본 조작색은 라임 `#c8ff4d`(글자 `#101800`), 보조는 코랄 `#ff7d5c`(경고·도전·발사)와 바이올렛 `#a48bff`(배경 광원). 게임별 색은 `src/ui/game-art.ts`의 세 번째 값이며 어두운 바탕에서 빛나도록 밝게 잡고, 표지·초대 코드·현재 차례·게임 카드 그라데이션에 씁니다.
 - 표면: 3D 경기장 위의 입장·대기 패널과 헤더, 시점 스위치, 토스트는 반투명 + `backdrop-filter` 유리 질감. 기본 버튼은 라임 면에 라임 글로우, 초대 코드는 점선 테두리의 티켓 형태.
@@ -14,6 +14,6 @@
 - 여러 명의 쿠데타·다빈치코드는 참가자 정보를 두 열에 배치합니다. 이름을 숨겨서 높이를 줄이지 않습니다.
 - 기본 상태는 320×568부터 페이지 스크롤을 줄입니다. 키보드, 펼친 규칙·설정·최종 보드, 긴 손패처럼 내용 확인에 필요한 스크롤은 허용합니다.
 
-검증: `npm run build`, `npm run test:fit`, `npm run test:responsive`, `npm run test:tables`. Windows에서 `CHROME_PATH`에 Chrome 실행 파일 경로를 지정합니다. 화면 캡처는 `artifacts/`에 생성됩니다. `test:fit`은 참가자 이름과 게임 시작 상태도 확인하고, `test:responsive`는 모든 게임과 검색·페이지 이동, 모바일 입장·대기실의 넘침을 검사합니다.
+검증: `npm run build`, `npm run test:quick`(단위·`test:fit`·`test:responsive`). 긴 브라우저 전경 검증은 `npm run test:full` 또는 개별 스크립트. Windows에서 `CHROME_PATH`에 Chrome 실행 파일 경로를 지정합니다. 화면 캡처는 `artifacts/`에 생성됩니다. `test:fit`은 참가자 이름과 게임 시작 상태도 확인하고, `test:responsive`는 모든 게임과 검색·페이지 이동, 모바일 입장·대기실의 넘침을 검사합니다.
 
 게임별 표지와 입장 화면의 게임 소개는 `src/ui/game-art.ts`에서 공유합니다. 9종 SVG 표지를 게임 목록·입장·대기 화면에 재사용하고 플레이·결과 단계에서는 보드 공간을 차지하지 않도록 생략합니다. 글꼴은 본문 Pretendard(`/fonts/club-*.woff2`, 이름 `Club`), 제목·브랜드·방 코드·타이머는 지마켓 산스(`/fonts/GmarketSans*.woff`, `--font-display`)입니다. 지마켓 산스는 글자폭과 행간이 커서 320px 폭·700px 이하 화면에서는 제목을 22px로 줄입니다. 버튼·상태창·참가자·결과 패널도 같은 토큰을 사용합니다.

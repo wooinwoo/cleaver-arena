@@ -1,0 +1,19 @@
+
+/* Entry and room surfaces follow the same app navigation and spacing. */
+.game-identity { gap: 18px; margin-bottom: 24px; }
+.game-identity h1 { font-size: 26px; }
+.identity-art { flex-basis: 80px; height: 80px; border-radius: 22px; }
+.table-status { border-left-width: 4px; }
+@media (max-width: 760px) {
+  body.in-table #table-page { padding: 10px 20px 16px; }
+  body.in-table:not([data-table-phase='playing']) .table-sidebar { border: 0; border-radius: 0; padding: 0; background: none; }
+  body.in-table .game-identity { margin-bottom: 22px; }
+  .identity-art { height: 72px; flex-basis: 72px; }
+  body:not(.in-hub):not(.in-table):not(.in-match) #lobby { width: calc(100% - 40px); padding: 0; margin-top: 18px; border: 0; background: none; }
+  body:not(.in-hub):not(.in-table):not(.in-match) > canvas { opacity: 0; }
+  body[data-table-phase='lobby'] .game-identity { margin-bottom: 14px; }
+  body[data-table-phase='lobby'] .identity-art { height: 48px; flex-basis: 62px; }
+  #t-room > summary { min-height: 32px; padding: 4px 0; }
+  .table-rules { padding-top: 8px; }
+  body[data-table-phase='finished'] .table-sidebar { padding: 12px 0 0; }
+}

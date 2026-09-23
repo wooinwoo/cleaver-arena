@@ -1,0 +1,13 @@
+
+/* Header. */
+body > header { background: #0b0d14a6; border-bottom: 1px solid var(--app-line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+body.in-match > header { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+body:not(.in-hub) #install-app { display: none; }
+body > header { padding: 18px 32px; }
+.brand { font-size: 18px; gap: 10px; letter-spacing: 0; color: var(--app-text); }
+.brand svg { fill: var(--app-accent); width: 32px; height: 32px; transform: rotate(-9deg); filter: drop-shadow(0 0 10px #c8ff4d66); }
+.brand circle { fill: var(--app-bg); }
+.brand path[fill] { fill: var(--app-bg); }
+.brand small { display: none; }
+#connection { background: var(--app-raised); color: var(--app-soft); border: 1px solid var(--app-line); border-radius: 999px; }
+#connection::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--app-accent); margin-right: 8px; box-shadow: 0 0 8px var(--app-accent); vertical-align: 1px; }

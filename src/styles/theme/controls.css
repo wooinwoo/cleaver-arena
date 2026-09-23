@@ -1,0 +1,31 @@
+
+/* Controls. */
+button { background: var(--app-raised); color: var(--app-text); }
+button:hover { background: var(--app-hover); }
+/* Sentences people actually read (descriptions, rules, logs, hints) use the brighter soft tone; metadata stays muted. */
+:is(.intro,.help,.table-description,#view-note,#ready-help,#t-ready-note,.table-rules p,#t-rules-text,#settings-note,.empty-board p,#t-log,.coup-log,.sp-hint,.settings-disclosure > summary span,.poker-scene-hint,.poker-summary,.poker-decks) { color: var(--app-soft); }
+.fineprint { color: var(--app-muted); }
+label { color: #dde2ee; font-size: var(--text-small); line-height: 1.45; font-weight: 600; }
+input, select, #game-search { border: 1px solid var(--app-line-strong); background: #0b0d14; color: var(--app-text); border-radius: 12px; min-height: 46px; padding: 11px 14px; font-size: 16px; caret-color: var(--app-accent); transition: border-color .15s, box-shadow .15s; }
+select { background-image: linear-gradient(45deg, transparent 50%, var(--app-muted) 50%), linear-gradient(135deg, var(--app-muted) 50%, transparent 50%); background-position: calc(100% - 19px) 50%, calc(100% - 14px) 50%; background-size: 5px 5px; background-repeat: no-repeat; appearance: none; -webkit-appearance: none; padding-right: 34px; }
+input::placeholder { color: var(--app-faint); }
+input:focus,select:focus,#game-search:focus { border-color: var(--app-accent); box-shadow: 0 0 0 3px var(--app-accent-glow); outline: none; }
+button:focus-visible,a:focus-visible,summary:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+input:focus-visible,select:focus-visible { outline: none; }
+:is(.icon-button,.join-row button,.invite button,.table-invite button,#apply-settings,#t-cancel,#t-toolbar button,.poker-actions button,.sp-choice button) { background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line); border-radius: 12px; }
+:is(.icon-button,.join-row button,.invite button,.table-invite button,#apply-settings,#t-cancel,#t-toolbar button,.poker-actions button,.sp-choice button):hover { background: var(--app-hover); border-color: var(--app-line-strong); }
+.icon-button { font-size: 13px; }
+.primary, .poker-actions .primary, .sp-choice .primary, #t-toolbar button.selected { background: var(--app-accent); color: var(--app-accent-ink); border: 0; border-radius: 12px; box-shadow: 0 8px 28px var(--app-accent-glow), inset 0 1px 0 #ffffff66; font-weight: 800; }
+.primary:hover,.poker-actions .primary:hover,.sp-choice .primary:hover,#t-toolbar button.selected:hover { background: var(--app-accent-strong); }
+.primary:disabled { opacity: .4; box-shadow: none; }
+.text-button { color: var(--app-soft); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #ffffff40; }
+.text-button:hover { color: var(--app-text); }
+#loading { background: var(--app-bg); }
+#loading span { color: var(--app-muted); }
+#loading strong { font-size: 24px; letter-spacing: 0; }
+.splash-mark rect { fill: var(--app-accent); }
+.splash-mark path { fill: var(--app-bg); }
+.splash-mark { filter: drop-shadow(0 0 24px #c8ff4d80); }
+#error:empty { display: none; }
+#toast { position: fixed; background: #171b28f2; color: var(--app-text); border: 1px solid #c8ff4d59; box-shadow: 0 12px 34px #00000080, 0 0 0 1px #00000060; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 12px; }
+body:not(.in-match) #toast { top: auto; bottom: max(18px, env(safe-area-inset-bottom)); width: max-content; max-width: calc(100% - 32px); pointer-events: none; }

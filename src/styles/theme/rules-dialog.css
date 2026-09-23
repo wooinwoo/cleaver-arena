@@ -1,0 +1,48 @@
+
+/* Rules dialog: the game's rules in the centre of the screen, big enough to read across the table. */
+html.rules-open, html.rules-open body { overflow: hidden; }
+.rules-dialog { width: min(680px, calc(100% - 32px)); max-height: min(88dvh, 900px); margin: auto; padding: 0; border: 1px solid var(--app-line-strong); border-radius: 26px; background: var(--app-panel); color: var(--app-text); box-shadow: 0 40px 100px #000000b3, 0 0 0 1px #00000080; overflow: auto; overscroll-behavior: contain; }
+.rules-dialog::backdrop { background: #05060acc; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.rules-dialog[open] { animation: rules-in .22s ease-out; }
+@keyframes rules-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+.rules-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 16px; padding: 22px 22px 16px; background: linear-gradient(var(--app-panel) 78%, transparent); }
+.rules-art { flex: 0 0 76px; height: 68px; overflow: hidden; border-radius: 18px; box-shadow: 0 8px 22px #00000073, 0 0 0 1px #ffffff1f; }
+.rules-art svg { display: block; width: 100%; height: 100%; }
+.rules-heading { flex: 1; min-width: 0; }
+.rules-eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--app-accent); }
+.rules-dialog h2 { margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.rules-subtitle { margin: 6px 0 0; font-size: var(--text-small); color: var(--app-soft); }
+.rules-close { flex: 0 0 auto; width: 40px; min-height: 40px; padding: 0; border-radius: 50%; background: var(--app-raised); border: 1px solid var(--app-line); color: var(--app-text); font-size: 16px; }
+.rules-list { margin: 0; padding: 4px 24px 8px; list-style: none; counter-reset: rule; display: grid; gap: 10px; }
+.rules-list li { counter-increment: rule; position: relative; padding: 12px 14px 12px 52px; border-radius: 14px; background: #ffffff06; border: 1px solid var(--app-line); font-size: 16px; line-height: 1.7; color: var(--app-text); overflow-wrap: anywhere; }
+.rules-list li::before { content: counter(rule); position: absolute; left: 14px; top: 12px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--app-accent); color: var(--app-accent-ink); font-family: var(--font-display); font-weight: 700; font-size: 13px; }
+.rules-video { display: flex; align-items: center; gap: 14px; margin: 16px 24px 0; padding: 12px; border-radius: 16px; background: var(--app-raised); border: 1px solid var(--app-line); color: var(--app-text); text-decoration: none; transition: border-color .15s, background .15s; }
+.rules-video:hover { border-color: #ff4d4d99; background: var(--app-hover); }
+.rules-thumb { position: relative; flex: 0 0 132px; height: 76px; overflow: hidden; border-radius: 10px; background: linear-gradient(135deg, #2a3044, #0b0d14); }
+.rules-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.rules-thumb i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 40px; height: 28px; border-radius: 8px; background: #ff0000; color: #fff; font-size: 13px; font-style: normal; }
+.rules-video-copy { display: grid; gap: 4px; min-width: 0; }
+.rules-video-copy b { font-size: 15px; }
+.rules-video-copy small { font-size: 13px; color: var(--app-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rules-video-copy em { font-style: normal; font-size: 12px; color: var(--app-muted); }
+.rules-dialog .rules-ok { width: calc(100% - 48px); margin: 18px 24px 24px; }
+.table-rules > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; list-style: none; cursor: pointer; }
+.table-rules > summary::-webkit-details-marker { display: none; }
+.table-rules > summary::after { content: '크게 보기 ↗'; flex: 0 0 auto; font-size: 12px; font-weight: 700; color: var(--app-accent); }
+.table-rules > p { display: none; }
+.link-button { display: inline; width: auto; min-height: 0; margin: 0; padding: 0 2px; background: none; border: 0; color: var(--app-accent); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: #c8ff4d66; white-space: nowrap; }
+.link-button:hover { background: none; color: var(--app-accent-strong); }
+@media (max-width: 760px) {
+  .rules-dialog { width: 100%; max-width: none; max-height: 92dvh; margin: auto 0 0; border-radius: 24px 24px 0 0; border-bottom: 0; }
+  .rules-dialog[open] { animation-name: rules-up; }
+  @keyframes rules-up { from { transform: translateY(40px); opacity: 0; } }
+  .rules-head { padding: 18px 16px 12px; gap: 12px; }
+  .rules-art { flex-basis: 60px; height: 54px; border-radius: 14px; }
+  .rules-dialog h2 { font-size: 24px; }
+  .rules-list { padding: 2px 16px 6px; gap: 8px; }
+  .rules-list li { padding: 11px 12px 11px 46px; font-size: 15px; line-height: 1.65; }
+  .rules-list li::before { left: 11px; top: 11px; width: 26px; height: 26px; font-size: 12px; }
+  .rules-video { margin: 12px 16px 0; }
+  .rules-thumb { flex-basis: 108px; height: 62px; }
+  .rules-dialog .rules-ok { width: calc(100% - 32px); margin: 14px 16px calc(16px + env(safe-area-inset-bottom)); }
+}

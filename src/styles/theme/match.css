@@ -1,0 +1,24 @@
+
+/* In-match overlays use the same panel and control vocabulary. */
+.match-bar,.health-panel { background: #0b0d14cc; border: 1px solid var(--app-line-strong); box-shadow: 0 10px 30px #00000080; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.match-bar strong { color: var(--app-accent); }
+body.in-match .icon-button { background: #0b0d14cc; color: var(--app-text); }
+.health-track { background: #ffffff1f; }
+#health-fill { background: var(--app-accent); box-shadow: 0 0 12px var(--app-accent); }
+#health-fill.low { background: var(--app-coral); box-shadow: 0 0 12px var(--app-coral); }
+#timer.low { color: var(--app-coral); }
+#spell-controls button { background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line-strong); border-radius: 12px; }
+#spell-controls button:not(:disabled) { background: var(--app-accent); color: var(--app-accent-ink); box-shadow: 0 0 0 2px #c8ff4d40, 0 8px 24px #c8ff4d40; }
+#spell-controls button:disabled { background: #0b0d14cc; color: var(--app-muted); }
+body.has-touch.in-match #spell-controls button { border-radius: 12px; box-shadow: none; }
+body.has-touch.in-match #spell-controls button:not(:disabled) { background: var(--app-accent); color: var(--app-accent-ink); }
+body.has-touch.in-match #spell-controls button:disabled { background: #0b0d14cc; color: var(--app-muted); }
+.pad { border-color: #ffffff40; background: #0b0d1466; }
+.pad-thumb { background: #c8ff4dbf; }
+.aim-pad .pad-thumb { background: #ff7d5cbf; }
+#fire { background: var(--app-coral); color: #2a0d05; box-shadow: 0 0 0 4px #ff7d5c33, 0 8px 22px #ff7d5c59; }
+body.in-match .brand { color: var(--app-text); text-shadow: 0 1px 6px #000000b3; }
+body.in-match .brand small { color: var(--app-muted); }
+#announcement { color: #fff; text-shadow: 0 4px 18px #000000cc, 0 0 40px #c8ff4d66; }
+body.has-touch.in-match #view-note { background: #0b0d14cc; color: var(--app-muted); }
+body.has-touch.in-match .pad b { color: #fff; text-shadow: 0 1px 3px #000c; }

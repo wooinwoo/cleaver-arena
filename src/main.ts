@@ -1,4 +1,4 @@
-import './style.css';
+import './styles/index.css';
 import type { World } from './world.ts';
 import { COLORS } from './palette.ts';
 import { isTableId } from '../shared/catalog.ts';
@@ -6,7 +6,6 @@ import { initTabletop } from './tabletop.ts';
 import type { ArenaMap, Game, Input } from '../shared/game.ts';
 import { initGameFinder } from './ui/game-finder.ts';
 import { gameArt } from './ui/game-art.ts';
-import './ui/app.css';
 import { openRules } from './ui/rules-dialog.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -31,6 +30,7 @@ let rosterKey = '';
 let phaseKey = '';
 let lastPhase = '';
 let lastAliveIds = '';
+let landscapeHintShown = false;
 let settingsKey = '';
 let mouseFire = false;
 let pulseUntil = 0;
@@ -46,7 +46,7 @@ let freshState = false;
 let hitAnimation: Animation | undefined;
 
 function openGame() {
-  if (!world) { location.assign('/?game=cleaver'); return; }
+  if (!world) { location.assign('/?game=cleaver&create=1'); return; }
   $('hub').hidden = true;
   $('lobby').hidden = false;
   $('games-menu').hidden = false;
@@ -55,15 +55,160 @@ function openGame() {
   history.replaceState(null, '', '/?game=cleaver');
   world.engine.resize();
 }
-$('choose-cleaver').onclick = openGame;
-document.querySelectorAll<HTMLButtonElement>('[data-game]').forEach(button => {
-  button.onclick = () => location.assign(`/?game=${button.dataset.game}`);
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+function savedName() { return (localStorage.getItem('cleaver-name') ?? '').trim(); }
+function applyName(name: string) {
+  localStorage.setItem('cleaver-name', name);
+  nameInput.value = name;
+  $('me-name').textContent = name;
+  const gateName = $<HTMLInputElement>('gate-name');
+  gateName.value = name;
+  if (lobbySocket?.readyState === WebSocket.OPEN) lobbySocket.send(JSON.stringify({ type: 'hello', name }));
+}
+document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => {
+  const game = cell.dataset.game!;
+  const play = cell.querySelector<HTMLButtonElement>('.game-option');
+  if (play) play.onclick = () => {
+    const name = savedName();
+    if (!name) { pendingAfterGate = `/?game=${game}&create=1`; showGate(); return; }
+    location.assign(`/?game=${game}&create=1`);
+  };
+});
+document.querySelectorAll<HTMLButtonElement>('[data-practice]').forEach(button => {
+  button.onclick = () => {
+    const name = savedName();
+    if (!name) { pendingAfterGate = '/?game=cleaver&practice=1'; showGate(); return; }
+    location.assign('/?game=cleaver&practice=1');
+  };
 });
 initGameFinder();
 document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
 const CLEAVER_RULES = '경기장에 따라 1:1 반원 대결, 개인전, 팀전(2·4·6명, 최대 3:3)으로 붙어요. 중앙 와드가 있는 경기장에서는 와드 선을 넘지 않고 각자 반원 안에서만 움직여요. PC는 우클릭으로 이동하고 좌클릭 또는 Q로 식칼을 던져요. 모바일은 왼쪽 패드로 이동, 오른쪽 패드로 조준하고 손을 떼면 발사해요. 식칼에 맞으면 체력이 줄고 0이 되면 탈락해요. 점멸(F)은 마우스 방향으로 순간이동, 유체화(D)는 잠시 빠르게 달려요. 주문 대기시간은 방장이 경기 설정에서 정해요. 시점은 탑뷰(롤 시점)와 1인칭 중 방장이 고르고 참가자 모두 같은 시점으로 해요. 마지막까지 살아남은 사람 또는 팀이 이겨요.';
 $('rules-open').onclick = () => openRules('cleaver', '문도피구', CLEAVER_RULES);
 $('games-menu').onclick = () => { if (session) leave(); else location.assign('/'); };
+document.querySelector('.brand')?.addEventListener('click', event => {
+  const code = state?.code ?? session?.code;
+  if (code) { event.preventDefault(); location.assign(`/?game=cleaver&room=${code}`); }
+  else { event.preventDefault(); location.assign('/'); }
+});
+
+// —— 닉네임 게이트 · 홈(열린 방) ——
+let pendingAfterGate: string | null = null;
+let lobbySocket: WebSocket | null = null;
+let lobbyRetry: ReturnType<typeof setTimeout> | undefined;
+
+function showGate() {
+  $('loading').hidden = true;
+  $('hub').hidden = true;
+  $('lobby').hidden = true;
+  $('nickname-gate').hidden = false;
+  document.body.classList.remove('in-hub');
+  document.body.classList.add('in-gate');
+  const gateName = $<HTMLInputElement>('gate-name');
+  gateName.value = savedName();
+  gateName.focus({ preventScroll: true });
+}
+
+function closeLobbySocket() {
+  clearTimeout(lobbyRetry);
+  lobbySocket?.close();
+  lobbySocket = null;
+}
+
+function connectLobby(name: string) {
+  closeLobbySocket();
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/lobby-ws`);
+  lobbySocket = ws;
+  ws.onopen = () => { $('open-rooms').hidden = false; ws.send(JSON.stringify({ type: 'hello', name })); };
+  ws.onmessage = event => {
+    if (ws !== lobbySocket) return;
+    const data = JSON.parse(event.data);
+    if (data.type === 'lobby') renderOpenRooms(data);
+    else if (data.type === 'error') $('open-rooms-status').textContent = data.message;
+  };
+  ws.onclose = () => {
+    if (ws !== lobbySocket || !document.body.classList.contains('in-hub')) return;
+    $('open-rooms-status').textContent = '연결 끊김 · 재시도 중';
+    lobbyRetry = setTimeout(() => { if (document.body.classList.contains('in-hub')) connectLobby(savedName()); }, 3000);
+  };
+  ws.onerror = () => { if (ws === lobbySocket) $('open-rooms-status').textContent = '연결 실패'; };
+}
+
+function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<string, string | number>[] }) {
+  const members = data.members ?? [];
+  const rooms = (data.rooms ?? []) as { game: string; code: string; title: string; players: number; capacity: number; host: string; note: string }[];
+  $('open-rooms').hidden = false;
+  $('open-rooms-status').textContent = members.length ? `${members.length}명 접속 중 · 방 ${rooms.length}개` : `방 ${rooms.length}개`;
+  const list = $('open-rooms-list');
+  if (!rooms.length) {
+    list.innerHTML = '<li class="open-empty">지금 열려 있는 방이 없어요. 게임 카드를 눌러 하나 만들까요?</li>';
+    return;
+  }
+  list.replaceChildren(...rooms.map(room => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'open-room';
+    button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.note)} · ${escapeHtml(room.host)}</small></span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
+    button.onclick = () => {
+      const name = savedName();
+      const target = `/?game=${room.game}&room=${room.code}`;
+      if (!name) { pendingAfterGate = target; showGate(); return; }
+      location.assign(target);
+    };
+    item.append(button);
+    return item;
+  }));
+}
+
+function enterHome(name: string) {
+  closeLobbySocket();
+  $('nickname-gate').hidden = true;
+  document.body.classList.remove('in-gate');
+  $('hub').hidden = false;
+  document.body.classList.add('in-hub');
+  document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
+  $('loading').hidden = true;
+  $('connection').textContent = '게임을 선택해 주세요';
+  $('me-name').textContent = name;
+  nameInput.value = name;
+  connectLobby(name);
+}
+
+$('gate-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const name = $<HTMLInputElement>('gate-name').value.trim();
+  if (!name) { $<HTMLInputElement>('gate-name').reportValidity(); return; }
+  applyName(name);
+  const target = pendingAfterGate;
+  pendingAfterGate = null;
+  if (target) location.assign(target);
+  else enterHome(name);
+});
+
+$('me-edit').onclick = () => {
+  const input = $<HTMLInputElement>('me-input');
+  input.value = savedName();
+  $('me-edit').hidden = true;
+  input.hidden = false;
+  input.focus();
+  input.select();
+};
+function commitMeName() {
+  const input = $<HTMLInputElement>('me-input');
+  if (input.hidden) return;
+  const name = input.value.trim().slice(0, 12);
+  input.hidden = true;
+  $('me-edit').hidden = false;
+  if (name) { applyName(name); toast('닉네임을 바꿨어요.'); }
+  else input.value = savedName();
+}
+$<HTMLInputElement>('me-input').addEventListener('blur', commitMeName);
+$<HTMLInputElement>('me-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') { event.preventDefault(); commitMeName(); }
+  if (event.key === 'Escape') { const input = $<HTMLInputElement>('me-input'); input.value = savedName(); input.hidden = true; $('me-edit').hidden = false; }
+});
+
 
 function toast(message: string) {
   $('toast').textContent = message;
@@ -180,7 +325,10 @@ function renderState() {
   if (!state) return;
   const me = state.players.find(p => p.id === myId);
   if (!me) return;
-  if (lastPhase === 'countdown' && state.phase === 'playing') { toast('시작! 식칼을 던져요'); sound(880, .15); }
+  if (lastPhase === 'countdown' && state.phase === 'playing') {
+    toast('시작! 식칼을 던져요'); sound(880, .15);
+    if (touch && !landscapeHintShown && innerHeight > innerWidth) { landscapeHintShown = true; setTimeout(() => toast('가로로 돌리면 경기장이 더 넓게 보여요'), 3200); }
+  }
   lastPhase = state.phase;
   const aliveIds = state.players.filter(p => p.hp > 0 && p.connected).map(p => p.id);
   if (state.phase === 'playing' && lastAliveIds && aliveIds.length < lastAliveIds.split(',').length) {
@@ -221,7 +369,7 @@ function renderState() {
         const head = state.winner.endsWith(' 승리') ? state.winner.slice(0, -' 승리'.length) : state.winner;
         const headSpan = document.createElement('span'); headSpan.textContent = head; title.append(headSpan);
         if (head !== state.winner) { const tail = document.createElement('span'); tail.className = 'title-suffix'; tail.textContent = ' 승리'; title.append(tail); }
-        $('ready-help').textContent = '한 판 더? 모두 다시 준비하면 시작해요.';
+        $('ready-help').textContent = `한 판 더? 모두 다시 준비하면 시작해요. (방금 ${state.round}라운드)`;
         sound(me.hp > 0 ? 650 : 180, .3);
         toast(`${state.winner} · 다시 준비를 눌러 주세요`);
       }
@@ -264,7 +412,7 @@ function renderState() {
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
     $('room-mode').textContent = `${state.map === 'baron' ? '바론 둥지' : state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.';
+    if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.') + (touch ? ' 조작: 왼손 이동 · 오른손 조준 · 손 떼면 발사.' : '');
   }
 }
 
@@ -324,6 +472,17 @@ $('copy').onclick = async () => {
   try { await navigator.clipboard.writeText(url); toast('초대 링크 복사 완료! 친구에게 보내 주세요.'); }
   catch { window.prompt('초대 링크를 복사해 주세요.', url); }
 };
+{
+  const share = $<HTMLButtonElement>('share');
+  if (navigator.share) {
+    share.hidden = false;
+    share.onclick = async () => {
+      const url = `${location.origin}/?game=cleaver&room=${state?.code ?? session?.code}`;
+      try { await navigator.share({ title: '친구네 오락실', text: '우리 방에 와!', url }); }
+      catch { /* user cancelled */ }
+    };
+  }
+}
 
 function setView(view: 'top' | 'fps') {
   resetControls();
@@ -482,14 +641,26 @@ $('fullscreen').onclick = async () => {
 };
 
 async function boot() {
-const gameId = new URLSearchParams(location.search).get('game');
-if (isTableId(gameId)) { initTabletop(gameId); return; }
-const home = !gameId && !new URLSearchParams(location.search).has('room');
+const params = new URLSearchParams(location.search);
+const gameId = params.get('game');
+const roomCode = params.get('room');
+const createIntent = params.get('create') === '1';
+const practiceIntent = params.get('practice') === '1';
+const home = !gameId && !roomCode;
+
 if (home) {
-  document.body.classList.add('in-hub');
-  document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('loading').hidden = true;
-  $('connection').textContent = '게임을 선택해 주세요';
+  const name = savedName();
+  if (!name) showGate();
+  else enterHome(name);
+  return;
+}
+if (isTableId(gameId)) { initTabletop(gameId, { create: createIntent }); return; }
+
+// 초대 링크·문도 진입: 닉네임이 없으면 게이트를 거쳐 다시 돌아온다.
+if (!savedName() && !sessionStorage.getItem(sessionKey)) {
+  pendingAfterGate = location.pathname + location.search;
+  showGate();
   return;
 }
 try {
@@ -524,11 +695,10 @@ try {
     $('hit-flash').classList.add('hit');
     setTimeout(() => $('hit-flash').classList.remove('hit'), 150);
   };
-  world.scene.executeWhenReady(() => { $('loading').hidden = true; $<HTMLButtonElement>('choose-cleaver').disabled = false; });
+  world.scene.executeWhenReady(() => { $('loading').hidden = true; });
   setView('top');
-  nameInput.value = localStorage.getItem('cleaver-name') ?? '';
-  const roomCode = new URLSearchParams(location.search).get('room');
-  if (roomCode || new URLSearchParams(location.search).get('game') === 'cleaver') {
+  nameInput.value = savedName();
+  if (roomCode || gameId === 'cleaver') {
     $('hub').hidden = true; $('lobby').hidden = false; $('games-menu').hidden = false;
   } else {
     document.body.classList.add('in-hub');
@@ -536,11 +706,16 @@ try {
   }
   if (roomCode) {
     codeInput.value = roomCode.toUpperCase().slice(0, 6);
-    document.querySelector('#entry .fineprint')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요 · 방장의 시점 설정을 따라가요`;
+    document.querySelector('#entry-note')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요 · 방장의 시점 설정을 따라가요`;
     toast('초대받았어요! 닉네임을 입력하고 입장을 눌러 주세요.');
     nameInput.focus({ preventScroll: true });
     for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = true;
     $('view-note').textContent = '방장의 시점 설정을 따라가요';
+  } else if (createIntent && savedName()) {
+    // 맵·시점 확인 후 확정: 닉네임은 채워져 있으니 방 만들기에 포커스만 준다.
+    world.scene.executeWhenReady(() => $<HTMLButtonElement>('create').focus({ preventScroll: true }));
+  } else if (practiceIntent) {
+    world.scene.executeWhenReady(() => { if (!nameInput.value.trim()) nameInput.value = '연습생'; enter(true); });
   }
   try {
     const saved = JSON.parse(sessionStorage.getItem(sessionKey) ?? 'null');

@@ -6,16 +6,20 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game, type Player } from '../shared/game.ts';
 import { attachTabletop } from './tabletop.ts';
+import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, type OpenRoom } from './lobby.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
 type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean };
 const publicDir = fileURLToPath(new URL('../dist/', import.meta.url));
-const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json' };
 
 export function createArenaServer() {
   // ponytail: Rooms live in one process. Add shared state and room routing only when scaling beyond one server.
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
+  const registry = createRoomRegistry();
+  registerRoomSource(registry, (): OpenRoom[] =>
+    [...rooms.entries()].map(([code, room]) => cleaverRoom(code, room.game)));
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -37,9 +41,10 @@ export function createArenaServer() {
     } catch { res.writeHead(404).end('게임을 먼저 빌드해 주세요.'); }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
-  const closeTables = attachTabletop(server);
+  const closeTables = attachTabletop(server, registry);
+  const lobby = attachLobby(server, registry);
   server.on('upgrade', (req, socket, head) => {
-    if (req.url === '/table-ws') return;
+    if (req.url === '/table-ws' || req.url === '/lobby-ws') return;
     if (req.url !== '/ws' || clients.size >= 120) { socket.destroy(); return; }
     if (req.headers.origin) {
       try { if (new URL(req.headers.origin).host !== req.headers.host) { socket.destroy(); return; } }
@@ -193,7 +198,7 @@ export function createArenaServer() {
     server, rooms,
     async close() {
       clearInterval(simulation); clearInterval(broadcast); clearInterval(heartbeat);
-      closeTables();
+      closeTables(); lobby.close();
       for (const ws of clients.keys()) ws.terminate();
       wss.close();
       await new Promise<void>(done => server.close(() => done()));

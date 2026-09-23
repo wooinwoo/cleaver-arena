@@ -14,6 +14,7 @@ const errors: string[] = [];
 async function page(mobile = false) {
   const context = await browser.newContext({ viewport: mobile ? { width: 844, height: 390 } : { width: 1440, height: 900 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 1 : 2 });
   await context.addInitScript(() => {
+    localStorage.setItem('cleaver-name', '테스트친구');
     const Original = window.WebSocket;
     window.WebSocket = class extends Original {
       constructor(url: string | URL, protocols?: string | string[]) {
@@ -29,7 +30,8 @@ async function page(mobile = false) {
   tab.on('pageerror', error => { errors.push(error.message); console.error('BROWSER:', error.message); });
   await tab.goto(base, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await expect(tab.locator('#loading')).toBeHidden({ timeout: 60_000 });
-  await tab.locator('#choose-cleaver').click();
+  await expect(tab.locator('#nickname-gate')).toBeHidden({ timeout: 10_000 });
+  await tab.locator('.game-cell[data-game="cleaver"] .game-option').click();
   return tab;
 }
 async function finishDuel(a: Page, b: Page, label: string) {
@@ -118,7 +120,7 @@ try {
   for (const tab of onlyArena ? [] : [a, b]) {
     await tab.locator('#match-leave:visible, #leave:visible').click();
     await expect(tab.locator('#loading')).toBeHidden({ timeout: 60_000 });
-    await tab.locator('#choose-cleaver').click();
+    await tab.locator('.game-cell[data-game="cleaver"] .game-option').click();
   }
   await a.locator('#nickname').fill('민트친구'); await b.locator('#nickname').fill('코랄친구');
   await a.locator('#map').selectOption('arena');

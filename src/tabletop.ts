@@ -22,7 +22,7 @@ type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerV
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
 
-export function initTabletop(kind: TableId) {
+export function initTabletop(kind: TableId, options: { create?: boolean } = {}) {
   const config = TABLE_GAMES[kind];
   const variants: Record<string, { title: string; rules: string }> | null = kind === 'janggi' ? JANGGI_VARIANTS : kind === 'poker' ? POKER_VARIANTS : null;
   document.body.classList.add('in-table');
@@ -199,6 +199,10 @@ export function initTabletop(kind: TableId) {
   $('t-code-input').addEventListener('keydown', event => {
     if (event.key === 'Enter') { event.preventDefault(); enter('join'); }
   });
+  // 홈 카드 탭으로 온 생성 의도: 닉네임이 있으면 방 만들기를 바로 확정한다.
+  if (options.create && !invitation && name.value.trim()) {
+    queueMicrotask(() => enter('create'));
+  }
   function enter(type: 'create' | 'join') {
     if (connecting) return;
     if (!name.value.trim()) { name.reportValidity(); return; }
@@ -215,6 +219,9 @@ export function initTabletop(kind: TableId) {
   };
   function leave() { intentional = true; clearTimeout(timer); send({ type: 'leave' }); ws?.close(); sessionStorage.removeItem(key); location.assign('/'); }
   $('t-leave').onclick = leave; $('games-menu').onclick = leave;
+  document.querySelector('.brand')?.addEventListener('click', event => {
+    if (session?.code) { event.preventDefault(); location.assign(`/?game=${kind}&room=${session.code}`); }
+  });
   $('t-confirm').onclick = () => { if (pending) { send({ type: 'action', action: pending }); pending = null; $<HTMLButtonElement>('t-confirm').disabled = true; } };
   $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; davinciPick = null; coupReveal = null; render(); };
   function canAct() { return !submitting && ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }

@@ -102,7 +102,7 @@ interface HanabiState extends BaseState {
 |---|------|------|------|
 | 1 | 상태·액션·view + 단위 테스트 | `shared/hanabi.ts`, `tests/hanabi.test.ts` | 중 |
 | 2 | 서버 등록 (definitions 1줄) | `server/tabletop.ts` | 소 |
-| 3 | 클라 렌더러 (패·더미·토큰·힌트 UI) | `src/tabletop.ts`, `src/style.css` | 중 |
+| 3 | 클라 렌더러 (패·더미·토큰·힌트 UI) | `src/tabletop.ts`, `src/styles/layout/` | 중 |
 | 4 | 카탈로그·허브 버튼 | `shared/catalog.ts`, `index.html` | 소 |
 | 5 | AI 3단계 + 봇 대전 연결 | `shared/ai-hanabi.ts` (+ 드라이버는 stash에 있음) | 중 |
 | 6 | 브라우저 회귀 (입장→힌트→내기→종료) | `tests/hanabi-browser.ts` | 소 |

@@ -1,0 +1,39 @@
+
+/* Shared room and entry panels — glass over the 3D arena. */
+#lobby { background: var(--app-panel-glass); border: 1px solid var(--app-line); border-radius: 22px; padding: 24px; width: 340px; left: 24px; top: 100px; bottom: 100px; box-shadow: 0 24px 60px #00000066; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+#entry h1,.room-title { font-size: 30px; margin-bottom: 12px; }
+#entry h1 br { display: none; }
+#entry .intro { font-size: var(--text-small); line-height: 1.65; margin-bottom: 16px; }
+#entry-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-field { min-width: 0; }
+.form-field label { margin: 0 0 6px; }
+.field-wide,#entry-form > .primary { grid-column: 1 / -1; }
+#entry-form > .primary { margin: 4px 0 0; }
+.fineprint { color: var(--app-faint); }
+.room-caption { font-size: 12px; color: var(--app-accent); text-transform: uppercase; letter-spacing: .14em; font-weight: 700; }
+.invite,.table-invite { background: var(--app-raised); color: var(--app-text); border: 1px dashed #c8ff4d66; border-radius: 16px; }
+.invite { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.invite > span { grid-column: 1 / -1; }
+.invite strong { grid-column: 1; }
+.invite button { grid-column: 2; }
+#share { grid-column: 1 / -1; }
+.invite strong,.table-invite strong { color: var(--app-accent); font-variant-numeric: tabular-nums; text-shadow: 0 0 18px #c8ff4d59; }
+.invite > span,.table-invite > span { color: var(--app-muted); }
+.invite button,.table-invite button { background: #c8ff4d1f; color: var(--app-accent); border-color: #c8ff4d40; }
+.invite button:hover,.table-invite button:hover { background: #c8ff4d33; }
+#players li,#t-players li { border-color: var(--app-line); }
+#players .ready-state,#t-players small { color: var(--app-accent); }
+#players .dot { color: #0b0d14; border-radius: 50%; }
+#room-settings { border-color: var(--app-line); padding: 12px; margin: 16px 0; }
+#settings-note,#t-rules-text { color: var(--app-muted); }
+.settings-disclosure { border: 1px solid var(--app-line); background: #ffffff05; border-radius: 14px; margin: 12px 0; }
+.settings-disclosure > summary { min-height: 48px; cursor: pointer; padding: 12px; font-size: var(--text-small); font-weight: 700; }
+.settings-disclosure > summary span { display: block; color: var(--app-muted); font-size: var(--text-small); font-weight: 500; margin: 5px 0 0 15px; }
+.settings-disclosure #room-settings { border: 0; margin: 0; padding: 0 12px 12px; }
+.settings-disclosure #room-settings legend { display: none; }
+.view-switch { background: #12151fe6; border: 1px solid var(--app-line); box-shadow: 0 10px 30px #00000066; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.view-switch button { color: var(--app-soft); background: transparent; }
+.view-switch button:hover { background: #ffffff0d; color: var(--app-text); }
+.view-switch button.selected { background: var(--app-accent); color: var(--app-accent-ink); }
+.view-switch button.selected span { color: #10180099; }
+#controls-help { background: #12151fe0; color: var(--app-soft); border: 1px solid var(--app-line); border-radius: 8px; padding: 5px 9px; }

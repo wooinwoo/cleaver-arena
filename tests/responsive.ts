@@ -78,7 +78,7 @@ async function check(page: Page, surface: string, hud = false) {
 }
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await context.addInitScript('window.__name = (fn) => fn;');
+  await context.addInitScript('window.__name = (fn) => fn; localStorage.setItem("cleaver-name", "테스트친구");');
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   for (const kind of (process.env.CLEAVER_ONLY === '1' ? [] : ['gomoku', 'quoridor', 'janggi', 'poker', 'chess', 'davinci', 'coup', 'splendor'])) {
@@ -112,27 +112,29 @@ try {
   }
   for (const view of ['top', 'fps']) {
     await page.goto(base, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('#choose-cleaver')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.locator('.game-cell[data-game="cleaver"] .game-option')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.locator('#nickname-gate')).toBeHidden();
     if (view === 'top') {
       await page.setViewportSize({ width: 390, height: 844 });
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(6);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(6);
       await page.setViewportSize({ width: 667, height: 375 });
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(6);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(6);
       await page.locator('#game-next').click();
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(3);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(3);
       await page.locator('#game-previous').click();
       await check(page, 'hub');
       await page.locator('#game-search').fill('숫자');
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(1);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(1);
       await page.locator('#game-search').fill('');
       await page.locator('.game-filters [data-filter="mind"]').click();
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(3);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(3);
       await page.locator('#game-search').fill('없는게임');
       await expect(page.locator('#game-empty')).toBeVisible();
       await page.locator('#game-reset').click();
-      await expect(page.locator('.game-list .game-option:not([hidden])')).toHaveCount(9);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(9);
+      await page.screenshot({ path: `${output}hub-with-open-rooms-390x844.png`, fullPage: true });
     }
-    await page.locator('#choose-cleaver').click();
+    await page.locator('.game-cell[data-game="cleaver"] .game-option').click();
     await page.locator('#loading').waitFor({ state: 'hidden', timeout: 60_000 });
     if (view === 'top') await check(page, 'cleaver-entry');
     await page.locator('#nickname').fill('가나다라마바사아자차카타');

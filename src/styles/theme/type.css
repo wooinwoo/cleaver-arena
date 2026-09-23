@@ -1,0 +1,27 @@
+
+/* A readable baseline shared by entry, rooms, results and game controls. */
+:is(.help,.fineprint,#ready-help,#t-ready-note,#settings-note,.table-rules p,.roster-heading) { font-size: var(--text-small); line-height: 1.55; }
+#players li,#t-players li { font-size: var(--text-small); }
+#players .ready-state,#t-players small { font-size: var(--text-caption); font-weight: 600; }
+body[data-table-phase] .table-status strong { font-size: var(--text-body); }
+body[data-table-phase] .table-status span { font-size: var(--text-small); }
+body[data-table-phase='playing'] #t-toolbar button,
+body[data-table-phase='playing'] #t-action-bar button,
+body[data-table-phase='playing'] #t-toolbar label,
+body[data-table-phase='playing'] #t-toolbar > span { font-size: var(--text-small); }
+body[data-table-phase='playing'] #t-action-bar > span { white-space: normal; overflow: visible; font-size: var(--text-small); line-height: 1.45; }
+:is(.davinci-rack,.coup-player) header strong { font-size: var(--text-small); }
+.coup-log,#t-log { font-size: var(--text-small); line-height: 1.55; }
+.poker-seats .poker-player > strong,.poker-3d-table .poker-actions button { font-size: var(--text-small); }
+.poker-player p,.poker-summary,.poker-decks { font-size: var(--text-caption); line-height: 1.5; }
+.sp-hint,.sp-muted,.sp-choice button,.sp-pane-tabs label,.sp-tier-tabs label { font-size: var(--text-small); }
+body[data-table-phase='playing'] .sp-pane-tabs label,body[data-table-phase='playing'] .sp-tier-tabs label { font-size: var(--text-small); }
+.sp-player-heading strong { font-size: var(--text-small); }
+.sp-row-label,.sp-resource-row .sp-row-label,.sp-resource-row .sp-amount,.sp-noble strong,.sp-noble .sp-amount,.sp-card-name,.sp-cost .sp-amount,.sp-bank-token > span,.sp-collection summary,.sp-payment-color,.sp-payment > small { font-size: var(--text-caption); }
+body[data-table-phase='playing'] .sp-card-name { font-size: var(--text-caption); }
+
+/* Display type: brand, headlines, codes and counters. */
+h1,.room-title,.brand,.invite strong,.table-invite strong,.match-bar strong,.health-panel strong,#loading strong,#announcement,.empty-board strong { font-family: var(--font-display); font-weight: 700; }
+h1 { letter-spacing: -.01em; line-height: 1.18; }
+h1 em { color: var(--app-accent); }
+.room-caption,.roster-heading span,.match-bar > span,.invite > span { letter-spacing: .04em; }
