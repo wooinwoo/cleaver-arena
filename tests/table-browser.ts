@@ -74,9 +74,18 @@ try {
       await expect(b.locator('.q-wall')).toHaveCount(1);
       for (const page of [a, b]) {
         await expect(page.locator('.q-wall')).toBeVisible();
-        const wall = (await page.locator('.q-wall').boundingBox())!;
-        const left = (await page.locator('[data-cell="10"]').boundingBox())!;
-        const right = (await page.locator('[data-cell="11"]').boundingBox())!;
+        // A state broadcast can redraw the board between the visibility check and the measurement.
+        const box = async (selector: string) => {
+          for (let attempt = 0; attempt < 20; attempt++) {
+            const found = await page.locator(selector).boundingBox();
+            if (found) return found;
+            await page.waitForTimeout(100);
+          }
+          throw new Error(`${selector} never had a bounding box`);
+        };
+        const wall = await box('.q-wall');
+        const left = await box('[data-cell="10"]');
+        const right = await box('[data-cell="11"]');
         expect(Math.abs(wall.y + wall.height / 2 - left.y - left.height)).toBeLessThan(1);
         expect(Math.abs(wall.x - left.x)).toBeLessThan(1);
         expect(Math.abs(wall.x + wall.width - right.x - right.width)).toBeLessThan(1);

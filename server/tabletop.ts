@@ -11,7 +11,7 @@ import { createChess, actChess } from '../shared/chess.ts';
 import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
 import { createDavinci, actDavinci, davinciView } from '../shared/davinci.ts';
 import { createCoup, actCoup, coupView } from '../shared/coup.ts';
-import { registerRoomSource, tabletopRoom, type RoomRegistry } from './lobby.ts';
+import { registerRoomSource, sanitizeTitle, tabletopRoom, type RoomRegistry } from './lobby.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
@@ -29,7 +29,7 @@ const definitions = {
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
 type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number };
-type Room = { code: string; kind: TableId; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
+type Room = { code: string; kind: TableId; title: string; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
 type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
 
 export function attachTabletop(server: Server, registry: RoomRegistry) {
@@ -43,6 +43,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
   function broadcast(room: Room) {
     for (const [ws, client] of clients) if (client.room === room && client.member) {
       send(ws, { type: 'table-state', room: { code: room.code, kind: room.kind, variant: room.variant, phase: room.phase, round: room.round, result: room.result,
+        title: room.title, host: room.players[0]?.id ?? null,
         players: room.players.map(({ id, name, seat, ready, connected }) => ({ id, name, seat, ready, connected })),
         me: client.member.seat, game: room.match?.view(client.member.seat) ?? null } });
     }
@@ -106,7 +107,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
           if (rooms.size >= 60) { fail('현재 방이 많아요. 잠시 후 다시 시도해 주세요.'); return; }
           let code: string;
           do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
-          room = { code, kind: data.game, phase: 'lobby', players: [], match: null, round: 0, result: '' };
+          room = { code, kind: data.game, title: sanitizeTitle(data.title) || `${name}의 ${TABLE_GAMES[data.game as TableId].title}`, phase: 'lobby', players: [], match: null, round: 0, result: '' };
           if (room.kind === 'janggi') room.variant = data.variant === 'genius' ? 'genius' : 'animal';
           if (room.kind === 'poker') room.variant = data.variant === 'duel' ? 'duel' : 'party';
           rooms.set(code, room);
@@ -125,6 +126,12 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
         send(ws, { type: 'joined', code: room.code, token: member.token }); broadcast(room); return;
       }
       const room = client.room, member = client.member!;
+      if (data.type === 'title') {
+        if (room.phase === 'playing' || room.players[0]?.id !== member.id) { fail('방장만 경기 시작 전에 방 제목을 바꿀 수 있어요.'); return; }
+        const title = sanitizeTitle(data.title);
+        if (!title) { fail('방 제목을 입력해 주세요.'); return; }
+        room.title = title; broadcast(room); return;
+      }
       if (data.type === 'ready' && room.phase !== 'playing') {
         member.ready = !member.ready;
         start(room);

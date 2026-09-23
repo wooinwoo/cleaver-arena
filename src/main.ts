@@ -5,8 +5,9 @@ import { isTableId } from '../shared/catalog.ts';
 import { initTabletop } from './tabletop.ts';
 import type { ArenaMap, Game, Input } from '../shared/game.ts';
 import { initGameFinder } from './ui/game-finder.ts';
-import { gameArt } from './ui/game-art.ts';
+import { gameArt, gameAccent } from './ui/game-art.ts';
 import { openRules } from './ui/rules-dialog.ts';
+import { editTitle } from './ui/room-title.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
@@ -85,6 +86,10 @@ initGameFinder();
 document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
 const CLEAVER_RULES = '경기장에 따라 1:1 반원 대결, 개인전, 팀전(2·4·6명, 최대 3:3)으로 붙어요. 중앙 와드가 있는 경기장에서는 와드 선을 넘지 않고 각자 반원 안에서만 움직여요. PC는 우클릭으로 이동하고 좌클릭 또는 Q로 식칼을 던져요. 모바일은 왼쪽 패드로 이동, 오른쪽 패드로 조준하고 손을 떼면 발사해요. 식칼에 맞으면 체력이 줄고 0이 되면 탈락해요. 점멸(F)은 마우스 방향으로 순간이동, 유체화(D)는 잠시 빠르게 달려요. 주문 대기시간은 방장이 경기 설정에서 정해요. 시점은 탑뷰(롤 시점)와 1인칭 중 방장이 고르고 참가자 모두 같은 시점으로 해요. 마지막까지 살아남은 사람 또는 팀이 이겨요.';
 $('rules-open').onclick = () => openRules('cleaver', '문도피구', CLEAVER_RULES);
+$('room-title-edit').onclick = () => {
+  if (!state || state.phase === 'playing' || state.phase === 'countdown') return;
+  editTitle(document.querySelector<HTMLElement>('.room-title')!, state.title, title => socket?.send(JSON.stringify({ type: 'title', title })));
+};
 $('games-menu').onclick = () => { if (session) leave(); else location.assign('/'); };
 document.querySelector('.brand')?.addEventListener('click', event => {
   const code = state?.code ?? session?.code;
@@ -136,7 +141,7 @@ function connectLobby(name: string) {
 
 function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<string, string | number>[] }) {
   const members = data.members ?? [];
-  const rooms = (data.rooms ?? []) as { game: string; code: string; title: string; players: number; capacity: number; host: string; note: string }[];
+  const rooms = (data.rooms ?? []) as { game: string; code: string; title: string; gameTitle?: string; players: number; capacity: number; host: string; note: string }[];
   $('open-rooms').hidden = false;
   $('open-rooms-status').textContent = members.length ? `${members.length}명 접속 중 · 방 ${rooms.length}개` : `방 ${rooms.length}개`;
   const list = $('open-rooms-list');
@@ -149,7 +154,8 @@ function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<st
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'open-room';
-    button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.note)} · ${escapeHtml(room.host)}</small></span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
+    button.style.setProperty('--game-accent', gameAccent(room.game));
+    button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.gameTitle ?? '')}${room.gameTitle ? ' · ' : ''}${escapeHtml(room.note)} · 방장 ${escapeHtml(room.host)}</small></span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
     button.onclick = () => {
       const name = savedName();
       const target = `/?game=${room.game}&room=${room.code}`;
@@ -411,6 +417,12 @@ function renderState() {
     }));
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
     $('room-mode').textContent = `${state.map === 'baron' ? '바론 둥지' : state.map === 'ward' ? '원형 와드' : '기존 장애물'} · ${state.mode === 'teams' ? '팀전' : state.mode === 'duel' ? '1:1' : '개인전'}`;
+    if (state.phase === 'lobby') {
+      const title = document.querySelector<HTMLElement>('.room-title')!;
+      if (!title.querySelector('input') && title.textContent !== state.title) title.textContent = state.title;
+      document.title = `${state.title} · 친구네 오락실`;
+    }
+    $('room-title-edit').hidden = !host || (state.phase !== 'lobby' && state.phase !== 'finished');
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
     if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.') + (touch ? ' 조작: 왼손 이동 · 오른손 조준 · 손 떼면 발사.' : '');
   }

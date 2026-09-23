@@ -20,6 +20,7 @@
 @import './theme/match.css';
 @import './theme/responsive.css';
 @import './theme/hub.css';
+@import './theme/rooms.css';
 @import './theme/entry-room.css';
 @import './theme/rules-dialog.css';
 @import './theme/quoridor.css';
