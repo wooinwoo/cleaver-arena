@@ -1,4 +1,6 @@
-# 친구네 오락실
+# SIDEPLAY
+
+모였으면, 한 판 하자. 친구들이 링크 하나로 모여서 노는 곳입니다. 화면상 서비스 이름은 SIDEPLAY(사이드플레이)이며, 저장소·패키지 이름과 기존 초대 링크·저장된 닉네임은 호환성을 위해 유지합니다.
 
 친구와 초대 링크로 만나는 아홉 가지 게임의 공용 로비입니다. 문도피구는 3D 식칼 피구 웹게임입니다. 모바일과 PC에서 같은 방에 접속하며 방장이 시작 전에 전원 공통 시점을 정합니다. 문도피구는 원본 문도 모델과 바론 둥지 맵을 Blender에서 게임용 GLB로 변환해 사용합니다. 기존 원형 와드·사각형 장애물 맵도 유지합니다. 인디언포커는 Blender에서 제작한 인물과 라운지 모델을 사용합니다.
 
@@ -125,8 +127,12 @@ cloudflared tunnel --url http://127.0.0.1:3186 --protocol http2
 
 ```bash
 npm run build
-npm run test:quick   # 단위 + test:fit + test:responsive
+npm run test:quick   # 단위 + test:hub + test:fit + test:responsive
 ```
+
+로비만 확인하려면 실행 중인 서버를 대상으로 `npm run test:hub`를 실행합니다. 첫 방문, 닉네임 변경·유지, 모바일 목록·페이지 전환, 검색·필터·빈 결과, 방 생성과 로비 복귀, 새 브랜딩을 검사합니다. 캡처도 필요하면 `SCREENSHOTS=1 npm run test:hub`를 사용하며 결과는 `artifacts/sideplay/`에 저장합니다. `CHROME_PATH`가 없으면 Playwright의 기본 브라우저를 사용합니다.
+
+키보드 접근 흐름만 별도로 검사하려면 `KEYBOARD_ONLY=1 npm run test:hub`를 사용합니다. 이 경로는 포인터 조작이나 화면 캡처 검증을 대체하지 않습니다.
 
 전체 브라우저 검증(느림, 필요할 때만):
 

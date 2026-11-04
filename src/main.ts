@@ -478,7 +478,7 @@ $('copy').onclick = async () => {
     share.hidden = false;
     share.onclick = async () => {
       const url = `${location.origin}/?game=cleaver&room=${state?.code ?? session?.code}`;
-      try { await navigator.share({ title: '친구네 오락실', text: '우리 방에 와!', url }); }
+      try { await navigator.share({ title: 'SIDEPLAY', text: '우리 방에서 한 판 하자!', url }); }
       catch { /* user cancelled */ }
     };
   }

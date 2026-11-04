@@ -5,6 +5,7 @@ export default defineConfig({
     proxy: {
       '/ws': { target: 'ws://127.0.0.1:3186', ws: true },
       '/table-ws': { target: 'ws://127.0.0.1:3186', ws: true },
+      '/lobby-ws': { target: 'ws://127.0.0.1:3186', ws: true },
     },
   },
   build: { chunkSizeWarningLimit: 1600 },

@@ -32,7 +32,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   $('game').hidden = true;
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('games-menu').hidden = false;
-  document.title = `${config.title} · 친구네 오락실`;
+  document.title = `${config.title} · SIDEPLAY`;
   const section = document.createElement('section'); section.id = 'table-page';
   section.innerHTML = `
     <aside class="table-sidebar">
