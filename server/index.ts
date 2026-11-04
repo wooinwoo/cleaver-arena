@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game, type Player } from '../shared/game.ts';
 import { attachTabletop } from './tabletop.ts';
-import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, type OpenRoom } from './lobby.ts';
+import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, sanitizeTitle, type OpenRoom } from './lobby.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
 type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean };
@@ -97,6 +97,7 @@ export function createArenaServer() {
           do { code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase(); } while (rooms.has(code));
           const map = data.map === 'arena' ? 'arena' : data.map === 'baron' ? 'baron' : 'ward';
           room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map, data.view === 'fps' ? 'fps' : 'top'), tokens: new Map(), disconnected: new Map() };
+          room.game.title = sanitizeTitle(data.title) || `${name}의 문도피구`;
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room) { send(ws, { type: 'error', message: '방을 찾을 수 없어요. 코드를 확인해 주세요.' }); return; }
@@ -123,6 +124,13 @@ export function createArenaServer() {
       } else if (data.type === 'spell') {
         const problem = castSpell(game, player.id, data.spell, data.yaw);
         if (problem) send(ws, { type: 'error', message: problem });
+      } else if (data.type === 'title') {
+        if (!['lobby', 'finished'].includes(game.phase) || game.players.find(p => !p.bot)?.id !== player.id) {
+          send(ws, { type: 'error', message: '방장만 경기 시작 전에 방 제목을 바꿀 수 있어요.' }); return;
+        }
+        const title = sanitizeTitle(data.title);
+        if (!title) { send(ws, { type: 'error', message: '방 제목을 입력해 주세요.' }); return; }
+        game.title = title;
       } else if (data.type === 'settings') {
         if (!['lobby', 'finished'].includes(game.phase) || game.players.find(p => !p.bot)?.id !== player.id) {
           send(ws, { type: 'error', message: '방장만 경기 시작 전에 설정할 수 있어요.' }); return;

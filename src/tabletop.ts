@@ -14,10 +14,12 @@ import type { splendorView } from '../shared/splendor.ts';
 import { renderSplendor } from './splendor.ts';
 import { gameWaiting, gameAccent, gameIdentity } from './ui/game-art.ts';
 import { openRules } from './ui/rules-dialog.ts';
+import { editTitle } from './ui/room-title.ts';
 
 type PublicPoker = ReturnType<typeof pokerView>;
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView> | DaVinciView | CoupView;
 type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
+  title?: string; host?: string | null;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
@@ -40,7 +42,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
       <form id="t-entry"><label for="t-name">내 닉네임</label><input id="t-name" maxlength="12" autocomplete="nickname" placeholder="친구들이 알아볼 이름" required />
         ${variants ? `<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note">${Object.entries(variants).map(([value, rule]) => `<option value="${value}">${rule.title}</option>`).join('')}</select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>` : ''}
         <button class="primary" type="submit">방 만들기</button><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="방 코드 6자리"/><button type="button" id="t-join">입장</button></div></form>
-      <details id="t-room" open hidden><summary>방 정보 · 참가자</summary><div class="table-invite"><span>우리 방 <strong id="t-code"></strong></span><button id="t-copy">초대 링크 복사</button></div>
+      <details id="t-room" open hidden><summary><span id="t-summary-title">방 정보 · 참가자</span><button type="button" id="t-title-edit-compact" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></summary><div class="room-name"><h2 id="t-title"></h2><button type="button" id="t-title-edit" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></div><div class="table-invite"><span>우리 방 <strong id="t-code"></strong></span><button id="t-copy">초대 링크 복사</button></div>
         <ul id="t-players"></ul><button id="t-ready" class="primary">준비하기</button><p id="t-ready-note">모두 준비하면 시작해요.</p></details>
       <p id="t-error" role="alert"></p><details class="table-rules" open><summary id="t-rules-title">이 게임의 규칙</summary><p id="t-rules-text">${config.rules}</p></details>
       <button id="t-leave" class="text-button">다른 게임 고르기</button>
@@ -224,6 +226,9 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   });
   $('t-confirm').onclick = () => { if (pending) { send({ type: 'action', action: pending }); pending = null; $<HTMLButtonElement>('t-confirm').disabled = true; } };
   $('t-cancel').onclick = () => { pending = null; selectedPiece = null; drop = null; davinciPick = null; coupReveal = null; render(); };
+  $('t-title-edit').onclick = () => { if (room && room.phase !== 'playing') editTitle($('t-title'), room.title || config.title, title => send({ type: 'title', title })); };
+  // The compact summary row doubles as the title on phones; editing there must not toggle the details.
+  $('t-title-edit-compact').onclick = (event) => { event.preventDefault(); event.stopPropagation(); if (room && room.phase !== 'playing') editTitle($('t-summary-title'), room.title || config.title, title => send({ type: 'title', title })); };
   function canAct() { return !submitting && ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
   function choose(action: Action, text: string, button?: HTMLElement) {
     pending = action; $('t-choice').textContent = text; $<HTMLButtonElement>('t-confirm').disabled = false;
@@ -248,6 +253,10 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
       if (room.phase === 'playing' && compact.matches) rules.open = false;
     }
     const me = room.players.find(p => p.seat === room!.me)!;
+    const roomTitle = room.title || config.title;
+    for (const heading of [$('t-title'), $('t-summary-title')]) if (!heading.querySelector('input') && heading.textContent !== roomTitle) heading.textContent = roomTitle;
+    $('t-title-edit').hidden = $('t-title-edit-compact').hidden = room.host !== me.id || room.phase === 'playing';
+    document.title = `${roomTitle} · 친구네 오락실`;
     resultReview.hidden = room.phase !== 'finished';
     $('t-ready').hidden = room.phase === 'playing';
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? '다시 준비하기' : '준비하기';

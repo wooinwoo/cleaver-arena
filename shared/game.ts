@@ -28,7 +28,7 @@ export type Player = {
 export type Shot = { id: number; owner: string; team: number; x: number; z: number; vx: number; vz: number };
 export type Hit = { owner: string; target: string; x: number; z: number; damage: number };
 export type Game = {
-  code: string; map: ArenaMap; mode: 'duel' | 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
+  code: string; title: string; map: ArenaMap; mode: 'duel' | 'ffa' | 'teams'; phase: 'lobby' | 'countdown' | 'playing' | 'finished';
   view: 'top' | 'fps'; spellCooldowns: { flash: number; ghost: number };
   players: Player[]; shots: Shot[]; hits: Hit[]; time: number; countdown: number;
   winner: string; nextShot: number; round: number;
@@ -36,7 +36,7 @@ export type Game = {
 
 export function createGame(code: string, mode: Game['mode'] = 'duel', map: ArenaMap = 'ward', view: Game['view'] = 'top'): Game {
   return { code, map, view, spellCooldowns: { flash: FLASH_COOLDOWN, ghost: GHOST_COOLDOWN },
-    mode: map !== 'arena' && mode === 'ffa' ? 'duel' : mode, phase: 'lobby', players: [], shots: [], hits: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
+    title: '', mode: map !== 'arena' && mode === 'ffa' ? 'duel' : mode, phase: 'lobby', players: [], shots: [], hits: [], time: 120, countdown: 3, winner: '', nextShot: 0, round: 0 };
 }
 
 export function addPlayer(game: Game, id: string, name: string, bot = false): Player {

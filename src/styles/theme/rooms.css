@@ -1,0 +1,58 @@
+/* Room names: a host-editable title in every waiting room, and the hall's live room cards. */
+.room-name { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; min-width: 0; }
+.room-name h1, .room-name h2 { flex: 1; min-width: 0; margin: 0; font-family: var(--font-display); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.room-name h2 { font-size: 20px; }
+#room .room-name h1 { font-size: 24px; }
+.room-name-edit { flex: 0 0 auto; width: 32px; min-height: 32px; padding: 0; border-radius: 50%; background: var(--app-raised); border: 1px solid var(--app-line); color: var(--app-soft); font-size: 14px; line-height: 1; }
+.room-name-edit:hover { color: var(--app-accent); border-color: var(--app-accent); background: var(--app-hover); }
+.room-name-input { width: 100%; min-height: 38px; padding: 4px 10px; font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+#room .room-name-input { font-size: 20px; }
+#t-room .room-name { margin-top: 4px; }
+#t-room > summary { list-style: none; }
+#t-room > summary::-webkit-details-marker { display: none; }
+@media (max-width: 760px) {
+  #room .room-name h1 { font-size: 22px; }
+  /* Phones: the collapsible summary row already exists, so it carries the title instead of a second block. */
+  #t-room .room-name { display: none; }
+  #t-room > summary { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 2px 0 6px; color: var(--app-text); }
+  #t-room > summary > span { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+  #t-room > summary::after { content: '▾'; flex: 0 0 auto; color: var(--app-muted); font-size: 14px; }
+  #t-room:not([open]) > summary::after { content: '▸'; }
+  #t-room > summary .room-name-edit { width: 28px; min-height: 28px; font-size: 13px; }
+  #t-room > summary .room-name-input { font-size: 17px; min-height: 34px; }
+}
+
+/* Hall (desktop and tablet): live rooms read as joinable cards, practice sits inside the 문도피구 card. */
+@media (min-width: 481px) {
+  body.in-hub #hub h1 { font-size: 34px; }
+  .open-rooms { padding: 16px 18px 18px; border-radius: 22px; border-color: #c8ff4d33; }
+  .open-rooms-head { margin-bottom: 12px; }
+  .open-rooms-head strong { display: inline-flex; align-items: center; gap: 9px; font-size: 15px; }
+  .open-rooms-head strong::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--app-accent); box-shadow: 0 0 10px var(--app-accent); animation: live-pulse 1.6s ease-in-out infinite; }
+  .open-rooms-head span { font-size: var(--text-small); color: var(--app-soft); }
+  #open-rooms-list { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+  .open-room { display: grid !important; grid-template-columns: 52px minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; min-height: 74px !important; padding: 11px 12px !important; border-radius: 16px !important; background: linear-gradient(135deg, color-mix(in srgb, var(--game-accent, var(--app-accent)) 14%, var(--app-raised)), var(--app-raised) 70%) !important; transition: transform .15s, border-color .15s, box-shadow .15s; }
+  .open-room:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--game-accent, var(--app-accent)) 60%, transparent); box-shadow: 0 12px 28px #00000066; }
+  .open-room-cover { flex-basis: 52px; width: 52px; height: 52px; border-radius: 14px; box-shadow: 0 6px 16px #00000059, 0 0 0 1px #ffffff1f; }
+  .open-room-copy { gap: 4px; }
+  .open-room-copy strong { font-family: var(--font-display); font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .open-room-copy small { color: var(--app-muted); }
+  .open-room-count { padding: 3px 9px; border-radius: 999px; background: #0b0d1480; border: 1px solid var(--app-line); color: var(--app-soft); font-weight: 700; font-size: 12px; }
+  .open-room b { padding: 7px 13px; border-radius: 999px; background: var(--app-accent); color: var(--app-accent-ink); font-size: 13px; }
+  .open-empty { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--app-line-strong); border-radius: 14px; color: var(--app-soft); }
+  .open-empty::before { content: '🕹️'; font-size: 18px; }
+  .game-cell:has(.game-sub) { position: relative; }
+  .game-sub { position: absolute; top: 12px; right: 12px; z-index: 1; align-self: auto; min-height: 30px !important; padding: 4px 12px !important; background: #0b0d14b3 !important; border: 1px solid var(--app-line-strong) !important; color: var(--app-soft) !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .game-sub:hover { color: var(--app-accent) !important; border-color: #c8ff4d80 !important; background: #0b0d14e6 !important; }
+}
+@media (min-width: 481px) and (max-width: 900px) {
+  .game-sub { top: 8px; right: 8px; }
+}
+@media (min-width: 481px) and (max-height: 650px) and (orientation: landscape) {
+  .game-sub { display: none; }
+}
+@keyframes live-pulse { 50% { opacity: .35; } }
+@media (max-width: 480px) {
+  /* Phones: the 문도피구 entry screen already offers solo practice, so the hall shortcut is redundant. */
+  .game-sub { display: none; }
+}

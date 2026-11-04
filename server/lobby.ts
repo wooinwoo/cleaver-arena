@@ -6,7 +6,9 @@ import { TABLE_GAMES, POKER_VARIANTS, type TableId, type PokerVariant } from '..
 export type OpenRoom = {
   game: string;
   code: string;
+  /** Host-chosen room name; falls back to the game name. */
   title: string;
+  gameTitle: string;
   players: number;
   capacity: number;
   host: string;
@@ -26,13 +28,19 @@ export function registerRoomSource(registry: RoomRegistry, source: () => OpenRoo
   registry.sources.push(source);
 }
 
-export function cleaverRoom(code: string, game: { mode: string; map: string; phase: string; players: { name: string; connected: boolean; bot?: boolean }[] }): OpenRoom {
+export const ROOM_TITLE_MAX = 24;
+/** Room names are plain text: control characters stripped, whitespace collapsed, capped. */
+export function sanitizeTitle(value: unknown): string {
+  return typeof value === 'string' ? value.replace(/[\p{C}]/gu, '').replace(/\s+/g, ' ').trim().slice(0, ROOM_TITLE_MAX) : '';
+}
+
+export function cleaverRoom(code: string, game: { title?: string; mode: string; map: string; phase: string; players: { name: string; connected: boolean; bot?: boolean }[] }): OpenRoom {
   const humans = game.players.filter(p => !p.bot && p.connected);
   const capacity = game.mode === 'duel' ? 2 : 6;
   const mapName = game.map === 'baron' ? '바론 둥지' : game.map === 'ward' ? '원형 와드' : '장애물 경기장';
   const modeName = game.mode === 'teams' ? '팀전' : game.mode === 'duel' ? '1:1' : '개인전';
   return {
-    game: 'cleaver', code, title: '문도피구',
+    game: 'cleaver', code, title: game.title || '문도피구', gameTitle: '문도피구',
     players: game.players.filter(p => !p.bot).length, capacity,
     host: humans[0]?.name ?? '—',
     note: `${mapName} · ${modeName}`,
@@ -40,7 +48,7 @@ export function cleaverRoom(code: string, game: { mode: string; map: string; pha
   };
 }
 
-export function tabletopRoom(room: { code: string; kind: TableId; variant?: string; phase: string; players: { name: string; connected: boolean }[] }): OpenRoom {
+export function tabletopRoom(room: { code: string; kind: TableId; title?: string; variant?: string; phase: string; players: { name: string; connected: boolean }[] }): OpenRoom {
   const config = TABLE_GAMES[room.kind];
   const capacity = room.kind === 'poker'
     ? POKER_VARIANTS[(room.variant ?? 'party') as PokerVariant].max
@@ -51,7 +59,7 @@ export function tabletopRoom(room: { code: string; kind: TableId; variant?: stri
       ? (room.variant === 'genius' ? '더 지니어스' : '동물장기')
       : (config.description.split(/[.!?]/)[0] ?? config.title);
   return {
-    game: room.kind, code: room.code, title: config.title,
+    game: room.kind, code: room.code, title: room.title || config.title, gameTitle: config.title,
     players: room.players.length, capacity,
     host: room.players.find(p => p.connected)?.name ?? '—',
     note,
