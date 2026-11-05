@@ -6,7 +6,7 @@ import type { Action } from '../shared/tabletop-types.ts';
 // Controlled late-game snapshots exercise rare UI decisions against the real rule engine.
 // The separate splendor-browser.ts plays complete games through the actual WebSocket server.
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args: ['--no-sandbox'] });
 const errors: string[] = [];
 
 // Keep each of the ninety cards in exactly one location when arranging a boundary position.

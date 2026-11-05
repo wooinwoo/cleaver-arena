@@ -4,7 +4,7 @@ const base = process.env.BASE_URL ?? 'http://127.0.0.1:3187';
 const models = '**/models/*.glb';
 const errors: string[] = [];
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
+  executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });

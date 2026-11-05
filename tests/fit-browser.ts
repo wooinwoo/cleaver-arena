@@ -16,7 +16,7 @@ const cases: { kind: TableId; seats: number }[] = [
   { kind: 'splendor', seats: 2 }, { kind: 'splendor', seats: 4 },
 ];
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
+  executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox'],
 });
 await mkdir('artifacts', { recursive: true });

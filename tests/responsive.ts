@@ -9,7 +9,7 @@ const output = fileURLToPath(new URL(`../artifacts/responsive-${audit ? 'before'
 await mkdir(output, { recursive: true });
 const sizes = [[320, 300], [390, 300], [320, 568], [360, 640], [375, 667], [390, 844], [412, 915], [568, 320], [667, 375], [844, 390], [1024, 600], [768, 1024], [820, 1180], [1024, 768], [1440, 900]];
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
+  executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });
 const failures: string[] = [], errors: string[] = [];

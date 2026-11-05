@@ -9,7 +9,7 @@ import { chooseSplendorAction } from './splendor-helpers.ts';
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
 const output = fileURLToPath(new URL('../artifacts/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args: ['--no-sandbox', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 const errors: string[] = [];
 async function press(page: Page, locator: Locator) { if (page.viewportSize()!.width < 760) await locator.tap(); else await locator.click(); }
 async function game(page: Page): Promise<ReturnType<typeof splendorView>> { return page.evaluate(() => (window as any).__tableRoom.game); }

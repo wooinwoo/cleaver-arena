@@ -25,7 +25,7 @@ const proxy = createServer(front => {
 await new Promise<void>(done => proxy.listen(0, '127.0.0.1', done));
 const base = `http://127.0.0.1:${(proxy.address() as { port: number }).port}`;
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH ?? '/home/rst010/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
+  executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const errors: string[] = [];

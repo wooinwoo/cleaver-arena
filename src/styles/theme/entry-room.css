@@ -17,3 +17,6 @@
   .table-rules { padding-top: 8px; }
   body[data-table-phase='finished'] .table-sidebar { padding: 12px 0 0; }
 }
+
+/* Riot fan-content notice: required wherever Riot assets appear, so it stays visible on phones too. */
+.riot-notice { margin: 14px 0 0; color: var(--app-faint); font-size: 11px; line-height: 1.5; }
