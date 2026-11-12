@@ -193,3 +193,10 @@ TypeScript, Babylon.js, Node.js, ws, Vite, chess.js를 사용합니다. 서버�
 참고: [Babylon.js](https://www.babylonjs.com/specifications/), [Render WebSocket](https://render.com/docs/websocket), [Render 무료 인스턴스](https://render.com/docs/free), [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
 
 규칙 참고: [Gigamic 쿼리도](https://export.gigamic.com/wp-content/uploads/2021/01/INS-RULES-QUORIDOR_10-2016.pdf), [LPSA 승인 동물장기 설명서](https://planeta-igr.com/image/data/instrukcii/93159.pdf), [tvN 십이장기](https://tvn.cjenm.com/ko/thegenius3/contents3/), [chess.js](https://jhlywa.github.io/chess.js/). 체스의 3회 반복·50수 무승부는 이 게임의 자동 판정 방식이며, [FIDE 대회 규정](https://handbook.fide.com/chapter/e012023)의 청구 절차와는 다릅니다.
+
+## 라이선스
+
+소스 코드는 [MIT 라이선스](LICENSE)를 따릅니다. 아래 파일은 MIT 라이선스에 포함되지 않습니다.
+
+- `public/models/mundo.glb`, `public/models/mundo-cleaver.glb`, `public/models/baron-pit.glb`와 이 에셋이 보이는 화면 캡처: 리그 오브 레전드 자산에서 만든 파일로 권리는 Riot Games에 있습니다. 출처는 [에셋 출처](art/ASSETS.md)에 있습니다.
+- `public/fonts/`의 폰트 파일: 각 폰트의 라이선스를 따릅니다. Pretendard는 `public/FONT-LICENSE.txt`의 SIL Open Font License 1.1입니다.
