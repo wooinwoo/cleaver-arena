@@ -42,8 +42,8 @@
   .open-empty { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--app-line-strong); border-radius: 14px; color: var(--app-soft); }
   .open-empty::before { content: '🕹️'; font-size: 18px; }
   .game-cell:has(.game-sub) { position: relative; }
-  .game-sub { position: absolute; top: 12px; right: 12px; z-index: 1; align-self: auto; min-height: 30px !important; padding: 4px 12px !important; background: #0b0d14b3 !important; border: 1px solid var(--app-line-strong) !important; color: var(--app-soft) !important; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-  .game-sub:hover { color: var(--app-accent) !important; border-color: #c8ff4d80 !important; background: #0b0d14e6 !important; }
+  .game-sub { position: absolute; top: 12px; right: 12px; z-index: 1; align-self: auto; min-height: 30px !important; padding: 4px 12px !important; background: #fffdf8e6 !important; border: 1px solid #dedfd4 !important; color: #244e43 !important; text-decoration: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .game-sub:hover { color: #244e43 !important; border-color: #a6b79f !important; background: #f0f2e7 !important; }
 }
 @media (min-width: 481px) and (max-width: 900px) {
   .game-sub { top: 8px; right: 8px; }

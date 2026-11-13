@@ -20,3 +20,9 @@
 
 /* Riot fan-content notice: required wherever Riot assets appear, so it stays visible on phones too. */
 .riot-notice { margin: 14px 0 0; color: var(--app-faint); font-size: 11px; line-height: 1.5; }
+/* Short phones: the rules above override the compact spacing in responsive.css, so restore it here and tighten the Riot notice to keep the entry within 568px. */
+@media (max-width: 480px) and (max-height: 700px) {
+  .game-identity { margin-bottom: 12px; }
+  body:not(.in-hub):not(.in-table):not(.in-match) #lobby { margin-top: 8px; }
+  .riot-notice { margin-top: 8px; font-size: 10px; line-height: 1.4; }
+}

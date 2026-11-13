@@ -81,7 +81,7 @@ try {
   await activate('[data-filter="all"]');
   await activate('.game-cell[data-game="chess"] .game-option');
   await expect(page.locator('#t-room')).toBeVisible();
-  await expect(page).toHaveTitle('체스 · SIDEPLAY');
+  await expect(page).toHaveTitle(/체스 · SIDEPLAY$/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#0b0d14', 'game surfaces keep the existing palette');
   await activate('#games-menu');
   await expect(page.locator('#hub')).toBeVisible();

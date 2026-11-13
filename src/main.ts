@@ -420,7 +420,7 @@ function renderState() {
     if (state.phase === 'lobby') {
       const title = document.querySelector<HTMLElement>('.room-title')!;
       if (!title.querySelector('input') && title.textContent !== state.title) title.textContent = state.title;
-      document.title = `${state.title} · 친구네 오락실`;
+      document.title = `${state.title} · SIDEPLAY`;
     }
     $('room-title-edit').hidden = !host || (state.phase !== 'lobby' && state.phase !== 'finished');
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
