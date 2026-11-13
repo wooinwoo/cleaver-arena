@@ -1,5 +1,6 @@
 import { TABLE_GAMES, POKER_VARIANTS, type PokerVariant, type TableId } from '../shared/catalog.ts';
 import type { Action } from '../shared/tabletop-types.ts';
+import { tableBots } from '../shared/bots.ts';
 import type { GomokuState } from '../shared/gomoku.ts';
 import { quoridorMoves, type QuoridorState } from '../shared/quoridor.ts';
 import { JANGGI_VARIANTS, janggiTargets, type JanggiState, type JanggiVariant, type PieceKind } from '../shared/janggi.ts';
@@ -43,7 +44,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
         ${variants ? `<label for="t-variant">새 방의 룰</label><select id="t-variant" aria-describedby="t-variant-note">${Object.entries(variants).map(([value, rule]) => `<option value="${value}">${rule.title}</option>`).join('')}</select><p id="t-variant-note" class="help">입장할 때는 해당 방의 룰을 따라요.</p>` : ''}
         <button class="primary" type="submit">방 만들기</button><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="방 코드 6자리"/><button type="button" id="t-join">입장</button></div></form>
       <details id="t-room" open hidden><summary><span id="t-summary-title">방 정보 · 참가자</span><button type="button" id="t-title-edit-compact" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></summary><div class="room-name"><h2 id="t-title"></h2><button type="button" id="t-title-edit" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></div><div class="table-invite"><span>우리 방 <strong id="t-code"></strong></span><button id="t-copy">초대 링크 복사</button></div>
-        <ul id="t-players"></ul><button id="t-ready" class="primary">준비하기</button><p id="t-ready-note">모두 준비하면 시작해요.</p></details>
+        <ul id="t-players"></ul><button id="t-ready" class="primary">준비하기</button><button id="t-bot" type="button" hidden>봇이랑 하기</button><p id="t-ready-note">모두 준비하면 시작해요.</p></details>
       <p id="t-error" role="alert"></p><details class="table-rules" open><summary id="t-rules-title">이 게임의 규칙</summary><p id="t-rules-text">${config.rules}</p></details>
       <button id="t-leave" class="text-button">다른 게임 고르기</button>
     </aside>
@@ -214,6 +215,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     connect({ type, game: kind, name: name.value.trim(), code, ...(type === 'create' && variant ? { variant: variant.value } : {}) });
   }
   $('t-ready').onclick = () => send({ type: 'ready' });
+  $('t-bot').onclick = () => send({ type: 'bot' });
   $('t-copy').onclick = async () => {
     const url = `${location.origin}/?game=${kind}&room=${session?.code}`;
     try { await navigator.clipboard.writeText(url); $('t-ready-note').textContent = '링크 복사 완료! 친구에게 보내 주세요.'; }
@@ -259,6 +261,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     document.title = `${roomTitle} · SIDEPLAY`;
     resultReview.hidden = room.phase !== 'finished';
     $('t-ready').hidden = room.phase === 'playing';
+    $('t-bot').hidden = !tableBots[kind] || room.phase === 'playing' || room.players.length !== 1;
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? '다시 준비하기' : '준비하기';
     const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
     $('t-ready-note').textContent = room.phase === 'finished' ? '모두 다시 누르면 바로 다음 판이 시작해요.'
