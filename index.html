@@ -66,8 +66,20 @@
         <ul id="open-rooms-list"></ul>
       </div>
       <div class="hub-tools">
-        <label class="sr-only" for="game-search">게임 검색</label>
-        <input id="game-search" type="search" placeholder="오늘은 무슨 게임?" autocomplete="off" />
+        <div class="game-query">
+          <label class="sr-only" for="game-search">게임 검색</label>
+          <input id="game-search" type="search" placeholder="오늘은 무슨 게임?" autocomplete="off" />
+          <label class="sr-only" for="game-players">인원</label>
+          <select id="game-players">
+            <option value="">인원 전체</option>
+            <option value="1">혼자</option>
+            <option value="2">2명</option>
+            <option value="3">3명</option>
+            <option value="4">4명</option>
+            <option value="5">5명</option>
+            <option value="6">6명</option>
+          </select>
+        </div>
         <div class="game-filters" role="group" aria-label="게임 종류">
           <button type="button" data-filter="all" class="selected" aria-pressed="true">전체</button>
           <button type="button" data-filter="3d" aria-pressed="false">3D</button>
@@ -77,32 +89,32 @@
       </div>
       <div class="game-list">
         <div class="game-cell" data-game="cleaver" data-groups="3d">
-          <button class="game-option available" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>문도피구</strong><small>실시간 3D 대전 · 2–6명</small></span><b>방 만들기</b></button>
+          <button class="game-option available" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>문도피구</strong><small><span class="game-desc">실시간 3D 대전 · 팀전은 짝수</span></small></span><b>방 만들기</b></button>
           <button type="button" class="game-sub" data-practice="cleaver">혼자 연습</button>
         </div>
         <div class="game-cell" data-game="quoridor" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿼리도</strong><small>길 막기 · 2명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿼리도</strong><small><span class="game-desc">길 막기</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="gomoku" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>오목</strong><small>다섯 개 잇기 · 2명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>오목</strong><small><span class="game-desc">다섯 개 잇기</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="poker" data-groups="3d mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>인디언포커</strong><small>3D 눈치 대결 · 2–6명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>인디언포커</strong><small><span class="game-desc">3D 눈치 대결</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="janggi" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>십이장기</strong><small>열두 칸 수싸움 · 2명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>십이장기</strong><small><span class="game-desc">열두 칸 수싸움</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="chess" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>체스</strong><small>정통 전략 · 2명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>체스</strong><small><span class="game-desc">정통 전략</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="splendor" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>스플렌더</strong><small>보석 모으기 · 2–4명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>스플렌더</strong><small><span class="game-desc">보석 모으기</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="davinci" data-groups="mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>다빈치코드</strong><small>숫자 추리 · 2–4명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>다빈치코드</strong><small><span class="game-desc">숫자 추리</span></small></span><b>방 만들기</b></button>
         </div>
         <div class="game-cell" data-game="coup" data-groups="mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿠데타</strong><small>블러핑 승부 · 2–6명</small></span><b>방 만들기</b></button>
+          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿠데타</strong><small><span class="game-desc">블러핑 승부</span></small></span><b>방 만들기</b></button>
         </div>
       </div>
       <div id="game-empty" hidden><strong>맞는 게임이 없어요.</strong><button id="game-reset" type="button">전체 게임 보기</button></div>
