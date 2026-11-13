@@ -6,7 +6,7 @@ import type { TableId } from '../shared/catalog.ts';
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
 const output = fileURLToPath(new URL('../artifacts/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+const browser = await chromium.launch({ channel: 'chromium', executablePath: process.env.CHROME_PATH, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
 const errors: string[] = [];
 try {
   const cases: { kind: TableId; variant?: 'animal' | 'genius' }[] = ['gomoku', 'quoridor', 'davinci', 'coup', 'janggi', 'poker', 'chess'].map(kind => ({ kind: kind as TableId }));

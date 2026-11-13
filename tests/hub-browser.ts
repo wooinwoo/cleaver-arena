@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
 const capture = process.env.SCREENSHOTS === '1';
-const browser = await chromium.launch({
+const browser = await chromium.launch({ channel: 'chromium',
   executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-dev-shm-usage'],
 });
