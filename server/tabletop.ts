@@ -11,6 +11,7 @@ import { createChess, actChess } from '../shared/chess.ts';
 import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
 import { createDavinci, actDavinci, davinciView } from '../shared/davinci.ts';
 import { createCoup, actCoup, coupView } from '../shared/coup.ts';
+import { tableBots } from '../shared/bots.ts';
 import { registerRoomSource, sanitizeTitle, tabletopRoom, type RoomRegistry } from './lobby.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
@@ -28,8 +29,8 @@ const definitions = {
   coup: (seats: number) => runtime(createCoup(seats), actCoup, coupView),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
-type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number };
-type Room = { code: string; kind: TableId; title: string; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string };
+type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number; bot?: true };
+type Room = { code: string; kind: TableId; title: string; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string; botTimer?: ReturnType<typeof setTimeout> };
 type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
 
 export function attachTabletop(server: Server, registry: RoomRegistry) {
@@ -54,13 +55,26 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
     if (room.match?.state.kind === 'splendor' && room.match.state.winners.length > 1) {
       room.result = `${room.match.state.winners.map(seat => room.players.find(p => p.seat === seat)?.name ?? `${seat + 1}번`).join(' · ')} 공동 승리`;
     }
-    room.players.forEach(p => { p.ready = false; });
+    room.players.forEach(p => { p.ready = !!p.bot; });
   }
   function start(room: Room) {
     if (room.phase === 'playing' || room.players.length < TABLE_GAMES[room.kind].min || !room.players.every(p => p.ready && p.connected)) return;
     room.players.forEach((p, index) => { p.seat = index; });
     room.match = definitions[room.kind](room.players.length, room.variant);
     room.phase = 'playing'; room.round++; room.result = '';
+  }
+  /** Plays the bot's turn after a short pause so the human sees each move land. */
+  function driveBot(room: Room) {
+    const bot = room.players.find(p => p.bot), play = tableBots[room.kind];
+    if (!bot || !play || room.botTimer || room.phase !== 'playing' || room.match?.state.turn !== bot.seat) return;
+    room.botTimer = setTimeout(() => {
+      room.botTimer = undefined;
+      const match = room.match;
+      if (room.phase !== 'playing' || !match || match.state.turn !== bot.seat || !rooms.has(room.code)) return;
+      if (match.act(bot.seat, play(match.state, bot.seat))) return;
+      if (finished(match.state)) end(room);
+      broadcast(room); driveBot(room);
+    }, 500);
   }
   server.on('upgrade', (req, socket, head) => {
     if (req.url !== '/table-ws') return;
@@ -132,17 +146,22 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
         if (!title) { fail('방 제목을 입력해 주세요.'); return; }
         room.title = title; broadcast(room); return;
       }
+      if (data.type === 'bot') {
+        if (!tableBots[room.kind] || room.phase === 'playing' || room.players.length !== 1) { fail('혼자 있는 방에서만 봇과 시작할 수 있어요.'); return; }
+        room.players.push({ id: randomUUID(), token: randomUUID(), name: '봇', seat: 1, ready: true, connected: true, leftAt: 0, bot: true });
+        member.ready = true; start(room); broadcast(room); driveBot(room); return;
+      }
       if (data.type === 'ready' && room.phase !== 'playing') {
         member.ready = !member.ready;
         start(room);
-        broadcast(room);
+        broadcast(room); driveBot(room);
       } else if (data.type === 'action' && room.phase === 'playing' && room.match) {
         if (room.players.some(p => !p.connected)) { fail('상대의 재접속을 기다리고 있어요.'); return; }
         if (!data.action || typeof data.action !== 'object' || typeof (data.action as Action).type !== 'string') { fail('올바른 행동을 선택해 주세요.'); return; }
         const problem = room.match.act(member.seat, data.action as Action);
         if (problem) { fail(problem); return; }
         if (finished(room.match.state)) end(room);
-        broadcast(room);
+        broadcast(room); driveBot(room);
       } else if (data.type === 'leave') {
         member.connected = false; member.ready = false; member.leftAt = 1;
         client.room = undefined; client.member = undefined;
@@ -179,7 +198,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
         room.result = room.kind === 'poker' && room.variant === 'party' ? '접속 종료로 이번 판 취소 · 칩 초기화' : room.result;
       }
       room.players = room.players.filter(p => !expired.includes(p));
-      if (!room.players.length) rooms.delete(code);
+      if (!room.players.some(p => !p.bot)) rooms.delete(code);
       else { start(room); broadcast(room); }
     }
   }, 1000);

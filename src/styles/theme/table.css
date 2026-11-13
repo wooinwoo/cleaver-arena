@@ -44,3 +44,5 @@ body .coup-player > header,body .davinci-rack > header { display: flex; position
 .roster-heading span,.hand-row > small,.coup-revealed-names { color: var(--app-muted); }
 #t-action-bar > span { color: var(--app-text); }
 #error,#t-error { color: #ff9f88; }
+/* Solo start sits under the ready button with the same width, as the quieter second choice. */
+#t-bot { width: 100%; min-height: 46px; margin-top: 8px; }
