@@ -6,7 +6,7 @@ import type { Game } from '../shared/game.ts';
 const output = fileURLToPath(new URL('../artifacts/', import.meta.url));
 await mkdir(output, { recursive: true });
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3186';
-const browser = await chromium.launch({
+const browser = await chromium.launch({ channel: 'chromium',
   executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
 });

@@ -3,7 +3,7 @@ import { chromium, expect, type Page, type Route } from '@playwright/test';
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3187';
 const models = '**/models/*.glb';
 const errors: string[] = [];
-const browser = await chromium.launch({
+const browser = await chromium.launch({ channel: 'chromium',
   executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
@@ -11,8 +11,9 @@ const browser = await chromium.launch({
 
 async function pair() {
   const contexts = await Promise.all([
-    browser.newContext({ viewport: { width: 1100, height: 800 } }),
-    browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }),
+    // The PWA service worker fetches models itself, which page.route cannot hold back; this test needs to.
+    browser.newContext({ viewport: { width: 1100, height: 800 }, serviceWorkers: 'block' }),
+    browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' }),
   ]);
   const pages = await Promise.all(contexts.map(context => context.newPage()));
   pages.forEach(page => {

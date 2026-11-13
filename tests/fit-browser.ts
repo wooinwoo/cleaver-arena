@@ -15,7 +15,7 @@ const cases: { kind: TableId; seats: number }[] = [
   { kind: 'coup', seats: 2 }, { kind: 'coup', seats: 6 },
   { kind: 'splendor', seats: 2 }, { kind: 'splendor', seats: 4 },
 ];
-const browser = await chromium.launch({
+const browser = await chromium.launch({ channel: 'chromium',
   executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox'],
 });

@@ -7,7 +7,7 @@ type Room = { phase: string; round: number; variant: string; me: number; game: R
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:3187';
 const output = fileURLToPath(new URL('../artifacts/', import.meta.url));
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({
+const browser = await chromium.launch({ channel: 'chromium',
   executablePath: process.env.CHROME_PATH,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
@@ -62,6 +62,8 @@ try {
     await synced(room => room.game.stage === 'reveal');
     for (const page of pages) {
       await expect(own(page)).toHaveText(/카드 \d+/);
+      // Phones fold the board into the result card once the match ends; its review button reopens the board.
+      if (rooms.get(page)!.phase === 'finished' && await page.locator('#t-result-review').isVisible()) await press(page, '마지막 보드 보기');
       await expect(own(page)).toBeVisible();
     }
   }

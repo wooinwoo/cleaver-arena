@@ -168,7 +168,7 @@ npm run test:full
 
 [스플렌더 규칙·실행 검증 기록](docs/splendor-audit.md)에 공식 규칙 대조, 방 예외, 실제 완주 및 희귀 상황 검사 범위를 정리했습니다.
 
-브라우저 테스트는 실행 중인 게임 서버를 사용합니다. 기본 주소는 `http://127.0.0.1:3186`입니다. `BASE_URL`로 다른 주소를, `CHROME_PATH`로 Chromium 실행 파일을 지정할 수 있습니다. `CHROME_PATH`가 없으면 Playwright가 설치한 기본 Chromium을 사용합니다(`npx playwright install chromium`). 캡처는 `artifacts/`에 저장되고 Git에서 제외됩니다.
+브라우저 테스트는 실행 중인 게임 서버를 사용합니다. 기본 주소는 `http://127.0.0.1:3186`입니다. `BASE_URL`로 다른 주소를, `CHROME_PATH`로 Chromium 실행 파일을 지정할 수 있습니다. `CHROME_PATH`가 없으면 Playwright가 설치한 전체 Chromium을 사용합니다(`npx playwright install chromium`). 가벼운 headless shell은 WebGL 화면의 캡처가 수십 초씩 걸려 3D 검사가 시간 초과로 실패하므로, `CHROME_PATH`를 직접 지정할 때도 `chromium-*/chrome-linux64/chrome` 같은 전체 Chromium을 지정합니다. 캡처는 `artifacts/`에 저장되고 Git에서 제외됩니다.
 
 검증 범위는 입력·시작 전 설정 권한 검증, 세 맵의 이동·장애물·반원 경계, 명중·승패·재경기, 방 분리·재접속, 두 브라우저 동기화, 두 카메라, 모바일 터치와 세로 화면입니다. 실제 iPhone/Android 기기의 성능과 통신 지연은 별도 확인이 필요합니다.
 
