@@ -256,14 +256,14 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     const roomTitle = room.title || config.title;
     for (const heading of [$('t-title'), $('t-summary-title')]) if (!heading.querySelector('input') && heading.textContent !== roomTitle) heading.textContent = roomTitle;
     $('t-title-edit').hidden = $('t-title-edit-compact').hidden = room.host !== me.id || room.phase === 'playing';
-    document.title = `${roomTitle} · 친구네 오락실`;
+    document.title = `${roomTitle} · SIDEPLAY`;
     resultReview.hidden = room.phase !== 'finished';
     $('t-ready').hidden = room.phase === 'playing';
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? '다시 준비하기' : '준비하기';
     const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
     $('t-ready-note').textContent = room.phase === 'finished' ? '모두 다시 누르면 바로 다음 판이 시작해요.'
       : room.phase === 'playing' ? '진행 중 · 상대가 끊기면 최대 20초 기다려요.' : `${room.players.length} / ${capacity}명 · 모두 준비하면 시작해요.`;
-    $('t-round').textContent = room.round ? `${config.title} · ${room.round}번째 판` : `${config.min}–${capacity}명 게임`;
+    $('t-round').textContent = room.round ? `${config.title} · ${room.round}번째 판` : `${config.min === capacity ? capacity : `${config.min}–${capacity}`}명 게임`;
     $('t-turn').textContent = room.phase === 'finished' ? room.result : room.phase === 'lobby' ? '친구와 함께 준비를 눌러 주세요' :
       room.players.some(p => !p.connected) ? '상대의 재접속을 기다리는 중…' : `${playerName(room.game!.turn)} 차례${canAct() ? ' · 내 차례!' : ''}`;
     $('t-players').replaceChildren(...room.players.map(p => {
