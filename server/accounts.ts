@@ -127,15 +127,51 @@ type Session = {
   /** `lastSeenAt` as of the last save that was asked for. */
   savedSeenAt: number;
 };
-type StoredAccount = { id: string; name: string; salt: string; hash: string; cost: ScryptCost; createdAt: number };
-type StoredSession = { tokenHash: string; accountId: string; createdAt: number; lastSeenAt: number };
-type StoredFile = { version: 1; accounts: StoredAccount[]; sessions: StoredSession[] };
+export type StoredAccount = { id: string; name: string; salt: string; hash: string; cost: ScryptCost; createdAt: number };
+export type StoredSession = { tokenHash: string; accountId: string; createdAt: number; lastSeenAt: number };
+/** The whole stored state. This is also the layout of `accounts.json`. */
+export type StoredAccounts = { version: 1; accounts: StoredAccount[]; sessions: StoredSession[] };
+
+/** One change to the stored state. A save lists them in the order they happened. */
+export type AccountChange =
+  | { type: 'add-account'; account: StoredAccount }
+  /** The account's salt, hash and cost were replaced. */
+  | { type: 'rehash'; account: StoredAccount }
+  | { type: 'add-session'; session: StoredSession }
+  | { type: 'touch-session'; tokenHash: string; lastSeenAt: number }
+  | { type: 'end-sessions'; tokenHashes: string[] };
+
+/**
+ * Where a store keeps its accounts and sessions. The store holds every rule and a full copy
+ * of the state in memory; this layer only makes changes durable.
+ */
+export interface AccountPersistence {
+  /**
+   * Resolves once the changes are stored. `snapshot` gives the whole current state, for layers
+   * that write everything at once. Rejects with NameTakenError when the stored data already
+   * has the nickname of an account being added, and with any other error when the save failed.
+   */
+  save(changes: readonly AccountChange[], snapshot: () => StoredAccounts): Promise<void>;
+  /** Waits until every save asked for so far has finished. */
+  close(): Promise<void>;
+}
+
+/** The stored data already has an account under this nickname. */
+export class NameTakenError extends Error {
+  constructor() { super('nickname already stored'); this.name = 'NameTakenError'; }
+}
+
+/** Stored accounts that cannot be loaded as they are. */
+export class UnreadableAccountsError extends Error {
+  constructor(message: string) { super(message); this.name = 'UnreadableAccountsError'; }
+}
 
 const failure = (reason: AccountFailureReason): AccountFailure => ({ ok: false, reason, message: FAILURES[reason] });
 const digest = (token: string) => createHash('sha256').update(token).digest('hex');
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isTime = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const sameCost = (a: ScryptCost, b: ScryptCost) => a.N === b.N && a.r === b.r && a.p === b.p;
+const ended = (tokenHashes: string[]): AccountChange[] => tokenHashes.length ? [{ type: 'end-sessions', tokenHashes }] : [];
 
 function validCost(value: unknown): value is ScryptCost {
   if (!isRecord(value)) return false;
@@ -172,23 +208,29 @@ function report(what: string, error: unknown) {
   console.error(`${what}: ${error instanceof Error ? error.message : String(error)}`);
 }
 
-class MemoryAccountStore implements AccountStore {
-  protected readonly accounts = new Map<string, Account>();
+const storedAccount = ({ id, name, salt, hash, cost, createdAt }: Account): StoredAccount => (
+  { id, name, salt: salt.toString('base64'), hash: hash.toString('base64'), cost, createdAt });
+
+/** Every account rule, over a full copy of the state kept in memory. */
+class RuledAccountStore implements AccountStore {
+  private readonly accounts = new Map<string, Account>();
   /** Sessions by the SHA-256 of their token; the token itself is never kept. */
-  protected readonly sessions = new Map<string, Session>();
+  private readonly sessions = new Map<string, Session>();
   private readonly keys = new Map<string, Account>();
   /** Nickname keys of sign-ups that are still hashing. */
   private readonly claimed = new Set<string>();
   private readonly hashing = createGate(HASHES_AT_ONCE, HASHES_WAITING);
   private readonly decoy: Pick<Account, 'salt' | 'hash' | 'cost'>;
-  protected readonly now: () => number;
+  private readonly persistence: AccountPersistence;
+  private readonly now: () => number;
   private readonly cost: ScryptCost;
   private readonly maxAccounts: number;
   private sweptAt = 0;
   /** A session was used since the last save. */
-  protected stale = false;
+  private stale = false;
 
-  constructor(options: AccountStoreOptions) {
+  constructor(persistence: AccountPersistence, options: AccountStoreOptions) {
+    this.persistence = persistence;
     this.now = options.now ?? Date.now;
     this.cost = options.cost ?? DEFAULT_COST;
     if (!validCost(this.cost)) throw new Error('Unsupported scrypt cost');
@@ -214,13 +256,14 @@ class MemoryAccountStore implements AccountStore {
       this.accounts.set(account.id, account);
       this.keys.set(key, account);
     } finally { this.claimed.delete(key); }
-    const token = this.openSession(account.id);
-    if (!await this.saved()) {
+    const { token, session, dropped } = this.openSession(account.id);
+    const outcome = await this.saved([{ type: 'add-account', account: storedAccount(account) }, { type: 'add-session', session }, ...ended(dropped)]);
+    if (outcome !== 'ok') {
       // An account that could not be stored would vanish on restart, so it is not handed out.
       this.accounts.delete(account.id);
       this.keys.delete(key);
-      this.sessions.delete(digest(token));
-      return failure('unavailable');
+      this.sessions.delete(session.tokenHash);
+      return failure(outcome === 'taken' ? 'name-taken' : 'unavailable');
     }
     return { ok: true, account: { id: account.id, name }, token };
   }
@@ -235,13 +278,17 @@ class MemoryAccountStore implements AccountStore {
     const derived = await this.hash(password, salt, cost);
     if (!derived) return failure('unavailable');
     if (!timingSafeEqual(derived, hash) || !account || this.accounts.get(account.id) !== account) return failure('bad-credentials');
+    const changes: AccountChange[] = [];
     if (!sameCost(account.cost, this.cost)) {
       const fresh = randomBytes(SALT_BYTES), upgraded = await this.hash(password, fresh, this.cost);
-      if (upgraded) Object.assign(account, { salt: fresh, hash: upgraded, cost: this.cost });
+      if (upgraded) {
+        Object.assign(account, { salt: fresh, hash: upgraded, cost: this.cost });
+        changes.push({ type: 'rehash', account: storedAccount(account) });
+      }
     }
-    const token = this.openSession(account.id);
-    if (!await this.saved()) {
-      this.sessions.delete(digest(token));
+    const { token, session, dropped } = this.openSession(account.id);
+    if (await this.saved([...changes, { type: 'add-session', session }, ...ended(dropped)]) !== 'ok') {
+      this.sessions.delete(session.tokenHash);
       return failure('unavailable');
     }
     return { ok: true, account: { id: account.id, name: account.name }, token };
@@ -249,7 +296,8 @@ class MemoryAccountStore implements AccountStore {
 
   async logout(token: string | null | undefined): Promise<void> {
     if (typeof token !== 'string' || !SESSION_TOKEN.test(token)) return;
-    if (this.sessions.delete(digest(token))) await this.saved();
+    const key = digest(token);
+    if (this.sessions.delete(key)) await this.saved(ended([key]));
   }
 
   accountForToken(token: string | null | undefined): AccountProfile | null {
@@ -259,13 +307,13 @@ class MemoryAccountStore implements AccountStore {
     const now = this.now(), account = this.accounts.get(session.accountId);
     if (!account || now - session.lastSeenAt >= SESSION_TTL_MS) {
       this.sessions.delete(key);
-      void this.saved();
+      void this.saved(ended([key]));
       return null;
     }
     session.lastSeenAt = now;
     if (now - session.savedSeenAt >= SESSION_SAVE_INTERVAL_MS) {
       session.savedSeenAt = now;
-      void this.saved();
+      void this.saved([{ type: 'touch-session', tokenHash: key, lastSeenAt: now }]);
     } else this.stale = true;
     return { id: account.id, name: account.name };
   }
@@ -276,15 +324,29 @@ class MemoryAccountStore implements AccountStore {
     return key !== '' && this.keys.has(key);
   }
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    if (this.stale) {
+      this.stale = false;
+      // Uses that were not worth a save of their own are stored on the way out.
+      const changes: AccountChange[] = [];
+      for (const [tokenHash, session] of this.sessions) {
+        if (session.lastSeenAt === session.savedSeenAt) continue;
+        session.savedSeenAt = session.lastSeenAt;
+        changes.push({ type: 'touch-session', tokenHash, lastSeenAt: session.lastSeenAt });
+      }
+      if (changes.length) await this.saved(changes);
+    }
+    await this.persistence.close();
+  }
 
-  /** Makes the current state durable. Nothing to do when it only lives in memory. */
-  protected persist(): Promise<void> { return Promise.resolve(); }
-
-  /** Like persist(), but reports a failure instead of throwing. */
-  protected async saved(): Promise<boolean> {
-    try { await this.persist(); return true; }
-    catch (error) { report('Could not save accounts', error); return false; }
+  /** Stores the changes, reporting a failure instead of throwing. */
+  private async saved(changes: AccountChange[]): Promise<'ok' | 'taken' | 'failed'> {
+    try { await this.persistence.save(changes, () => this.snapshot()); return 'ok'; }
+    catch (error) {
+      if (error instanceof NameTakenError) return 'taken';
+      report('Could not save accounts', error);
+      return 'failed';
+    }
   }
 
   private async hash(password: string, salt: Buffer, cost: ScryptCost): Promise<Buffer | null> {
@@ -292,34 +354,42 @@ class MemoryAccountStore implements AccountStore {
     catch (error) { report('Could not hash a password', error); return null; }
   }
 
-  private openSession(accountId: string): string {
+  /** Starts a session. `dropped` lists the sessions that ended to make room or because they had expired. */
+  private openSession(accountId: string): { token: string; session: StoredSession; dropped: string[] } {
     const now = this.now();
-    if (now - this.sweptAt >= SESSION_SAVE_INTERVAL_MS) this.dropExpired(now);
-    const token = randomBytes(32).toString('base64url');
-    this.sessions.set(digest(token), { accountId, createdAt: now, lastSeenAt: now, savedSeenAt: now });
+    const dropped = now - this.sweptAt >= SESSION_SAVE_INTERVAL_MS ? this.dropExpired(now) : [];
+    const token = randomBytes(32).toString('base64url'), tokenHash = digest(token);
+    this.sessions.set(tokenHash, { accountId, createdAt: now, lastSeenAt: now, savedSeenAt: now });
     const own = [...this.sessions].filter(([, session]) => session.accountId === accountId);
     if (own.length > MAX_SESSIONS_PER_ACCOUNT) {
       // The devices that have been away longest are logged out first.
       own.sort((a, b) => a[1].lastSeenAt - b[1].lastSeenAt);
-      for (const [key] of own.slice(0, own.length - MAX_SESSIONS_PER_ACCOUNT)) this.sessions.delete(key);
+      for (const [key] of own.slice(0, own.length - MAX_SESSIONS_PER_ACCOUNT)) {
+        this.sessions.delete(key);
+        dropped.push(key);
+      }
     }
-    return token;
+    return { token, session: { tokenHash, accountId, createdAt: now, lastSeenAt: now }, dropped };
   }
 
-  private dropExpired(now: number) {
+  private dropExpired(now: number): string[] {
     this.sweptAt = now;
+    const dropped: string[] = [];
     for (const [key, session] of this.sessions) {
-      if (now - session.lastSeenAt >= SESSION_TTL_MS || !this.accounts.has(session.accountId)) this.sessions.delete(key);
+      if (now - session.lastSeenAt >= SESSION_TTL_MS || !this.accounts.has(session.accountId)) {
+        this.sessions.delete(key);
+        dropped.push(key);
+      }
     }
+    return dropped;
   }
 
-  protected snapshot(): StoredFile {
+  private snapshot(): StoredAccounts {
     this.dropExpired(this.now());
     this.stale = false;
     return {
       version: 1,
-      accounts: [...this.accounts.values()].map(({ id, name, salt, hash, cost, createdAt }) => (
-        { id, name, salt: salt.toString('base64'), hash: hash.toString('base64'), cost, createdAt })),
+      accounts: [...this.accounts.values()].map(storedAccount),
       sessions: [...this.sessions].map(([tokenHash, session]) => {
         session.savedSeenAt = session.lastSeenAt;
         return { tokenHash, accountId: session.accountId, createdAt: session.createdAt, lastSeenAt: session.lastSeenAt };
@@ -327,15 +397,16 @@ class MemoryAccountStore implements AccountStore {
     };
   }
 
-  /** Loads a snapshot into an empty store. Throws on anything it does not fully understand. */
-  protected restore(data: unknown) {
-    if (!isRecord(data) || data.version !== 1 || !Array.isArray(data.accounts) || !Array.isArray(data.sessions)) throw new Error('unknown layout or version');
+  /** Loads stored data into an empty store. Throws UnreadableAccountsError on anything it does not fully understand. */
+  restore(data: unknown) {
+    const unreadable = (what: string) => new UnreadableAccountsError(what);
+    if (!isRecord(data) || data.version !== 1 || !Array.isArray(data.accounts) || !Array.isArray(data.sessions)) throw unreadable('unknown layout or version');
     for (const entry of data.accounts as unknown[]) {
       if (!isRecord(entry) || typeof entry.id !== 'string' || !entry.id || typeof entry.name !== 'string'
-        || typeof entry.salt !== 'string' || typeof entry.hash !== 'string' || !validCost(entry.cost) || !isTime(entry.createdAt)) throw new Error('unreadable account entry');
+        || typeof entry.salt !== 'string' || typeof entry.hash !== 'string' || !validCost(entry.cost) || !isTime(entry.createdAt)) throw unreadable('unreadable account entry');
       const salt = Buffer.from(entry.salt, 'base64'), hash = Buffer.from(entry.hash, 'base64'), key = nameKey(entry.name);
-      if (salt.length !== SALT_BYTES || hash.length !== KEY_BYTES || !key) throw new Error('unreadable account entry');
-      if (this.accounts.has(entry.id) || this.keys.has(key)) throw new Error('duplicate account entry');
+      if (salt.length !== SALT_BYTES || hash.length !== KEY_BYTES || !key) throw unreadable('unreadable account entry');
+      if (this.accounts.has(entry.id) || this.keys.has(key)) throw unreadable('duplicate account entry');
       const account: Account = { id: entry.id, name: entry.name, key, salt, hash, cost: entry.cost, createdAt: entry.createdAt };
       this.accounts.set(account.id, account);
       this.keys.set(key, account);
@@ -343,12 +414,25 @@ class MemoryAccountStore implements AccountStore {
     const now = this.now();
     for (const entry of data.sessions as unknown[]) {
       if (!isRecord(entry) || typeof entry.tokenHash !== 'string' || !/^[0-9a-f]{64}$/.test(entry.tokenHash)
-        || typeof entry.accountId !== 'string' || !isTime(entry.createdAt) || !isTime(entry.lastSeenAt)) throw new Error('unreadable session entry');
+        || typeof entry.accountId !== 'string' || !isTime(entry.createdAt) || !isTime(entry.lastSeenAt)) throw unreadable('unreadable session entry');
       if (!this.accounts.has(entry.accountId) || now - entry.lastSeenAt >= SESSION_TTL_MS) continue;
       this.sessions.set(entry.tokenHash, { accountId: entry.accountId, createdAt: entry.createdAt, lastSeenAt: entry.lastSeenAt, savedSeenAt: entry.lastSeenAt });
     }
   }
 }
+
+/**
+ * A store with every account rule over the given persistence layer. `stored` is what the layer
+ * already holds, in the `StoredAccounts` layout. It is checked as it loads; anything not
+ * understood throws UnreadableAccountsError.
+ */
+export function createAccountStore(persistence: AccountPersistence, options: AccountStoreOptions = {}, stored?: unknown): AccountStore {
+  const store = new RuledAccountStore(persistence, options);
+  if (stored !== undefined) store.restore(stored);
+  return store;
+}
+
+const inMemory: AccountPersistence = { save: () => Promise.resolve(), close: () => Promise.resolve() };
 
 /** Renames over the target, waiting out the brief locks virus scanners and indexers take on Windows. */
 async function replaceFile(from: string, to: string) {
@@ -362,75 +446,67 @@ async function replaceFile(from: string, to: string) {
   }
 }
 
-class FileAccountStore extends MemoryAccountStore {
-  private readonly file: string;
-  /** Settles when every write asked for so far has finished. Never rejects. */
-  private tail: Promise<void> = Promise.resolve();
-  /** A write that has not started yet; it will pick up every change made until it does. */
-  private queued: Promise<void> | null = null;
-
-  private constructor(file: string, options: AccountStoreOptions) {
-    super(options);
-    this.file = file;
-  }
-
-  static async open(directory: string, options: AccountStoreOptions): Promise<FileAccountStore> {
-    const store = new FileAccountStore(join(directory, ACCOUNTS_FILE), options);
-    await mkdir(directory, { recursive: true });
-    let text: string;
-    try { text = await readFile(store.file, 'utf8'); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return store;
-      throw error;
-    }
-    // A file that cannot be read is left alone: starting empty would overwrite every account in it.
-    try { store.restore(JSON.parse(text.replace(/^﻿/, ''))); }
-    catch (error) { throw new Error(`Cannot load accounts from ${store.file} (${error instanceof Error ? error.message : String(error)}). Fix or move the file, then start again.`); }
-    return store;
-  }
-
-  /** One write at a time. Each caller gets the outcome of a write that began after its change. */
-  protected override persist(): Promise<void> {
-    if (this.queued) return this.queued;
-    const write = this.tail.then(() => {
-      this.queued = null;
-      return this.write();
-    });
-    this.queued = write;
-    this.tail = write.catch(() => {});
-    return write;
-  }
-
-  /** The whole state goes to a temporary file first, so the real one is always complete. */
-  private async write(): Promise<void> {
-    const text = JSON.stringify(this.snapshot());
-    const temporary = `${this.file}.tmp`;
+/** The whole state goes to a temporary file first, so the real one is always complete. */
+async function writeAccountsFile(file: string, data: StoredAccounts): Promise<void> {
+  const text = JSON.stringify(data);
+  const temporary = `${file}.tmp`;
+  try {
+    const handle = await open(temporary, 'w', 0o600);
     try {
-      const handle = await open(temporary, 'w', 0o600);
-      try {
-        await handle.writeFile(text, 'utf8');
-        await handle.sync();
-      } finally { await handle.close(); }
-      await replaceFile(temporary, this.file);
-    } catch (error) {
-      await unlink(temporary).catch(() => {});
-      throw error;
-    }
+      await handle.writeFile(text, 'utf8');
+      await handle.sync();
+    } finally { await handle.close(); }
+    await replaceFile(temporary, file);
+  } catch (error) {
+    await unlink(temporary).catch(() => {});
+    throw error;
   }
+}
 
-  override async close(): Promise<void> {
-    if (this.stale) await this.saved();
-    let tail: Promise<void>;
-    do { tail = this.tail; await tail; } while (tail !== this.tail);
-  }
+/** The whole state in one JSON file, written one write at a time. */
+function filePersistence(file: string): AccountPersistence {
+  /** Settles when every write asked for so far has finished. Never rejects. */
+  let tail: Promise<void> = Promise.resolve();
+  /** A write that has not started yet; it will pick up every change made until it does. */
+  let queued: Promise<void> | null = null;
+  return {
+    // Each caller gets the outcome of a write that began after its change.
+    save(_changes, snapshot) {
+      if (queued) return queued;
+      const write = tail.then(() => {
+        queued = null;
+        return writeAccountsFile(file, snapshot());
+      });
+      queued = write;
+      tail = write.catch(() => {});
+      return write;
+    },
+    async close() {
+      let current: Promise<void>;
+      do { current = tail; await current; } while (current !== tail);
+    },
+  };
 }
 
 /** Accounts that last as long as the process. */
 export function createMemoryAccountStore(options: AccountStoreOptions = {}): AccountStore {
-  return new MemoryAccountStore(options);
+  return createAccountStore(inMemory, options);
 }
 
 /** Accounts kept in `accounts.json` under `directory`. A missing file means no accounts yet. */
-export function createFileAccountStore(directory: string, options: AccountStoreOptions = {}): Promise<AccountStore> {
-  return FileAccountStore.open(directory, options);
+export async function createFileAccountStore(directory: string, options: AccountStoreOptions = {}): Promise<AccountStore> {
+  const file = join(directory, ACCOUNTS_FILE);
+  const persistence = filePersistence(file);
+  // Bad options are reported before anything is read.
+  const empty = createAccountStore(persistence, options);
+  await mkdir(directory, { recursive: true });
+  let text: string;
+  try { text = await readFile(file, 'utf8'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return empty;
+    throw error;
+  }
+  // A file that cannot be read is left alone: starting empty would overwrite every account in it.
+  try { return createAccountStore(persistence, options, JSON.parse(text.replace(/^﻿/, ''))); }
+  catch (error) { throw new Error(`Cannot load accounts from ${file} (${error instanceof Error ? error.message : String(error)}). Fix or move the file, then start again.`); }
 }

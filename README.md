@@ -116,7 +116,9 @@
 - 세션은 `HttpOnly`, `SameSite=Lax` 쿠키(HTTPS에서는 `Secure`)로 전달하며 서버에는 토큰의 SHA-256만 둡니다. 30일 동안 쓰지 않으면 만료됩니다.
 - 가입·로그인 요청은 주소당 10분에 20회, 로그인 실패는 닉네임당 10분에 8회로 제한합니다. 다른 사이트에서 보낸 POST는 거절합니다.
 - 네 WebSocket 서버는 연결할 때 쿠키를 읽습니다. 회원은 계정 닉네임으로만 참가하고, 비회원이 가입된 닉네임을 쓰려 하면 거절합니다.
-- 규칙과 저장은 [accounts.ts](server/accounts.ts), HTTP 처리는 [auth.ts](server/auth.ts), 화면은 [account.ts](src/ui/account.ts)를 기준으로 합니다.
+- 계정과 세션은 `TURSO_DATABASE_URL`과 `TURSO_AUTH_TOKEN`이 모두 설정되어 있으면 Turso(libSQL) 데이터베이스에, 아니면 `DATA_DIR`(기본 `./data`)의 `accounts.json`에 저장합니다. 저장 위치를 바꾸려면 두 변수를 설정하거나 지운 뒤 서버를 다시 시작합니다. 서버는 시작할 때 어느 저장소를 쓰는지 로그에 한 줄로 남깁니다. 파일과 데이터베이스 사이에 기존 계정을 옮기는 기능은 없습니다.
+- 데이터베이스의 표는 처음 시작할 때 만듭니다. 시작할 때 데이터베이스에 연결하지 못하면 서버가 뜨지 않고, 실행 중에 연결이 끊기면 가입·로그인에 잠시 후 다시 시도하라고 답합니다(503). 서버는 계정 전체를 메모리에도 두므로 한 저장소는 서버 인스턴스 하나만 사용합니다.
+- 규칙과 파일 저장은 [accounts.ts](server/accounts.ts), 데이터베이스 저장은 [accounts-db.ts](server/accounts-db.ts), HTTP 처리는 [auth.ts](server/auth.ts), 화면은 [account.ts](src/ui/account.ts)를 기준으로 합니다.
 
 ## 새 게임 추가
 
@@ -192,6 +194,16 @@ npm start
 - 인스턴스: 1개
 
 발급된 HTTPS 주소 하나로 페이지와 WebSocket을 제공합니다. 정적 사이트 호스팅만으로는 실시간 게임 서버를 실행할 수 없습니다. 무료 인스턴스는 유휴 상태에서 잠들 수 있으므로 첫 접속이 느릴 수 있습니다.
+
+Render 무료 인스턴스는 재시작할 때마다 디스크를 비우므로 `./data`에 둔 계정도 사라집니다. 계정을 유지하려면 Turso 무료 데이터베이스를 연결합니다.
+
+1. [Turso](https://turso.tech)에 가입하고 Turso CLI로 로그인합니다(`turso auth login`). 아래 작업은 Turso 웹 대시보드에서도 할 수 있습니다.
+2. 데이터베이스를 만듭니다: `turso db create sideplay`
+3. 주소와 토큰을 확인합니다: `turso db show sideplay --url`(`libsql://…`), `turso db tokens create sideplay`
+4. Render 서비스의 Environment에서 `TURSO_DATABASE_URL`에 주소를, `TURSO_AUTH_TOKEN`에 토큰을 넣고 다시 배포합니다. Blueprint로 처음 만들 때는 Render가 두 값을 입력하라고 묻습니다.
+5. 배포 로그에 `Accounts: Turso database at …`가 보이면 연결된 것입니다. 토큰은 로그에 남기지 않습니다.
+
+두 변수의 목록은 [.env.example](.env.example)에 있습니다.
 
 임시로 친구에게 보여주려면 Cloudflare Quick Tunnel을 사용할 수 있습니다. `npm start`를 켜 둔 상태에서 설치된 cloudflared를 실행합니다.
 

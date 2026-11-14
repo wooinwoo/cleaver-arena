@@ -9,6 +9,7 @@ import { attachTabletop } from './tabletop.ts';
 import { attachBumper } from './bumper.ts';
 import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, sanitizeTitle, type OpenRoom } from './lobby.ts';
 import { createFileAccountStore, createMemoryAccountStore, playerName, type AccountStore } from './accounts.ts';
+import { createDatabaseAccountStore, databaseHost } from './accounts-db.ts';
 import { createAuthApi, sessionTokenFromRequest } from './auth.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
@@ -230,8 +231,21 @@ export function createArenaServer(options: ArenaOptions = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  // Accounts outlive restarts in DATA_DIR. An unreadable accounts file stops the start rather than being replaced.
-  createFileAccountStore(process.env.DATA_DIR || './data').then(accounts => {
+  // Accounts outlive restarts in a Turso database when one is configured, otherwise in DATA_DIR.
+  // Stored accounts that cannot be read stop the start rather than being replaced.
+  const { TURSO_DATABASE_URL: databaseUrl, TURSO_AUTH_TOKEN: databaseToken } = process.env;
+  const directory = process.env.DATA_DIR || './data';
+  const opening = databaseUrl && databaseToken
+    ? createDatabaseAccountStore({ url: databaseUrl, authToken: databaseToken }).then(accounts => {
+      console.log(`Accounts: Turso database at ${databaseHost(databaseUrl)}`);
+      return accounts;
+    })
+    : createFileAccountStore(directory).then(accounts => {
+      const note = databaseUrl || databaseToken ? ' (TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must both be set to use the database)' : '';
+      console.log(`Accounts: file ${resolve(directory, 'accounts.json')}${note}`);
+      return accounts;
+    });
+  opening.then(accounts => {
     const arena = createArenaServer({ accounts });
     const port = Number(process.env.PORT || 3186);
     arena.server.listen(port, '0.0.0.0', () => console.log(`Cleaver Club listening on ${port}`));
