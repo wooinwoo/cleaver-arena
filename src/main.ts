@@ -132,7 +132,14 @@ function hubInfo(game: string) {
   return { title: '문도피구', description: '식칼을 던지고 피하는 실시간 3D 대전. 1:1부터 3:3 팀전까지 할 수 있어요.', rules: CLEAVER_RULES };
 }
 let selectedGame = '';
-function selectGame(game: string) {
+/** Library home (all games as a cover grid) or one game's page. */
+function setLibraryPage(page: 'home' | 'game') {
+  $('hub').dataset.page = page;
+  $('library-home').setAttribute('aria-pressed', String(page === 'home'));
+  if (page === 'home') renderRecentShelf();
+}
+function selectGame(game: string, options: { quiet?: boolean } = {}) {
+  if (!options.quiet) setLibraryPage('game');
   const cell = document.querySelector<HTMLElement>(`.game-cell[data-game="${game}"]`);
   if (!cell) return;
   selectedGame = game;
@@ -219,7 +226,67 @@ $('hub-count').textContent = `게임 ${document.querySelectorAll('.game-cell').l
 $('hub-play').onclick = () => go(`/?game=${selectedGame}&create=1`);
 $('hub-solo').onclick = () => document.querySelector<HTMLButtonElement>(`.game-cell[data-game="${selectedGame}"] .game-sub`)?.click();
 $('hub-rules').onclick = () => { const info = hubInfo(selectedGame); openRules(selectedGame, info.title, info.rules); };
-selectGame(document.querySelector(`.game-cell[data-game="${localStorage.getItem('sideplay-last-game')}"]`) ? localStorage.getItem('sideplay-last-game')! : 'cleaver');
+// —— 라이브러리 홈: 모든 게임을 분류별 표지 격자로 보여준다. 목록이 길어져도 넓은 화면에서 고를 수 있다.
+const homeTiles = new Map<string, HTMLButtonElement[]>();
+function homeTile(cell: HTMLElement) {
+  const game = cell.dataset.game!;
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'home-tile';
+  tile.dataset.game = game;
+  tile.style.setProperty('--game-accent', gameAccent(game));
+  const art = document.createElement('span'); art.className = 'home-art'; art.setAttribute('aria-hidden', 'true'); art.innerHTML = gameArt(game);
+  const copy = document.createElement('span'); copy.className = 'home-copy';
+  const solo = cell.querySelector<HTMLElement>('.game-sub');
+  const tags = [cell.querySelector('.game-players')?.textContent ?? '', solo ? (solo.dataset.solo ? '봇 가능' : '혼자 연습') : ''].filter(Boolean).join(' · ');
+  copy.append(Object.assign(document.createElement('strong'), { textContent: cell.querySelector('.game-option strong')?.textContent ?? game }),
+    Object.assign(document.createElement('small'), { textContent: tags }));
+  const rooms = document.createElement('span'); rooms.className = 'home-rooms';
+  tile.append(art, copy, rooms);
+  tile.hidden = cell.hidden;
+  tile.onclick = () => { selectGame(game); $('hub-detail').scrollTop = 0; };
+  tile.ondblclick = () => go(`/?game=${game}&create=1`);
+  homeTiles.set(game, [...(homeTiles.get(game) ?? []), tile]);
+  return tile;
+}
+function homeShelf(label: string, cells: HTMLElement[], id?: string) {
+  const shelf = document.createElement('section');
+  shelf.className = 'home-shelf';
+  if (id) shelf.id = id;
+  const head = document.createElement('h3');
+  head.append(Object.assign(document.createElement('span'), { textContent: label }), Object.assign(document.createElement('small'), { textContent: String(cells.length) }));
+  const grid = document.createElement('div'); grid.className = 'home-grid';
+  grid.append(...cells.map(homeTile));
+  shelf.append(head, grid);
+  return shelf;
+}
+const libraryCells = [...document.querySelectorAll<HTMLElement>('.game-list .game-cell')];
+$('home-shelves').append(...LIBRARY_GROUPS.map(([group, label]) => homeShelf(label, libraryCells.filter(cell => cell.dataset.libraryGroup === group))));
+$('home-count').textContent = `게임 ${libraryCells.length}개`;
+/** Recently launched games (this browser only), rebuilt each time the home opens. */
+function renderRecentShelf() {
+  document.getElementById('home-recent')?.remove();
+  for (const [game, tiles] of homeTiles) homeTiles.set(game, tiles.filter(tile => tile.isConnected));
+  const records = playRecords();
+  const recent = Object.keys(records).sort((a, b) => records[b].last - records[a].last)
+    .map(game => libraryCells.find(cell => cell.dataset.game === game)).filter((cell): cell is HTMLElement => !!cell).slice(0, 6);
+  if (recent.length) $('home-shelves').prepend(homeShelf('최근 실행', recent, 'home-recent'));
+  renderHomeRooms();
+}
+/** Open-room badges on the home tiles. */
+function renderHomeRooms() {
+  for (const [game, tiles] of homeTiles) {
+    const count = lobbyRooms.filter(room => room.game === game).length;
+    for (const tile of tiles) tile.querySelector('.home-rooms')!.textContent = count ? `열린 방 ${count}` : '';
+  }
+}
+// Search and filters hide list rows; the home tiles follow them.
+const tileSync = new MutationObserver(() => { for (const cell of libraryCells) for (const tile of homeTiles.get(cell.dataset.game!) ?? []) tile.hidden = cell.hidden; });
+for (const cell of libraryCells) tileSync.observe(cell, { attributes: true, attributeFilter: ['hidden'] });
+$('library-home').onclick = () => setLibraryPage('home');
+$('hd-back').onclick = () => setLibraryPage('home');
+selectGame(document.querySelector(`.game-cell[data-game="${localStorage.getItem('sideplay-last-game')}"]`) ? localStorage.getItem('sideplay-last-game')! : 'cleaver', { quiet: true });
+setLibraryPage('home');
 $('room-title-edit').onclick = () => {
   if (!state || state.phase === 'playing' || state.phase === 'countdown') return;
   editTitle(document.querySelector<HTMLElement>('.room-title')!, state.title, title => socket?.send(JSON.stringify({ type: 'title', title })));
@@ -341,6 +408,7 @@ function renderLobby(members: { name: string; member?: boolean }[]) {
   roomList($('open-rooms-list'), lobbyRooms, '열린 방 없음');
   roomList($('rooms-table'), lobbyRooms, '열린 방이 없어요. 라이브러리에서 게임을 골라 방을 만들 수 있어요.');
   renderGameRooms();
+  if (homeTiles.size) renderHomeRooms();
   $('nav-rooms-count').textContent = lobbyRooms.length ? String(lobbyRooms.length) : '';
   $('me-status').textContent = `${account().member ? '회원' : '비회원'} · ${lobbyOnline ? '온라인' : '연결 중'}`;
   const status = $('hub-conn');

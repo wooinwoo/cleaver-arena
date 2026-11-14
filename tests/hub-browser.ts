@@ -122,7 +122,17 @@ try {
   await page.locator('#code-join-input').press('Enter');
   await expect(page.locator('#code-join-error')).toContainText('열린 방 목록에 없는');
   await activate('.client-nav [data-view="library"]');
+  // On a desktop the library opens on its home: every game as a cover grid; a tile opens that game's page.
+  // (Phones browse the list itself as a grid, so they have no separate home.)
+  await expect(page.locator('#hub-home')).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator('#hub-home')).toBeVisible();
+  await expect(page.locator('#hub-home .home-tile:not([hidden])')).toHaveCount(await page.locator('.game-cell').count() + (await page.locator('#home-recent .home-tile').count()));
+  await activate('#hub-home .home-shelf:not(#home-recent) .home-tile[data-game="chess"]');
   await expect(page.locator('#hub-detail')).toBeVisible();
+  await expect(page.locator('#hd-title')).toHaveText('체스');
+  await activate('#hd-back');
+  await expect(page.locator('#hub-home')).toBeVisible();
   const manifest = await (await page.request.get(`${base}/manifest.webmanifest`)).json();
   assert.equal(manifest.short_name, 'SIDEPLAY');
   assert.equal((await page.request.get(`${base}/icons/sideplay.svg`)).status(), 200);

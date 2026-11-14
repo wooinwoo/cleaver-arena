@@ -100,6 +100,7 @@
         <div class="hub-welcome"><h1>게임 라이브러리</h1></div>
       </div>
       <div class="hub-rail">
+        <button type="button" id="library-home" class="library-home" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4Z"/></svg>홈</button>
         <div class="hub-tools">
           <div class="game-query">
             <label class="sr-only" for="game-search">게임 검색</label>
@@ -179,7 +180,12 @@
         </div>
         <div id="game-empty" hidden><strong>맞는 게임이 없어요.</strong><button id="game-reset" type="button">전체 게임 보기</button></div>
       </div>
+      <section id="hub-home" class="hub-home" aria-label="라이브러리 홈">
+        <div class="home-head"><h2>라이브러리</h2><span id="home-count"></span></div>
+        <div id="home-shelves"></div>
+      </section>
       <section id="hub-detail" class="hub-detail" aria-label="선택한 게임">
+        <button type="button" id="hd-back" class="hd-back">‹ 홈</button>
         <div class="hd-hero">
           <div class="hd-art" aria-hidden="true"></div>
           <div class="hd-heading"><ul class="hd-tags"></ul><h2 id="hd-title"></h2><p id="hd-desc"></p></div>

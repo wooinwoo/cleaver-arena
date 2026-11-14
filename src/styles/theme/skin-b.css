@@ -132,3 +132,6 @@ html:has(body.skin-b) { background: #0a0d13; }
 :root body.skin-b .rules-eyebrow { color: #d6b676; }
 :root body.skin-b #toast { background: #070a0ff2; }
 :root body.skin-b.in-match .match-bar, :root body.skin-b.in-match .health-panel, :root body.skin-b .bh-top { background: #070a0fd9; }
+/* B browses with its icon strip, so it has no separate library home: the stage always shows a game. */
+:root body.skin-b.in-hub #hub .hub-home, :root body.skin-b.in-hub #hub .library-home, :root body.skin-b.in-hub #hub .hd-back { display: none; }
+@media (min-width: 761px) { :root body.skin-b.in-hub #hub[data-page='home']:not([data-view='rooms']) .hub-detail { display: flex; } }
