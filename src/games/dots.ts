@@ -99,31 +99,6 @@ export function render(ctx: TableRenderContext<DotsState>) {
   turnCues(ctx, step, settle);
 }
 
-const coverArt = (() => {
-  const step = 24, x0 = 102, y0 = 10;
-  const parts: string[] = [];
-  const boxes: [number, number, number][] = [[0, 0, 0], [0, 1, 0], [1, 3, 1], [2, 2, 2], [3, 0, 3], [3, 1, 3]];
-  for (const [r, c, seat] of boxes) {
-    parts.push(`<rect x="${x0 + c * step + 2}" y="${y0 + r * step + 2}" width="${step - 4}" height="${step - 4}" rx="3" fill="${COLORS[seat]}" opacity="0.35"/>`);
-  }
-  const lines: [LineDir, number, number, number][] = [
-    ['h', 0, 0, 0], ['h', 0, 1, 0], ['h', 1, 0, 0], ['h', 1, 1, 0], ['v', 0, 0, 0], ['v', 0, 1, 0], ['v', 0, 2, 0],
-    ['h', 1, 3, 1], ['h', 2, 3, 1], ['v', 1, 3, 1], ['v', 1, 4, 1],
-    ['h', 2, 2, 2], ['h', 3, 2, 2], ['v', 2, 2, 2], ['v', 2, 3, 2],
-    ['h', 3, 0, 3], ['h', 3, 1, 3], ['h', 4, 0, 3], ['h', 4, 1, 3], ['v', 3, 0, 3], ['v', 3, 1, 3], ['v', 3, 2, 3],
-    ['h', 0, 3, 1], ['v', 1, 0, 2], ['h', 2, 0, 0], ['v', 0, 4, 3],
-  ];
-  for (const [dir, r, c, seat] of lines) {
-    const x1 = x0 + c * step, y1 = y0 + r * step;
-    const [x2, y2] = dir === 'h' ? [x1 + step, y1] : [x1, y1 + step];
-    parts.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${COLORS[seat]}" stroke-width="4" stroke-linecap="round"/>`);
-  }
-  for (let r = 0; r <= 5; r++) for (let c = 0; c <= 4; c++) {
-    parts.push(`<circle cx="${x0 + c * step}" cy="${y0 + r * step}" r="3.2" fill="#1f2937"/>`);
-  }
-  return parts.join('');
-})();
-
 export const COVER: TableCover = {
   colors: ['#1e2f52', '#9cc0ff', '#2563eb'],
   // Key art: a sheet of paper in perspective, a pencil closing the last side of a box.

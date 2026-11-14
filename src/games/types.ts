@@ -43,7 +43,7 @@ export interface TableRenderContext<View> {
 
 /** A renderer module exports `render(ctx)` plus `COVER` art for the hub card and room bar. */
 export interface TableCover {
-  /** [dark, light, accent] colours for the cover gradient and accents. */
+  /** [base, glow, accent]: the cover backdrop tone, its light, and the accent the UI uses for this game. */
   colors: [string, string, string];
   /** SVG markup drawn inside a 300×140 viewBox (no outer <svg>). Original art only. */
   art: string;

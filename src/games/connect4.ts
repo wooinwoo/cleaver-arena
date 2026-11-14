@@ -62,24 +62,6 @@ export function render(ctx: TableRenderContext<ConnectFourState>) {
   turnCues(ctx, step, fresh ? fall + (newLine ? 300 : 80) : 0);
 }
 
-const discs = (() => {
-  // Fixed mid-game position on the cover grid (rows top to bottom).
-  const layout = [
-    '.......',
-    '.......',
-    '...1...',
-    '..00...',
-    '..110..',
-    '.10010.',
-  ];
-  let svg = '';
-  layout.forEach((row, r) => [...row].forEach((v, c) => {
-    const fill = v === '0' ? '#e0483e' : v === '1' ? '#f5c638' : '#13284a';
-    svg += `<circle cx="${102 + c * 16}" cy="${27 + r * 16}" r="6" fill="${fill}"/>`;
-  }));
-  return svg;
-})();
-
 export const COVER: TableCover = {
   colors: ['#14305c', '#6aa0ff', '#f5c638'],
   // Key art: the upright grid seen at an angle, a yellow disc dropping into the fourth column.

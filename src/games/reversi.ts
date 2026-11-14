@@ -76,14 +76,6 @@ export function render(ctx: TableRenderContext<ReversiState>) {
   turnCues(ctx, step, settle);
 }
 
-/** Disc on the tilted cover board at column `col`, row `row` (0-7). */
-function disc(col: number, row: number, seat: number) {
-  const bx = -54.25 + col * 15.5, by = -54.25 + row * 15.5;
-  const x = (150 + (bx - by) * 0.7071).toFixed(1), y = 72 + (bx + by) * 0.7071 * 0.62;
-  return `<ellipse cx="${x}" cy="${(y + 2).toFixed(1)}" rx="7.5" ry="4.6" fill="#0006"/>`
-    + `<ellipse cx="${x}" cy="${y.toFixed(1)}" rx="7.5" ry="4.6" fill="${seat ? '#f3f1e6' : '#1f2a2c'}"/>`;
-}
-
 export const COVER: TableCover = {
   colors: ['#13482d', '#8ff0b0', '#7fe0a0'],
   // Key art: a tilted board in mid-game with one disc flipping in the air above its landing square.

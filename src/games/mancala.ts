@@ -178,24 +178,6 @@ export function render(ctx: TableRenderContext<MancalaState>) {
   turnCues(ctx, step, settle);
 }
 
-const coverPits = (() => {
-  const parts: string[] = [];
-  let k = 0;
-  for (const cy of [50, 92]) {
-    for (let i = 0; i < 6; i++) {
-      const cx = 72 + i * 31;
-      parts.push(`<circle cx="${cx}" cy="${cy}" r="13" fill="#5a3416"/><circle cx="${cx}" cy="${cy + 1.5}" r="11" fill="#3e220c"/>`);
-      const n = 2 + ((i * 3 + cy) % 3);
-      for (let s = 0; s < n; s++) {
-        const a = (s / n) * Math.PI * 2 + i;
-        const x = (cx + Math.cos(a) * 5).toFixed(1), y = (cy + 1 + Math.sin(a) * 5).toFixed(1);
-        parts.push(`<circle cx="${x}" cy="${y}" r="3.2" fill="${SEED_COLORS[k++ % 5]}"/>`);
-      }
-    }
-  }
-  return parts.join('');
-})();
-
 export const COVER: TableCover = {
   colors: ['#4a2812', '#ffbe68', '#f2b134'],
   // Key art: a carved board in perspective, glass seeds in the pits and three seeds dropping into one.
