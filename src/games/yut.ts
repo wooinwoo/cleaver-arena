@@ -5,27 +5,24 @@ import {
 import './yut.css';
 
 export const COVER: TableCover = {
-  colors: ['#4a2a17', '#e8cf9c', '#c0392b'],
-  art: `
-    <rect x="34" y="18" width="232" height="110" rx="14" fill="#b23a2e"/>
-    <rect x="44" y="27" width="212" height="92" rx="9" fill="none" stroke="#f2d9a2" stroke-width="2" stroke-dasharray="6 5"/>
-    <path d="M60 110 240 36M60 36l180 74" stroke="#8e2a21" stroke-width="2" opacity=".6"/>
-    <g transform="rotate(-18 92 72)">
-      <rect x="82" y="30" width="22" height="86" rx="11" fill="#f4e3c0" stroke="#6b3f1f" stroke-width="2.5"/>
-      <path d="M86 52l14 8M100 52l-14 8M86 86l14 8M100 86l-14 8" stroke="#3b2414" stroke-width="2.5" stroke-linecap="round"/>
-    </g>
-    <g transform="rotate(-4 136 72)">
-      <rect x="125" y="26" width="22" height="90" rx="11" fill="#f4e3c0" stroke="#6b3f1f" stroke-width="2.5"/>
-      <path d="M131 44v54" stroke="#d6b98a" stroke-width="2"/>
-    </g>
-    <g transform="rotate(10 178 72)">
-      <rect x="167" y="28" width="22" height="88" rx="11" fill="#9a5b2e" stroke="#5b3318" stroke-width="2.5"/>
-      <path d="M173 40v62" stroke="#b87442" stroke-width="2"/>
-    </g>
-    <g transform="rotate(24 220 74)">
-      <rect x="209" y="32" width="22" height="84" rx="11" fill="#f4e3c0" stroke="#6b3f1f" stroke-width="2.5"/>
-      <path d="M215 46v54" stroke="#d6b98a" stroke-width="2"/>
-    </g>`,
+  colors: ['#5a1e16', '#ffc27a', '#c0392b'],
+  // Key art: four sticks tumbling in the air over a red mat printed with the yut board.
+  art: (() => {
+    const stick = ([x, y, rot, flat, mark]: number[]) => `<ellipse cx="${x + 4}" cy="${110 + (x - 196) * .04}" rx="18" ry="3.2" fill="#000" opacity=".45" filter="url(#@bl)"/>`
+      + `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-6" y="-31" width="12" height="62" rx="6" fill="url(#@${flat ? 'sf' : 'sr'})"/>`
+      + (flat ? `<path d="M-1.5-23V23" stroke="#c99a5a" stroke-opacity=".5"/>` : `<path d="M2.4-25V25" stroke="#fff" stroke-opacity=".3" stroke-width="1.5"/>`)
+      + (mark ? `<path d="M-3.2-20l6.4 5.5m0-5.5-6.4 5.5M-3.2 14.5l6.4 5.5m0-5.5-6.4 5.5" stroke="#3b2414" stroke-width="2" stroke-linecap="round"/>` : '') + '</g>';
+    return `<defs><linearGradient id="@sf" x2="1" y2="0"><stop stop-color="#d9bb85"/><stop offset=".45" stop-color="#f6e6c2"/><stop offset="1" stop-color="#fffaea"/></linearGradient>`
+      + `<linearGradient id="@sr" x2="1" y2="0"><stop stop-color="#4a230b"/><stop offset=".55" stop-color="#a8622c"/><stop offset=".8" stop-color="#dc9a5a"/><stop offset="1" stop-color="#8a4a1c"/></linearGradient>`
+      + `<radialGradient id="@mt" cx=".55" cy=".35" r=".7"><stop stop-color="#e2533f"/><stop offset=".6" stop-color="#a8281e"/><stop offset="1" stop-color="#5e110c"/></radialGradient></defs>`
+      + `<ellipse cx="178" cy="122" rx="120" ry="14" fill="#000" opacity=".55" filter="url(#@bl)"/><ellipse cx="178" cy="114" rx="118" ry="25" fill="#3a0a06"/>`
+      + `<g transform="translate(178 109) scale(1 .21)"><circle r="118" fill="url(#@mt)"/><circle r="108" stroke="#f2d9a2" stroke-opacity=".5" stroke-width="4" stroke-dasharray="9 7"/>`
+      + `<g stroke="#f6d48e" stroke-opacity=".55"><circle r="64" stroke-width="6"/><circle r="64" stroke-width="20" stroke-dasharray="0 20.1" stroke-linecap="round"/><path d="M-45-45 45 45M45-45-45 45" stroke-width="5"/></g></g>`
+      + `<path d="M118 82Q120 54 138 40M204 26Q218 18 232 22M262 60Q270 48 266 34" stroke="#ffe2b0" stroke-opacity=".5" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>`
+      + `<circle cx="196" cy="50" r="40" fill="#ffd9a0" opacity=".3" filter="url(#@gw)"/>`
+      + [[146, 60, -38, 1, 1], [182, 46, 10, 0, 0], [214, 66, 50, 1, 0], [246, 46, -16, 0, 0]].map(stick).join('')
+      + `<path d="M226 22l2-5 2 5 5 2-5 2-2 5-2-5-5-2z" fill="#fff"/>`;
+  })(),
 };
 
 let picked = 0;

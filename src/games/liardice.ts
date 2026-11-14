@@ -183,28 +183,30 @@ export function render(ctx: TableRenderContext<View>) {
 }
 
 export const COVER: TableCover = {
-  colors: ['#2c1d14', '#efe2c8', '#c4472f'],
-  art: `
-  <ellipse cx="150" cy="122" rx="120" ry="12" fill="#000" opacity="0.18"/>
-  <g transform="rotate(-14 96 70)">
-    <path d="M58 28 L134 28 L124 112 L68 112 Z" fill="#c4472f"/>
-    <path d="M58 28 L134 28 L131 42 L61 42 Z" fill="#9c3524"/>
-    <path d="M68 112 L124 112 L123 104 L69 104 Z" fill="#7d2a1d"/>
-    <path d="M78 48 L84 100" stroke="#fff" stroke-opacity="0.25" stroke-width="5" stroke-linecap="round"/>
-  </g>
-  <g transform="rotate(8 178 92)">
-    <rect x="152" y="66" width="50" height="50" rx="9" fill="#f7f1e4" stroke="#2c1d14" stroke-width="2"/>
-    <circle cx="165" cy="79" r="4.5" fill="#2c1d14"/><circle cx="189" cy="79" r="4.5" fill="#2c1d14"/>
-    <circle cx="177" cy="91" r="4.5" fill="#2c1d14"/>
-    <circle cx="165" cy="103" r="4.5" fill="#2c1d14"/><circle cx="189" cy="103" r="4.5" fill="#2c1d14"/>
-  </g>
-  <g transform="rotate(-10 240 96)">
-    <rect x="218" y="76" width="42" height="42" rx="8" fill="#f7f1e4" stroke="#2c1d14" stroke-width="2"/>
-    <circle cx="239" cy="97" r="5.5" fill="#c4472f"/>
-  </g>
-  <g transform="rotate(20 212 40)">
-    <rect x="194" y="22" width="34" height="34" rx="7" fill="#f7f1e4" stroke="#2c1d14" stroke-width="2"/>
-    <circle cx="203" cy="31" r="3.5" fill="#2c1d14"/><circle cx="211" cy="39" r="3.5" fill="#2c1d14"/>
-    <circle cx="219" cy="47" r="3.5" fill="#2c1d14"/>
-  </g>`,
+  colors: ['#3a1c12', '#ff9a6a', '#c4472f'],
+  // Key art: a leather cup lifted off a hidden roll, light spilling out, two dice on the table.
+  art: (() => {
+    const pips: Record<number, number[][]> = {
+      1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.25, .25], [.5, .5], [.75, .75]],
+      4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]],
+      6: [[.27, .22], [.27, .5], [.27, .78], [.73, .22], [.73, .5], [.73, .78]],
+    };
+    const face = (o: number[], a: number[], b: number[], fill: string, n: number) => `<path d="M${o[0]} ${o[1]}l${a[0]} ${a[1]}l${b[0]} ${b[1]}l${-a[0]} ${-a[1]}Z" fill="${fill}" stroke="${fill}" stroke-width="1.5" stroke-linejoin="round"/>`
+      + `<g transform="matrix(${a.join(' ')} ${b.join(' ')} ${o.join(' ')})" fill="${n === 1 ? '#c4472f' : '#2c1d14'}">${pips[n].map(([u, v]) => `<circle cx="${u}" cy="${v}" r="${n === 1 ? .15 : .1}"/>`).join('')}</g>`;
+    const die = (x: number, y: number, s: number, rot: number, [top, left, right]: number[]) => {
+      const k = (n: number) => +(n * s).toFixed(1), T3 = [x - k(.87), y - k(.65)], T2 = [x, y - k(.15)];
+      return `<ellipse cx="${x}" cy="${y + k(.8)}" rx="${k(1.2)}" ry="${k(.3)}" fill="#000" opacity=".55" filter="url(#@bl)"/><g transform="rotate(${rot} ${x} ${y})">`
+        + face(T3, [k(.87), k(.5)], [k(.87), k(-.5)], '#fffaf0', top) + face(T3, [k(.87), k(.5)], [0, k(1)], '#d8cbb4', left)
+        + face(T2, [k(.87), k(-.5)], [0, k(1)], '#f2e8d6', right) + '</g>';
+    };
+    return `<defs><radialGradient id="@tb" cx=".55" cy=".3" r=".75"><stop stop-color="#9a5530"/><stop offset=".55" stop-color="#4f2614"/><stop offset="1" stop-color="#1e0c06"/></radialGradient>`
+      + `<linearGradient id="@cp" x2="1" y2="0"><stop stop-color="#4a160c"/><stop offset=".55" stop-color="#a8392a"/><stop offset=".8" stop-color="#d9634a"/><stop offset="1" stop-color="#7a2418"/></linearGradient></defs>`
+      + `<ellipse cx="180" cy="120" rx="130" ry="24" fill="#120603"/><ellipse cx="180" cy="114" rx="130" ry="24" fill="url(#@tb)"/><ellipse cx="180" cy="114" rx="129" ry="23.4" stroke="#ffb98a" stroke-opacity=".35"/>`
+      + `<ellipse cx="204" cy="102" rx="44" ry="11" fill="#ffc46a" opacity=".55" filter="url(#@gw)"/>` + die(206, 98, 10, 4, [4, 1, 2])
+      + `<g transform="translate(200 46) rotate(12)"><ellipse cy="37" rx="28" ry="6" fill="#ffd68a" opacity=".7" filter="url(#@bl)"/>`
+      + `<path d="M-30 32-21-30Q0-37 21-30L30 32A30 9 0 0 1-30 32Z" fill="url(#@cp)"/><ellipse cy="-31" rx="21" ry="5" fill="#c9503b"/><ellipse cy="-31" rx="16" ry="3.4" stroke="#ffd2a8" stroke-opacity=".5"/>`
+      + `<path d="M-25.5-4Q0 4 25.5-4M-28.5 18Q0 27 28.5 18" stroke="#f6c27a" stroke-width="1.4" stroke-dasharray="3 2.5"/><path d="M-30 32A30 9 0 0 0 30 32" stroke="#e7a85a" stroke-width="3"/><path d="M12-26 18 26" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-linecap="round"/></g>`
+      + die(146, 112, 15, -8, [5, 3, 1]) + die(246, 116, 12, 10, [2, 3, 1])
+      + `<path d="M246 28l2-6 2 6 6 2-6 2-2 6-2-6-6-2z" fill="#fff"/><path d="M164 86l-6-4M172 76l-4-6" stroke="#ffd68a" stroke-width="2" stroke-linecap="round" opacity=".7"/>`;
+  })(),
 };

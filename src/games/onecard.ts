@@ -142,14 +142,24 @@ export function render(ctx: TableRenderContext<OneCardView>): void {
 
 
 export const COVER: TableCover = {
-  colors: ['#1f3b4d', '#e9f1f4', '#e2574c'],
-  art: [
-    '<g transform="translate(150 132)">',
-    ...[-30, -15, 0, 15, 30].map((angle, i) =>
-      `<g transform="rotate(${angle}) translate(-26 -112)"><rect width="52" height="76" rx="7" fill="#fbfaf5" stroke="#1f3b4d" stroke-width="2"/>` +
-      `<text x="9" y="20" font-family="sans-serif" font-size="14" font-weight="700" fill="${i % 2 ? '#e2574c' : '#1f3b4d'}">${['♠', '♥', '♣', '♦', '♠'][i]}</text></g>`),
-    '</g>',
-    '<circle cx="150" cy="62" r="30" fill="#e2574c"/>',
-    '<text x="150" y="78" text-anchor="middle" font-family="sans-serif" font-size="46" font-weight="800" fill="#fbfaf5">1</text>',
-  ].join(''),
+  colors: ['#16344a', '#8fd0f0', '#e2574c'],
+  // Key art: a fanned hand with the ace of hearts played to the front, the last card.
+  art: (() => {
+    const card = (rank: string, suit: string, red: boolean, big: number) => {
+      const c = red ? '#d93a3a' : '#1b2a36';
+      return `<rect x="-23" y="-32" width="46" height="64" rx="5" fill="url(#@cf)" stroke="#0d1b26" stroke-opacity=".3"/>`
+        + `<text x="-15.5" y="-16" font-family="system-ui,sans-serif" font-size="11" font-weight="800" fill="${c}" text-anchor="middle">${rank}</text>`
+        + `<use href="#@${suit}" transform="translate(-15.5 -7) scale(.55)" fill="${c}"/><use href="#@${suit}" transform="translate(1 6) scale(${big})" fill="${c}"/>`;
+    };
+    const fan = ([angle, rank, suit]: (number | string)[]) => `<g transform="rotate(${angle} 196 150) translate(196 62)" filter="url(#@sh)">${card(String(rank), String(suit), suit === 'D' || suit === 'H', 1.5)}</g>`;
+    return `<defs><linearGradient id="@cf" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".7" stop-color="#f1efe8"/><stop offset="1" stop-color="#d6d2c6"/></linearGradient>`
+      + `<path id="@H" d="M0 6C-5 2-8-1-8-4A4.1 4.1 0 0 1 0-5.5 4.1 4.1 0 0 1 8-4C8-1 5 2 0 6Z"/><path id="@D" d="M0-7 5 0 0 7-5 0Z"/>`
+      + `<path id="@S" d="M0-7C-5-3-8 0-8 3A4 4 0 0 0-1 4.6L-2.6 8H2.6L1 4.6A4 4 0 0 0 8 3C8 0 5-3 0-7Z"/>`
+      + `<g id="@C"><circle cy="-3.4" r="3.3"/><circle cx="-3.5" cy="1.6" r="3.3"/><circle cx="3.5" cy="1.6" r="3.3"/><path d="M0 0 2.4 8H-2.4Z"/></g></defs>`
+      + `<ellipse cx="196" cy="124" rx="70" ry="9" fill="#000" opacity=".5" filter="url(#@bl)"/>`
+      + [[-36, '7', 'S'], [-19, '9', 'D'], [19, '4', 'C'], [36, '2', 'S']].map(fan).join('')
+      + `<circle cx="198" cy="60" r="38" fill="#ffd0c4" opacity=".4" filter="url(#@gw)"/>`
+      + `<g transform="translate(198 64) rotate(4) scale(1.18)" filter="url(#@sh)">${card('A', 'H', true, 2.7)}<rect x="-21" y="-30" width="42" height="60" rx="4" stroke="#d93a3a" stroke-opacity=".25"/></g>`
+      + `<path d="M234 22l2-6 2 6 6 2-6 2-2 6-2-6-6-2zM158 30l1.5-4 1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5z" fill="#fff"/>`;
+  })(),
 };

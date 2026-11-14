@@ -65,13 +65,30 @@ function disc(col: number, row: number, seat: number) {
 }
 
 export const COVER: TableCover = {
-  colors: ['#5f9e78', '#d3ead2', '#7fe0a0'],
-  art: `<g transform="translate(150 79) scale(1 .62) rotate(45)"><rect x="-62" y="-62" width="124" height="124" rx="8" fill="#234c36"/></g>`
-    + `<g transform="translate(150 72) scale(1 .62) rotate(45)">`
-    + `<rect x="-62" y="-62" width="124" height="124" rx="8" fill="#2f7a4f"/>`
-    + `<path d="M-46.5-62v124M-31-62v124M-15.5-62v124M0-62v124M15.5-62v124M31-62v124M46.5-62v124`
-    + `M-62-46.5h124M-62-31h124M-62-15.5h124M-62 0h124M-62 15.5h124M-62 31h124M-62 46.5h124" stroke="#24603d" stroke-width="1.5"/></g>`
-    + [[3, 3, 1], [4, 3, 0], [3, 4, 0], [4, 4, 1], [5, 3, 0], [2, 4, 1], [5, 5, 0], [3, 5, 0]]
-      .map(([col, row, seat]) => disc(col, row, seat)).join('')
-    + `<g transform="translate(240 40)"><ellipse cx="0" cy="5" rx="16" ry="9" fill="#0003"/><ellipse cx="0" cy="2" rx="16" ry="9" fill="#1f2a2c"/><ellipse cx="0" cy="-2" rx="16" ry="9" fill="#f3f1e6"/></g>`,
+  colors: ['#13482d', '#8ff0b0', '#7fe0a0'],
+  // Key art: a tilted board in mid-game with one disc flipping in the air above its landing square.
+  art: (() => {
+    const at = (u: number, v: number) => [178 + (u - v) * .98, 42 + (u + v) * .38];
+    const d = (p: number[][]) => 'M' + p.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L') + 'Z';
+    const [T, R, B, L] = [at(0, 0), at(100, 0), at(100, 100), at(0, 100)];
+    const down = ([x, y]: number[]) => [x, y + 8];
+    const grid = [1, 2, 3, 4, 5, 6, 7].map(k => `M${k * 12.5} 0V100M0 ${k * 12.5}H100`).join('');
+    const disc = ([i, j, white]: number[]) => {
+      const [x, y] = at((i + .5) * 12.5, (j + .5) * 12.5);
+      return `<ellipse cx="${x.toFixed(1)}" cy="${(y + 1.8).toFixed(1)}" rx="6.2" ry="3.3" fill="${white ? '#15191a' : '#d9d5c8'}"/>`
+        + `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="6.2" ry="3.3" fill="url(#@${white ? 'dw' : 'db'})"/>`;
+    };
+    const [lx, ly] = at(5.5 * 12.5, 2.5 * 12.5);
+    return `<defs><linearGradient id="@rv" x2="1" y2="1"><stop stop-color="#4fbf7f"/><stop offset=".55" stop-color="#23824f"/><stop offset="1" stop-color="#145a35"/></linearGradient>`
+      + `<radialGradient id="@dw" fx=".62" fy=".25"><stop stop-color="#fff"/><stop offset=".6" stop-color="#eeeadf"/><stop offset="1" stop-color="#b3ae9e"/></radialGradient>`
+      + `<radialGradient id="@db" fx=".62" fy=".25"><stop stop-color="#66706d"/><stop offset=".55" stop-color="#1c2120"/><stop offset="1" stop-color="#060807"/></radialGradient></defs>`
+      + `<ellipse cx="178" cy="122" rx="112" ry="13" fill="#000" opacity=".55" filter="url(#@bl)"/>`
+      + `<path d="${d([L, B, down(B), down(L)])}" fill="#06190f"/><path d="${d([B, R, down(R), down(B)])}" fill="#0f3a24"/><path d="${d([T, R, B, L])}" fill="url(#@rv)"/>`
+      + `<g transform="matrix(.98 .38 -.98 .38 178 42)"><path d="${grid}" stroke="#0b3a22" stroke-width="1.1"/><rect x="1" y="1" width="98" height="98" stroke="#b6f7cf" stroke-opacity=".45"/></g>`
+      + [[3, 3, 1], [4, 3, 0], [3, 4, 0], [4, 4, 1], [5, 3, 0], [2, 4, 1], [5, 5, 0], [3, 5, 0], [4, 5, 1], [2, 2, 0], [5, 4, 1], [4, 2, 0], [6, 4, 0], [2, 5, 1]].map(disc).join('')
+      + `<ellipse cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" rx="9" ry="4.4" fill="#000" opacity=".5" filter="url(#@bl)"/><ellipse cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" rx="8" ry="4" stroke="#d8ffe6" stroke-opacity=".8" stroke-width="1.2"/>`
+      + `<circle cx="214" cy="36" r="30" fill="#e6fff0" opacity=".35" filter="url(#@gw)"/><path d="M178 58Q176 30 196 20M244 52Q252 34 238 22" stroke="#e6fff0" stroke-opacity=".5" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>`
+      + `<g transform="translate(214 36) rotate(-24)"><ellipse cy="3.5" rx="22" ry="8.5" fill="#0d1010"/><path d="M-22 0v3.5a22 8.5 0 0 0 44 0V0Z" fill="#202625"/><ellipse rx="22" ry="8.5" fill="url(#@dw)"/><path d="M-14-4.5Q0-9 14-5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></g>`
+      + `<path d="M246 22l2-6 2 6 6 2-6 2-2 6-2-6-6-2z" fill="#fff"/>`;
+  })(),
 };
