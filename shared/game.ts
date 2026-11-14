@@ -24,6 +24,8 @@ export type Player = {
   x: number; z: number; yaw: number; hp: number; cooldown: number;
   flashCooldown: number; ghostCooldown: number; ghostTime: number; flashes: number;
   ready: boolean; connected: boolean; bot: boolean; input: Input;
+  /** Playing under a logged-in account. The server sets this; it is false for guests and bots. */
+  member: boolean;
 };
 export type Shot = { id: number; owner: string; team: number; x: number; z: number; vx: number; vz: number };
 export type Hit = { owner: string; target: string; x: number; z: number; damage: number };
@@ -45,7 +47,7 @@ export function addPlayer(game: Game, id: string, name: string, bot = false): Pl
   const player: Player = {
     id, name, slot, team: slot % 2, x: 0, z: 0, yaw: 0, hp: 100,
     cooldown: 0, flashCooldown: 0, ghostCooldown: 0, ghostTime: 0, flashes: 0,
-    ready: bot, connected: true, bot, input: { x: 0, z: 0, yaw: 0, fire: false },
+    ready: bot, connected: true, bot, input: { x: 0, z: 0, yaw: 0, fire: false }, member: false,
   };
   game.players.push(player);
   spawn(player, game.map);

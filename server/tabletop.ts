@@ -20,6 +20,8 @@ import { createMancala, actMancala } from '../shared/mancala.ts';
 import { createDots, actDots } from '../shared/dots.ts';
 import { tableBots } from '../shared/bots.ts';
 import { registerRoomSource, sanitizeTitle, tabletopRoom, type RoomRegistry } from './lobby.ts';
+import { playerName, type AccountStore } from './accounts.ts';
+import { sessionTokenFromRequest } from './auth.ts';
 
 function runtime<S extends BaseState>(state: S, act: (state: S, seat: number, action: Action) => string | null, view: (state: S, seat: number) => unknown = state => state) {
   return { state, act: (seat: number, action: Action) => act(state, seat, action), view: (seat: number) => view(state, seat) };
@@ -43,11 +45,12 @@ const definitions = {
   dots: (seats: number) => runtime(createDots(seats), actDots),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
-type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number; bot?: true };
+/** A seat in a room. `member` marks a seat taken by a logged-in account. */
+type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number; bot?: true; member: boolean };
 type Room = { code: string; kind: TableId; title: string; variant?: TableVariant; phase: 'lobby' | 'playing' | 'finished'; players: Member[]; match: Match | null; round: number; result: string; botTimer?: ReturnType<typeof setTimeout> };
-type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number };
+type Client = { room?: Room; member?: Member; count: number; window: number; alive: boolean; created: number; session: string | null };
 
-export function attachTabletop(server: Server, registry: RoomRegistry) {
+export function attachTabletop(server: Server, registry: RoomRegistry, accounts: AccountStore) {
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
   registerRoomSource(registry, () => [...rooms.values()].map(room => tabletopRoom(room)));
@@ -59,7 +62,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
     for (const [ws, client] of clients) if (client.room === room && client.member) {
       send(ws, { type: 'table-state', room: { code: room.code, kind: room.kind, variant: room.variant, phase: room.phase, round: room.round, result: room.result,
         title: room.title, host: room.players[0]?.id ?? null,
-        players: room.players.map(({ id, name, seat, ready, connected }) => ({ id, name, seat, ready, connected })),
+        players: room.players.map(({ id, name, seat, ready, connected, member }) => ({ id, name, seat, ready, connected, member })),
         me: client.member.seat, game: room.match?.view(client.member.seat) ?? null } });
     }
   }
@@ -99,8 +102,8 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
     }
     wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
   });
-  wss.on('connection', ws => {
-    const client: Client = { count: 0, window: Date.now(), alive: true, created: Date.now() };
+  wss.on('connection', (ws, req) => {
+    const client: Client = { count: 0, window: Date.now(), alive: true, created: Date.now(), session: sessionTokenFromRequest(req) };
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('error', () => ws.terminate());
@@ -126,8 +129,9 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
           send(ws, { type: 'joined', code: room.code, token: member.token }); broadcast(room); return;
         }
         if (data.type !== 'create' && data.type !== 'join') return;
-        const name = typeof data.name === 'string' ? data.name.trim().replace(/[\p{C}]/gu, '').slice(0, 12) : '';
-        if (!name) { fail('닉네임을 입력해 주세요.'); return; }
+        const who = playerName(accounts, client.session, data.name);
+        if (!who.ok) { fail(who.message); return; }
+        const name = who.name;
         let room: Room | undefined;
         if (data.type === 'create') {
           if (data.game === 'janggi' && data.variant !== undefined && data.variant !== 'animal' && data.variant !== 'genius') { fail('십이장기 룰을 다시 선택해 주세요.'); return; }
@@ -149,7 +153,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
           room.players.forEach(p => { p.ready = false; });
         }
         const seat = [0, 1, 2, 3, 4, 5].find(n => !room!.players.some(p => p.seat === n))!;
-        const member: Member = { id: randomUUID(), token: randomUUID(), name, seat, ready: false, connected: true, leftAt: 0 };
+        const member: Member = { id: randomUUID(), token: randomUUID(), name, seat, ready: false, connected: true, leftAt: 0, member: who.member };
         room.players.push(member); client.room = room; client.member = member;
         send(ws, { type: 'joined', code: room.code, token: member.token }); broadcast(room); return;
       }
@@ -162,7 +166,7 @@ export function attachTabletop(server: Server, registry: RoomRegistry) {
       }
       if (data.type === 'bot') {
         if (!tableBots[room.kind] || room.phase === 'playing' || room.players.length !== 1) { fail('혼자 있는 방에서만 봇과 시작할 수 있어요.'); return; }
-        room.players.push({ id: randomUUID(), token: randomUUID(), name: '봇', seat: 1, ready: true, connected: true, leftAt: 0, bot: true });
+        room.players.push({ id: randomUUID(), token: randomUUID(), name: '봇', seat: 1, ready: true, connected: true, leftAt: 0, bot: true, member: false });
         member.ready = true; start(room); broadcast(room); driveBot(room); return;
       }
       if (data.type === 'ready' && room.phase !== 'playing') {

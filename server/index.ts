@@ -8,16 +8,24 @@ import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Ga
 import { attachTabletop } from './tabletop.ts';
 import { attachBumper } from './bumper.ts';
 import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, sanitizeTitle, type OpenRoom } from './lobby.ts';
+import { createFileAccountStore, createMemoryAccountStore, playerName, type AccountStore } from './accounts.ts';
+import { createAuthApi, sessionTokenFromRequest } from './auth.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
-type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean };
+type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean; session: string | null };
+export type ArenaOptions = {
+  /** Where accounts live. Without one they are kept in memory and end with the process. */
+  accounts?: AccountStore;
+};
 const publicDir = fileURLToPath(new URL('../dist/', import.meta.url));
 const mime: Record<string, string> = { '.glb': 'model/gltf-binary', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.woff': 'font/woff', '.webmanifest': 'application/manifest+json' };
 
-export function createArenaServer() {
+export function createArenaServer(options: ArenaOptions = {}) {
   // ponytail: Rooms live in one process. Add shared state and room routing only when scaling beyond one server.
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
+  const accounts = options.accounts ?? createMemoryAccountStore();
+  const auth = createAuthApi(accounts);
   const registry = createRoomRegistry();
   registerRoomSource(registry, (): OpenRoom[] =>
     [...rooms.entries()].map(([code, room]) => cleaverRoom(code, room.game)));
@@ -25,10 +33,12 @@ export function createArenaServer() {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'");
+    let pathname: string | undefined;
+    try { pathname = new URL(req.url ?? '/', 'http://local').pathname; } catch { /* answered below, after the method check */ }
+    // The account API is the only part of the site that accepts POST.
+    if (pathname === '/api' || pathname?.startsWith('/api/')) { await auth.handle(req, res, pathname); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405).end(); return; }
-    let pathname: string;
-    try { pathname = new URL(req.url ?? '/', 'http://local').pathname; }
-    catch { res.writeHead(400).end(); return; }
+    if (pathname === undefined) { res.writeHead(400).end(); return; }
     if (pathname === '/health') { res.setHeader('Content-Type', 'application/json'); res.end('{"ok":true}'); return; }
     let decoded: string;
     try { decoded = decodeURIComponent(pathname); } catch { res.writeHead(400).end(); return; }
@@ -42,9 +52,9 @@ export function createArenaServer() {
     } catch { res.writeHead(404).end('게임을 먼저 빌드해 주세요.'); }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
-  const closeTables = attachTabletop(server, registry);
-  const bumper = attachBumper(server, registry);
-  const lobby = attachLobby(server, registry);
+  const closeTables = attachTabletop(server, registry, accounts);
+  const bumper = attachBumper(server, registry, accounts);
+  const lobby = attachLobby(server, registry, accounts);
   server.on('upgrade', (req, socket, head) => {
     if (req.url === '/table-ws' || req.url === '/lobby-ws' || req.url === '/bumper-ws') return;
     if (req.url !== '/ws' || clients.size >= 120) { socket.destroy(); return; }
@@ -57,8 +67,9 @@ export function createArenaServer() {
   const send = (ws: WebSocket, data: unknown) => {
     if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 256_000) ws.send(JSON.stringify(data));
   };
-  wss.on('connection', ws => {
-    const client: Client = { alive: true, count: 0, window: Date.now(), lastInput: Date.now(), created: Date.now() };
+  wss.on('connection', (ws, req) => {
+    // The login cookie is only visible on the upgrade request; the session is looked up again whenever a name is needed.
+    const client: Client = { alive: true, count: 0, window: Date.now(), lastInput: Date.now(), created: Date.now(), session: sessionTokenFromRequest(req) };
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('message', raw => {
@@ -88,8 +99,9 @@ export function createArenaServer() {
           send(ws, { type: 'joined', id, code: room.game.code, token: data.token });
           return;
         }
-        const name = typeof data.name === 'string' ? data.name.trim().replace(/[\p{C}]/gu, '').slice(0, 12) : '';
-        if (!name) { send(ws, { type: 'error', message: '닉네임을 입력해 주세요.' }); return; }
+        const who = playerName(accounts, client.session, data.name);
+        if (!who.ok) { send(ws, { type: 'error', message: who.message }); return; }
+        const name = who.name;
         let room: Room | undefined;
         if (data.type === 'create') {
           if (data.view !== undefined && data.view !== 'top' && data.view !== 'fps') { send(ws, { type: 'error', message: '시점을 다시 선택해 주세요.' }); return; }
@@ -107,7 +119,7 @@ export function createArenaServer() {
         const capacity = room.game.mode === 'duel' ? 2 : 6;
         if (room.game.players.length >= capacity) { send(ws, { type: 'error', message: `방 정원 ${capacity}명이 찼어요.` }); return; }
         const id = randomUUID(), token = randomUUID();
-        addPlayer(room.game, id, name);
+        addPlayer(room.game, id, name).member = who.member;
         room.tokens.set(token, id);
         client.room = room; client.id = id;
         if (data.type === 'create' && data.practice === true) addPlayer(room.game, randomUUID(), '연습 로봇', true);
@@ -205,20 +217,27 @@ export function createArenaServer() {
     }
   }, 10_000);
   return {
-    server, rooms,
+    server, rooms, accounts,
     async close() {
       clearInterval(simulation); clearInterval(broadcast); clearInterval(heartbeat);
       closeTables(); bumper.close(); lobby.close();
       for (const ws of clients.keys()) ws.terminate();
       wss.close();
       await new Promise<void>(done => server.close(() => done()));
+      await accounts.close();
     },
   };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const arena = createArenaServer();
-  const port = Number(process.env.PORT || 3186);
-  arena.server.listen(port, '0.0.0.0', () => console.log(`Cleaver Club listening on ${port}`));
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void arena.close().then(() => process.exit(0)); });
+  // Accounts outlive restarts in DATA_DIR. An unreadable accounts file stops the start rather than being replaced.
+  createFileAccountStore(process.env.DATA_DIR || './data').then(accounts => {
+    const arena = createArenaServer({ accounts });
+    const port = Number(process.env.PORT || 3186);
+    arena.server.listen(port, '0.0.0.0', () => console.log(`Cleaver Club listening on ${port}`));
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void arena.close().then(() => process.exit(0)); });
+  }, error => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
 }

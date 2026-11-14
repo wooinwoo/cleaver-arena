@@ -23,6 +23,8 @@ export interface BumperPlayer {
   alive: boolean; fall: number; dashCooldown: number; dashTime: number; stun: number;
   score: number; kos: number; lastHitBy: string | null; lastHitAge: number;
   input: BumperInput;
+  /** Playing under a logged-in account. The server sets this; it is false for guests and bots. */
+  member: boolean;
 }
 export type BumperEvent = { seq: number; type: 'hit' | 'fall' | 'dash'; x: number; z: number; a: number; b: number; power: number };
 export type BumperPhase = 'lobby' | 'countdown' | 'playing' | 'roundEnd' | 'finished';
@@ -45,7 +47,7 @@ export function addBumperPlayer(game: BumperGame, id: string, name: string, bot 
   const player: BumperPlayer = {
     id, name, slot, bot, connected: true, ready: bot, x: 0, z: 0, vx: 0, vz: 0, yaw: 0,
     alive: true, fall: 0, dashCooldown: 0, dashTime: 0, stun: 0, score: 0, kos: 0, lastHitBy: null, lastHitAge: 99,
-    input: { x: 0, z: 0, dash: false },
+    input: { x: 0, z: 0, dash: false }, member: false,
   };
   game.players.push(player);
   place(game);
@@ -245,7 +247,7 @@ export function bumperView(game: BumperGame) {
     players: game.players.map(p => ({
       id: p.id, name: p.name, slot: p.slot, bot: p.bot, connected: p.connected, ready: p.ready,
       x: round(p.x), z: round(p.z), yaw: round(p.yaw), alive: p.alive, fall: round(p.fall),
-      dash: round(p.dashCooldown), dashing: p.dashTime > 0, score: p.score, kos: p.kos,
+      dash: round(p.dashCooldown), dashing: p.dashTime > 0, score: p.score, kos: p.kos, member: p.member,
     })),
   };
 }

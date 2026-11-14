@@ -2,6 +2,8 @@ import type { Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { TABLE_GAMES, POKER_VARIANTS, type TableId, type PokerVariant } from '../shared/catalog.ts';
+import { playerName, type AccountStore } from './accounts.ts';
+import { sessionTokenFromRequest } from './auth.ts';
 
 export type OpenRoom = {
   game: string;
@@ -18,7 +20,7 @@ export type OpenRoom = {
 
 export type RoomRegistry = { sources: Array<() => OpenRoom[]> };
 
-type LobbyClient = { id: string; name: string; alive: boolean; count: number; window: number; created: number };
+type LobbyClient = { id: string; name: string; member: boolean; session: string | null; alive: boolean; count: number; window: number; created: number };
 
 export function createRoomRegistry(): RoomRegistry {
   return { sources: [] };
@@ -83,13 +85,13 @@ function openRooms(registry: RoomRegistry): OpenRoom[] {
   }).slice(0, 40);
 }
 
-export function attachLobby(server: Server, registry: RoomRegistry) {
+export function attachLobby(server: Server, registry: RoomRegistry, accounts: AccountStore) {
   const clients = new Map<WebSocket, LobbyClient>();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
   function snapshot() {
     return {
       type: 'lobby',
-      members: [...clients.values()].filter(c => c.name).map(c => ({ id: c.id, name: c.name })),
+      members: [...clients.values()].filter(c => c.name).map(c => ({ id: c.id, name: c.name, member: c.member })),
       rooms: openRooms(registry),
     };
   }
@@ -108,8 +110,8 @@ export function attachLobby(server: Server, registry: RoomRegistry) {
     }
     wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
   });
-  wss.on('connection', ws => {
-    const client: LobbyClient = { id: randomUUID(), name: '', alive: true, count: 0, window: Date.now(), created: Date.now() };
+  wss.on('connection', (ws, req) => {
+    const client: LobbyClient = { id: randomUUID(), name: '', member: false, session: sessionTokenFromRequest(req), alive: true, count: 0, window: Date.now(), created: Date.now() };
     clients.set(ws, client);
     ws.send(JSON.stringify(snapshot()));
     ws.on('pong', () => { client.alive = true; });
@@ -122,9 +124,14 @@ export function attachLobby(server: Server, registry: RoomRegistry) {
       try { data = JSON.parse(raw.toString()); } catch { return; }
       if (!data || typeof data !== 'object') return;
       if (data.type === 'hello') {
-        const name = typeof data.name === 'string' ? data.name.trim().replace(/[\p{C}]/gu, '').slice(0, 12) : '';
-        if (!name) return;
-        client.name = name;
+        const who = playerName(accounts, client.session, data.name);
+        if (!who.ok) {
+          // A socket whose login has ended is no longer listed under the account nickname.
+          if (client.member) { client.name = ''; client.member = false; broadcast(); }
+          if (who.reason === 'reserved') ws.send(JSON.stringify({ type: 'error', message: who.message }));
+          return;
+        }
+        client.name = who.name; client.member = who.member;
         broadcast();
       } else if (data.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong', time: data.time }));

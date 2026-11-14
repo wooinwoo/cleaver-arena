@@ -6,12 +6,14 @@ import {
   startBumper, tickBumper, type BumperGame,
 } from '../shared/bumper.ts';
 import { registerRoomSource, sanitizeTitle, type OpenRoom, type RoomRegistry } from './lobby.ts';
+import { playerName, type AccountStore } from './accounts.ts';
+import { sessionTokenFromRequest } from './auth.ts';
 
 type Room = { game: BumperGame; tokens: Map<string, string>; left: Map<string, number> };
-type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; created: number; lastInput: number };
+type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; created: number; lastInput: number; session: string | null };
 
 /** Real-time bumper arena on /bumper-ws: rooms, a 30 Hz simulation and 20 Hz snapshots. */
-export function attachBumper(server: Server, registry: RoomRegistry) {
+export function attachBumper(server: Server, registry: RoomRegistry, accounts: AccountStore) {
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
   registerRoomSource(registry, (): OpenRoom[] => [...rooms.values()].map(({ game }) => {
@@ -38,8 +40,8 @@ export function attachBumper(server: Server, registry: RoomRegistry) {
   const host = (game: BumperGame) => game.players.find(p => !p.bot);
   const waiting = (game: BumperGame) => game.phase === 'lobby' || game.phase === 'finished';
 
-  wss.on('connection', ws => {
-    const client: Client = { alive: true, count: 0, window: Date.now(), created: Date.now(), lastInput: Date.now() };
+  wss.on('connection', (ws, req) => {
+    const client: Client = { alive: true, count: 0, window: Date.now(), created: Date.now(), lastInput: Date.now(), session: sessionTokenFromRequest(req) };
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('error', () => ws.terminate());
@@ -67,8 +69,9 @@ export function attachBumper(server: Server, registry: RoomRegistry) {
           return;
         }
         if (data.type !== 'create' && data.type !== 'join') return;
-        const name = typeof data.name === 'string' ? data.name.trim().replace(/[\p{C}]/gu, '').slice(0, 12) : '';
-        if (!name) { fail('닉네임을 입력해 주세요.'); return; }
+        const who = playerName(accounts, client.session, data.name);
+        if (!who.ok) { fail(who.message); return; }
+        const name = who.name;
         let room: Room | undefined;
         if (data.type === 'create') {
           if (rooms.size >= 40) { fail('현재 방이 많아요. 잠시 후 다시 시도해 주세요.'); return; }
@@ -88,7 +91,7 @@ export function attachBumper(server: Server, registry: RoomRegistry) {
         }
         if (room.game.phase === 'finished') { room.game.phase = 'lobby'; room.game.winner = ''; }
         const id = randomUUID(), token = randomUUID();
-        addBumperPlayer(room.game, id, name);
+        addBumperPlayer(room.game, id, name).member = who.member;
         room.tokens.set(token, id);
         client.room = room; client.id = id;
         if (data.type === 'create' && data.solo === true) for (let n = 1; n <= 3; n++) addBumperPlayer(room.game, randomUUID(), `봇 ${n}`, true);
