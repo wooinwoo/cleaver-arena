@@ -47,7 +47,9 @@ test('all table games create/join/start/action; private poker views; wrong-game 
         assert.equal(snapshotB.room.game.variant, variant ?? 'animal');
       }
       assert.ok(snapshotA.room.players.every((p: Record<string, unknown>) => !('token' in p)));
-      const actions = { splendor: { type: 'take', gems: [1, 1, 1, 0, 0] }, chess: { type: 'move', from: 'e2', to: 'e4' }, gomoku: { type: 'place', r: 7, c: 7 }, quoridor: { type: 'move', r: 7, c: 4 }, janggi: { type: 'move', from: 7, to: 4 }, poker: { type: 'call' }, davinci: { type: 'draw' }, coup: { type: 'act', kind: 'income' } };
+      const actions = { splendor: { type: 'take', gems: [1, 1, 1, 0, 0] }, chess: { type: 'move', from: 'e2', to: 'e4' }, gomoku: { type: 'place', r: 7, c: 7 }, quoridor: { type: 'move', r: 7, c: 4 }, janggi: { type: 'move', from: 7, to: 4 }, poker: { type: 'call' }, davinci: { type: 'draw' }, coup: { type: 'act', kind: 'income' },
+        reversi: { type: 'place', r: 2, c: 3 }, onecard: { type: 'draw' }, yut: { type: 'throw' }, connect4: { type: 'drop', c: 3 },
+        liardice: { type: 'bid', count: 1, face: 2 }, mancala: { type: 'sow', pit: 0 }, dots: { type: 'line', dir: 'h', r: 0, c: 0 } };
       b.send({ type: 'action', action: actions[kind], seat: 0 });
       assert.match((await b.wait(data => data.type === 'error')).message, /차례/);
       if (kind === 'poker') {
@@ -64,7 +66,7 @@ test('all table games create/join/start/action; private poker views; wrong-game 
         assert.ok(typeof snapshotA.room.game.deckCount === 'number' && !('deck' in snapshotA.room.game));
       }
       a.send({ type: 'action', action: actions[kind] });
-      const after = await b.wait(data => data.type === 'table-state' && (kind === 'davinci' ? data.room.game?.stage === 'guess' : data.room.game?.turn === 1));
+      const after = await b.wait(data => data.type === 'table-state' && (kind === 'davinci' ? data.room.game?.stage === 'guess' : kind === 'yut' ? !!data.room.game?.lastThrow : data.room.game?.turn === 1));
       assert.equal(after.room.phase, 'playing');
       const outsider = await client();
       outsider.send({ type: 'join', game: kind === 'poker' ? 'gomoku' : 'poker', name: '다른 게임', code: joined.code });

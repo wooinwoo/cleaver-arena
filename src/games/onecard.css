@@ -1,0 +1,60 @@
+.onecard-board{width:100%;max-width:640px;min-width:0;display:flex;flex-direction:column;gap:10px;color:var(--app-text);box-sizing:border-box}
+.onecard-board *{box-sizing:border-box}
+.oc-others{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;min-width:0}
+.oc-opp,.oc-mine{background:var(--app-panel);border:1px solid var(--app-line);border-radius:12px;padding:8px 10px;min-width:0}
+.oc-turn{outline:3px solid var(--app-accent);outline-offset:1px}
+.oc-opp-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;min-width:0}
+.oc-opp-head strong{font-size:13px;overflow-wrap:anywhere;min-width:0}
+.oc-count{font-size:12px;color:var(--app-muted);font-variant-numeric:tabular-nums}
+.oc-one{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:#e2574c;color:#fff}
+.oc-win{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--app-accent);color:var(--app-panel)}
+.oc-backs{display:flex;flex-wrap:wrap;gap:3px;min-height:26px;align-items:center}
+.oc-back{width:16px;height:24px;border-radius:3px;background:repeating-linear-gradient(45deg,#2c5677 0 3px,#244864 3px 6px);border:1px solid #fbfaf5aa}
+.oc-more{font-size:11px;color:var(--app-muted)}
+.oc-centre{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;background:var(--app-raised);border:1px solid var(--app-line);border-radius:12px;padding:12px}
+.oc-deck{min-width:96px;min-height:96px;border-radius:10px;border:2px solid #fbfaf5aa;background:repeating-linear-gradient(45deg,#2c5677 0 5px,#244864 5px 10px);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;font:inherit;cursor:pointer}
+.oc-deck small{font-size:11px;opacity:.85}
+.oc-deck-label{font-size:14px;font-weight:800;text-shadow:0 1px 2px #0008}
+.oc-deck-attack{border-color:#e2574c;box-shadow:0 0 0 3px #e2574c66}
+.oc-deck:disabled{cursor:default;opacity:.7}
+.oc-pile{display:flex;align-items:center;gap:10px}
+.oc-marks{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.oc-declared,.oc-attack,.oc-dir{font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--app-panel);border:1px solid var(--app-line)}
+.oc-attack{background:#e2574c;color:#fff;border-color:#e2574c}
+.oc-dir{color:var(--app-muted);font-weight:600}
+.oc-log{margin:0;font-size:12px;line-height:1.5;color:var(--app-muted);text-align:center;overflow-wrap:anywhere}
+.oc-hand{display:flex;flex-wrap:wrap;gap:6px}
+.oc-card{position:relative;width:48px;height:68px;border-radius:7px;background:#fbfaf5;border:1px solid #b9b6a8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;font:inherit;line-height:1}
+.oc-card.oc-black{color:#1d2630}
+.oc-card.oc-red{color:#c8352b}
+.oc-card .oc-rank{font-size:17px;font-weight:800}
+.oc-card .oc-suit{font-size:20px}
+.oc-card.oc-joker{background:linear-gradient(160deg,#fbfaf5 55%,#f3e2b3)}
+.oc-card.oc-joker .oc-rank{font-size:12px}
+.oc-card.oc-joker .oc-suit{font-size:11px;font-weight:700}
+.oc-card.oc-joker.oc-red .oc-suit{background:linear-gradient(90deg,#c8352b,#d9a018,#2f7d4f,#2c5fb0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.oc-top{width:64px;height:90px}
+.oc-top .oc-rank{font-size:22px}
+.oc-top .oc-suit{font-size:28px}
+.oc-mini{width:26px;height:36px;border-radius:4px}
+.oc-mini .oc-rank{font-size:10px}
+.oc-mini .oc-suit{font-size:11px}
+.oc-mini.oc-joker .oc-rank,.oc-mini.oc-joker .oc-suit{font-size:7px}
+button.oc-card{cursor:default;min-height:44px}
+button.oc-card:disabled{opacity:.6}
+button.oc-card.oc-playable{cursor:pointer;opacity:1;outline:3px solid var(--app-accent);outline-offset:1px;transform:translateY(-3px)}
+button.oc-card.oc-playable:hover{filter:brightness(1.05)}
+button.oc-card.oc-pending{outline-color:#e2574c;transform:translateY(-6px)}
+.oc-ask{font-size:13px;font-weight:700}
+.oc-suit-pick,.oc-cancel{min-height:44px;min-width:64px;font-weight:700}
+.oc-suit-pick.oc-red{color:#c8352b}
+@media(max-width:480px){
+  .oc-others{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
+  .oc-card{width:42px;height:60px}
+  .oc-card .oc-rank{font-size:15px}
+  .oc-card .oc-suit{font-size:17px}
+  .oc-top{width:56px;height:80px}
+  .oc-deck{min-width:84px;min-height:84px}
+  .oc-centre{gap:10px;padding:10px}
+  .oc-hand{gap:5px}
+}

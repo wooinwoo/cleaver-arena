@@ -1,4 +1,5 @@
-export type TableGameId = 'quoridor' | 'gomoku' | 'janggi' | 'poker' | 'chess' | 'splendor' | 'davinci' | 'coup';
+export type TableGameId = 'quoridor' | 'gomoku' | 'janggi' | 'poker' | 'chess' | 'splendor' | 'davinci' | 'coup'
+  | 'reversi' | 'onecard' | 'yut' | 'connect4' | 'liardice' | 'mancala' | 'dots';
 export type Action = { type: string; [key: string]: unknown };
 export type BaseState = {
   kind: TableGameId;

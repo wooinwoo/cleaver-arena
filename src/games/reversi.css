@@ -1,0 +1,85 @@
+.reversi-board {
+  width: min(100%, 560px, calc(100dvh - 270px));
+  min-width: 0;
+  max-width: 100%;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 8px solid #1f4d34;
+  border-radius: 10px;
+  background: #174029;
+  box-shadow: 0 10px 30px #071d2633;
+}
+.reversi-board .board-cell {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 2px;
+  background: #2f7a4f;
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.reversi-board .board-cell:not(:disabled):hover { background: #3b8d5d; }
+.reversi-board .board-cell:disabled:hover { background: #2f7a4f; }
+.reversi-board .board-cell:focus-visible { outline: 3px solid var(--app-accent, #d4f18d); outline-offset: -3px; }
+.reversi-board .board-cell.pending { outline: 3px solid var(--app-accent, #d4f18d); outline-offset: -3px; background: #3f9463; }
+.reversi-board .board-cell.pending .reversi-hint { width: 70%; height: 70%; opacity: .55; background: var(--app-text, #f3f1e6); }
+
+.reversi-disc {
+  display: block;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 2px 3px #0006;
+}
+.reversi-disc-0 { background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
+.reversi-disc-1 { background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
+.reversi-flipped { animation: reversi-flip .3s ease-out; }
+@keyframes reversi-flip { from { transform: scaleX(.1); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .reversi-flipped { animation: none; } }
+
+.reversi-hint {
+  display: block;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: #0b2a1a99;
+  pointer-events: none;
+}
+.reversi-last::after {
+  content: '';
+  position: absolute;
+  width: 16%;
+  height: 16%;
+  border-radius: 50%;
+  background: #e38b42;
+  pointer-events: none;
+}
+
+#t-toolbar .reversi-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--app-line, #43635e);
+  border-radius: 999px;
+  background: var(--app-panel, #204448);
+  color: var(--app-text, #eaf3db);
+  font-size: 13px;
+  width: auto;
+  margin: 0;
+}
+#t-toolbar .reversi-count > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--app-muted, #c6d9cf); }
+#t-toolbar .reversi-count > strong { font-variant-numeric: tabular-nums; font-size: 16px; }
+#t-toolbar .reversi-count-turn { background: var(--app-raised, #2b5552); border-color: var(--app-accent, #d4f18d); }
+#t-toolbar .reversi-count .reversi-disc { width: 14px; height: 14px; flex-shrink: 0; box-shadow: none; }
+#t-toolbar .reversi-count .reversi-disc-1 { border: 1px solid #b9b4a3; box-sizing: border-box; }

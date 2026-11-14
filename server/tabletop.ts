@@ -11,6 +11,13 @@ import { createChess, actChess } from '../shared/chess.ts';
 import { createSplendor, actSplendor, splendorView } from '../shared/splendor.ts';
 import { createDavinci, actDavinci, davinciView } from '../shared/davinci.ts';
 import { createCoup, actCoup, coupView } from '../shared/coup.ts';
+import { createReversi, actReversi } from '../shared/reversi.ts';
+import { createOneCard, actOneCard, oneCardView } from '../shared/onecard.ts';
+import { createYut, actYut } from '../shared/yut.ts';
+import { createConnectFour, actConnectFour } from '../shared/connect4.ts';
+import { createLiarDice, actLiarDice, liarDiceView } from '../shared/liardice.ts';
+import { createMancala, actMancala } from '../shared/mancala.ts';
+import { createDots, actDots } from '../shared/dots.ts';
 import { tableBots } from '../shared/bots.ts';
 import { registerRoomSource, sanitizeTitle, tabletopRoom, type RoomRegistry } from './lobby.ts';
 
@@ -27,6 +34,13 @@ const definitions = {
   poker: (seats: number, variant?: TableVariant) => runtime(createPoker(seats, variant === 'duel' ? 'duel' : 'party'), actPoker, pokerView),
   davinci: (seats: number) => runtime(createDavinci(seats), actDavinci, davinciView),
   coup: (seats: number) => runtime(createCoup(seats), actCoup, coupView),
+  reversi: (_: number) => runtime(createReversi(), actReversi),
+  onecard: (seats: number) => runtime(createOneCard(seats), actOneCard, oneCardView),
+  yut: (seats: number) => runtime(createYut(seats), (state, seat, action) => actYut(state, seat, action)),
+  connect4: (_: number) => runtime(createConnectFour(), actConnectFour),
+  liardice: (seats: number) => runtime(createLiarDice(seats), (state, seat, action) => actLiarDice(state, seat, action), liarDiceView),
+  mancala: (_: number) => runtime(createMancala(), actMancala),
+  dots: (seats: number) => runtime(createDots(seats), actDots),
 };
 type Match = ReturnType<(typeof definitions)[TableId]>;
 type Member = { id: string; name: string; seat: number; ready: boolean; connected: boolean; token: string; leftAt: number; bot?: true };

@@ -1,0 +1,137 @@
+.liardice-board {
+  --ld-die: #f7f1e4;
+  --ld-pip: #2c1d14;
+  --ld-wild: #c4472f;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  color: var(--app-text);
+}
+
+.ld-summary {
+  background: var(--app-panel);
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.ld-bid {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
+  font-size: 1.05rem;
+}
+.ld-bid strong { font-size: 1.45rem; color: var(--app-accent); }
+.ld-bid-label { color: var(--app-muted); font-size: 0.9rem; }
+.ld-meta { margin: 6px 0 0; color: var(--app-muted); font-size: 0.85rem; }
+.ld-outcome { margin: 8px 0 0; font-weight: 600; }
+
+.ld-players { display: flex; flex-direction: column; gap: 6px; }
+.ld-player {
+  background: var(--app-panel);
+  border: 1px solid var(--app-line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.ld-player.turn { border-color: var(--app-accent); box-shadow: 0 0 0 1px var(--app-accent) inset; }
+.ld-player.me { background: var(--app-raised); }
+.ld-player.out { opacity: 0.45; }
+.ld-player.loser { border-color: var(--ld-wild, #c4472f); }
+.ld-player-head { display: flex; flex-direction: column; min-width: 0; }
+.ld-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw; }
+.ld-count { color: var(--app-muted); font-size: 0.8rem; }
+
+.ld-dice { display: flex; flex-wrap: wrap; gap: 5px; }
+.ld-dice.large { gap: 10px; justify-content: center; }
+
+.ld-die {
+  --size: 26px;
+  width: var(--size);
+  height: var(--size);
+  box-sizing: border-box;
+  padding: calc(var(--size) * 0.14);
+  border-radius: calc(var(--size) * 0.2);
+  background: var(--ld-die, #f7f1e4);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  display: inline-grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  flex: none;
+}
+.ld-die i { width: 70%; height: 70%; border-radius: 50%; }
+.ld-die i.on { background: var(--ld-pip, #2c1d14); }
+.ld-die.small { --size: 22px; }
+.ld-dice.large .ld-die { --size: 52px; }
+.ld-die.hidden {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-raised);
+  border: 1px dashed var(--app-line);
+  color: var(--app-muted);
+  font-weight: 700;
+  font-size: calc(var(--size) * 0.55);
+}
+.ld-die.counted { box-shadow: 0 0 0 2px var(--app-accent); }
+.ld-die.match { box-shadow: 0 0 0 3px var(--app-accent); }
+.ld-die.lost { opacity: 0.4; outline: 2px solid var(--ld-wild, #c4472f); outline-offset: 1px; }
+
+.ld-mine {
+  background: var(--app-raised);
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+}
+.ld-mine-title { margin: 0 0 8px; color: var(--app-muted); font-size: 0.85rem; }
+
+.ld-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.ld-stepper { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.ld-step-value { min-width: 56px; text-align: center; font-size: 1.2rem; font-weight: 700; }
+.ld-builder button {
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--app-line);
+  background: var(--app-raised);
+  color: var(--app-text);
+  font: inherit;
+  cursor: pointer;
+}
+.ld-builder button:disabled { opacity: 0.4; cursor: default; }
+.ld-step { font-size: 1.3rem; font-weight: 700; }
+.ld-faces { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.ld-face { display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.ld-face .ld-die { --size: 28px; }
+.ld-face.selected { border-color: var(--app-accent); box-shadow: 0 0 0 2px var(--app-accent) inset; }
+.ld-actions { display: flex; gap: 8px; }
+.ld-actions button { flex: 1 1 0; min-width: 0; padding: 0 10px; }
+.ld-builder .ld-submit, .ld-next { background: var(--app-accent); color: #fff; border-color: transparent; font-weight: 700; }
+.ld-call { font-weight: 700; }
+.ld-next { min-height: 44px; min-width: 120px; border-radius: 10px; }
+
+@media (max-width: 400px) {
+  .ld-dice.large .ld-die { --size: 44px; }
+  .ld-die { --size: 22px; }
+  .ld-bid strong { font-size: 1.25rem; }
+}

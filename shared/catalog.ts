@@ -1,3 +1,10 @@
+import { INFO as REVERSI_INFO } from './reversi.ts';
+import { INFO as ONECARD_INFO } from './onecard.ts';
+import { INFO as YUT_INFO } from './yut.ts';
+import { INFO as CONNECT4_INFO } from './connect4.ts';
+import { INFO as LIARDICE_INFO } from './liardice.ts';
+import { INFO as MANCALA_INFO } from './mancala.ts';
+import { INFO as DOTS_INFO } from './dots.ts';
 export const POKER_VARIANTS = {
   duel: {
     title: '1:1 승부룰',
@@ -21,6 +28,13 @@ export const TABLE_GAMES = {
   janggi: { title: '십이장기', min: 2, max: 2, description: '열두 칸 위에서 펼치는 수싸움.', rules: '방을 만들 때 동물장기 또는 더 지니어스 기본룰을 선택해요. 친구는 방장이 선택한 룰로 함께 플레이해요.' },
   davinci: { title: '다빈치코드', min: 2, max: 4, description: '상대의 숨은 숫자를 추리하는 클래식 추리 게임.', rules: '흑·백 0–11 타일 24장으로 진행해요. 시작할 때 타일을 뽑아 순서대로 세워요. 차례마다 더미에서 타일을 하나 가져온 뒤 상대의 세워진 타일 숫자를 맞혀요. 맞히면 그 타일을 공개하고 계속 맞힐 수 있고, 이미 아니라고 밝혀진 숫자는 다시 고를 수 없어요. 못 맞히면 방금 가져온 타일을 공개하고 차례가 넘어가요. 내가 가진 숫자는 같은 색에서 겹치지 않으니 추리의 힌트가 돼요. 타일을 모두 공개당하면 탈락하고, 마지막까지 남은 사람이 승리해요.' },
   coup: { title: '쿠데타', min: 2, max: 6, description: '거짓말과 눈치싸움의 블러핑 코인 게임.', rules: '공작·암살자·선장·대사·콘테스타 카드가 각 3장씩 덱에 들어가고, 각자 카드 2장(영향력)과 코인 2개로 시작해요. 차례에 수입 +1, 해외 원조 +2, 또는 역할을 주장하는 세금(공작) +3, 강탈(선장), 암살(암살자, 3코인), 교환(대사) 중 하나를 골라요. 코인 7개로 쿠를 하면 상대 영향력 1장을 강제 공개해요. 역할 주장은 거짓말이 가능하고, 누구나 챌린지를 걸 수 있어요. 주장이 사실이면 챌린지를 건 사람이 영향력을 잃고, 거짓이면 주장한 사람이 잃어요. 해외 원조는 공작, 강탈은 선장·대사, 암살은 콘테스타 주장으로 저지할 수 있고 저지 역시 챌린지할 수 있어요. 암살이 저지되면 코인을 돌려받아요. 코인이 10개 이상이면 쿠를 해야 해요. 영향력을 모두 잃으면 탈락하고, 마지막까지 남으면 승리해요.' },
+  reversi: REVERSI_INFO,
+  onecard: ONECARD_INFO,
+  yut: YUT_INFO,
+  connect4: CONNECT4_INFO,
+  liardice: LIARDICE_INFO,
+  mancala: MANCALA_INFO,
+  dots: DOTS_INFO,
 } as const;
 export type TableId = keyof typeof TABLE_GAMES;
 export function isTableId(value: unknown): value is TableId {

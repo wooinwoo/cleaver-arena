@@ -1,0 +1,133 @@
+.mancala-board {
+  --mc-wood: #a8693a;
+  --mc-wood-dark: #7a4721;
+  --mc-wood-light: #c48552;
+  --mc-hole: #3e220c;
+  --mc-hole-rim: #5a3416;
+  --mc-seed-text: #fff4e2;
+  width: min(100%, 640px);
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  color: var(--app-text, #f3efe6);
+}
+.mancala-board *, .mc-toolbar * { box-sizing: border-box; }
+
+.mc-wood {
+  display: grid;
+  grid-template-columns: minmax(44px, .9fr) repeat(6, minmax(0, 1fr)) minmax(44px, .9fr);
+  grid-template-rows: auto auto;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 28px;
+  background:
+    repeating-linear-gradient(100deg, transparent 0 14px, rgba(255, 255, 255, .05) 14px 16px, transparent 16px 34px),
+    linear-gradient(180deg, var(--mc-wood-light), var(--mc-wood) 40%, var(--mc-wood-dark));
+  border: 3px solid var(--mc-wood-dark);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .18), 0 6px 18px rgba(0, 0, 0, .28);
+  overflow: hidden;
+}
+
+.mc-pit, .mc-store {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 6px 2px;
+  border: 2px solid var(--mc-hole-rim);
+  background: radial-gradient(circle at 50% 35%, #4e2c12, var(--mc-hole) 70%);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5);
+  color: var(--mc-seed-text);
+  font: inherit;
+}
+.mc-pit { border-radius: 50%; aspect-ratio: 1; grid-column: calc(var(--c) + 1); }
+.mc-top { grid-row: 1; }
+.mc-bottom { grid-row: 2; }
+.mc-store { border-radius: 22px; grid-row: 1 / 3; }
+.mc-store-them { grid-column: 1; }
+.mc-store-me { grid-column: 8; }
+
+.mc-count { font-size: 17px; line-height: 1; font-variant-numeric: tabular-nums; }
+.mc-store .mc-count { font-size: 22px; }
+.mc-seeds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  max-width: 34px;
+  min-height: 7px;
+}
+.mc-seeds i { display: block; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset -1px -1px 0 rgba(0, 0, 0, .3); }
+.mc-tag {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--app-raised, #2b2a26);
+  color: var(--app-muted, #b9b2a5);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+button.mc-pit { cursor: pointer; border-color: var(--app-accent, #d4f18d); touch-action: manipulation; }
+button.mc-pit:hover { filter: brightness(1.15); }
+button.mc-pit:focus-visible { outline: 3px solid var(--app-accent, #d4f18d); outline-offset: 2px; }
+button.mc-pit[aria-pressed="true"], button.mc-pit.selected, button.mc-pit.is-selected { outline: 3px solid var(--app-accent, #d4f18d); outline-offset: 2px; }
+
+.mc-sown { box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 0 0 2px rgba(242, 177, 52, .8); }
+.mc-origin { border-style: dashed; border-color: #f2b134; }
+
+.mc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.mc-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--app-line, rgba(255, 255, 255, .14));
+  background: var(--app-panel, #1f1e1b);
+  color: var(--app-text, #f3efe6);
+}
+.mc-score span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-score b { font-variant-numeric: tabular-nums; }
+.mc-active { border-color: var(--app-accent, #d4f18d); }
+.mc-active b { color: var(--app-accent, #d4f18d); }
+.mc-note { color: var(--app-muted, #b9b2a5); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+
+/* Phones: stores become strips above and below so each pit keeps a 44px+ target. */
+@media (max-width: 520px) {
+  .mc-wood {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: auto auto auto auto;
+    gap: 5px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+  .mc-pit { grid-column: var(--c); min-height: 46px; padding: 4px 1px; }
+  .mc-top { grid-row: 2; }
+  .mc-bottom { grid-row: 3; }
+  .mc-store { grid-column: 1 / -1; min-height: 44px; flex-direction: row; gap: 10px; border-radius: 14px; }
+  .mc-store-them { grid-row: 1; }
+  .mc-store-me { grid-row: 4; }
+  .mc-store .mc-seeds { max-width: 120px; }
+  .mc-seeds { max-width: 30px; }
+  .mc-seeds i { width: 6px; height: 6px; }
+  .mc-count { font-size: 15px; }
+}
