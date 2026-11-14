@@ -44,7 +44,7 @@ export function cleaverRoom(code: string, game: { title?: string; mode: string; 
     players: game.players.filter(p => !p.bot).length, capacity,
     host: humans[0]?.name ?? '—',
     note: `${mapName} · ${modeName}`,
-    joinable: game.phase === 'lobby' || game.phase === 'finished',
+    joinable: (game.phase === 'lobby' || game.phase === 'finished') && humans.length > 0,
   };
 }
 
@@ -63,7 +63,8 @@ export function tabletopRoom(room: { code: string; kind: TableId; title?: string
     players: room.players.length, capacity,
     host: room.players.find(p => p.connected)?.name ?? '—',
     note,
-    joinable: room.phase !== 'playing',
+    // A room whose people all dropped is waiting out its reconnect window, not open to newcomers.
+    joinable: room.phase !== 'playing' && room.players.some(p => p.connected),
   };
 }
 
