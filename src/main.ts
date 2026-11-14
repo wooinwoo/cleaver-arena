@@ -14,18 +14,19 @@ import { account, logIn, logOut, onAccountChange, refreshAccount, signUp, wasMem
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
-// Comparison build: a second design (B) behind body.skin-b. Remove with src/styles/theme/skin-b.css once one is chosen.
+// Comparison build: designs B and C behind body.skin-b / body.skin-c. Remove the losers' stylesheets and this switch once one is chosen.
+const SKINS = ['a', 'b', 'c'];
 const skinParam = new URLSearchParams(location.search).get('skin');
-if (skinParam === 'a' || skinParam === 'b') localStorage.setItem('sideplay-skin', skinParam);
-document.body.classList.toggle('skin-b', localStorage.getItem('sideplay-skin') === 'b');
-const skinButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-skin]')];
-function syncSkin() { for (const button of skinButtons) button.setAttribute('aria-pressed', String((button.dataset.skin === 'b') === document.body.classList.contains('skin-b'))); }
-for (const button of skinButtons) button.onclick = () => {
+if (skinParam && SKINS.includes(skinParam)) localStorage.setItem('sideplay-skin', skinParam);
+function applySkin(skin: string) {
+  for (const other of SKINS) document.body.classList.toggle(`skin-${other}`, other !== 'a' && other === skin);
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-skin]')) button.setAttribute('aria-pressed', String(button.dataset.skin === skin));
+}
+applySkin(SKINS.includes(localStorage.getItem('sideplay-skin') ?? '') ? localStorage.getItem('sideplay-skin')! : 'a');
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-skin]')) button.onclick = () => {
   localStorage.setItem('sideplay-skin', button.dataset.skin!);
-  document.body.classList.toggle('skin-b', button.dataset.skin === 'b');
-  syncSkin();
+  applySkin(button.dataset.skin!);
 };
-syncSkin();
 const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 document.body.classList.toggle('has-touch', touch);
 const nameInput = $<HTMLInputElement>('nickname');
@@ -166,7 +167,10 @@ document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => 
 document.querySelector<HTMLElement>('.game-list')!.addEventListener('keydown', event => {
   const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0;
   if (!step) return;
-  const visible = [...document.querySelectorAll<HTMLElement>('.game-cell:not([hidden])')];
+  // Visual order: design C groups the list with CSS order, and collapsed groups take their games out of view.
+  const visible = [...document.querySelectorAll<HTMLElement>('.game-cell:not([hidden])')]
+    .filter(cell => cell.getClientRects().length)
+    .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order));
   const next = visible[visible.findIndex(cell => cell.dataset.game === selectedGame) + step];
   if (!next) return;
   event.preventDefault();
@@ -174,6 +178,29 @@ document.querySelector<HTMLElement>('.game-list')!.addEventListener('keydown', e
   next.querySelector<HTMLButtonElement>('.game-option')?.focus();
   next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 });
+// Library groups (design C shows the list under collapsible category headings; A and B keep a flat list).
+const LIBRARY_GROUPS: [string, string][] = [['3d', '3D'], ['board', '보드'], ['mind', '심리·추리']];
+{
+  const list = document.querySelector<HTMLElement>('.game-list')!;
+  const cells = [...list.querySelectorAll<HTMLElement>('.game-cell')];
+  LIBRARY_GROUPS.forEach(([group, label], index) => {
+    const members = cells.filter(cell => (cell.dataset.groups ?? '').split(' ')[0] === group);
+    members.forEach((cell, at) => { cell.dataset.libraryGroup = group; cell.style.setProperty('--library-order', String(index * 100 + at + 1)); });
+    const heading = document.createElement('button');
+    heading.type = 'button';
+    heading.className = 'library-group';
+    heading.dataset.libraryGroup = group;
+    heading.style.setProperty('--library-order', String(index * 100));
+    heading.setAttribute('aria-expanded', 'true');
+    heading.append(Object.assign(document.createElement('span'), { textContent: label }), Object.assign(document.createElement('small'), { textContent: String(members.length) }));
+    heading.onclick = () => {
+      const open = heading.getAttribute('aria-expanded') !== 'true';
+      heading.setAttribute('aria-expanded', String(open));
+      list.classList.toggle(`collapsed-${group}`, !open);
+    };
+    list.prepend(heading);
+  });
+}
 // Top tabs: the library, or every open room in one table.
 const viewTabs = [...document.querySelectorAll<HTMLButtonElement>('.client-nav [data-view]')];
 for (const tab of viewTabs) tab.onclick = () => {

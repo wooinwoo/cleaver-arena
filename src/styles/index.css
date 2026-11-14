@@ -31,6 +31,7 @@
 @import './theme/waiting-room.css';
 @import './theme/client-polish.css';
 @import './theme/skin-b.css';
+@import './theme/skin-c.css';
 
 /* Pairs with the critical <style> in index.html: reveal the page once these rules are live, and lift the
    pre-style SVG cap (specific rules size every icon from here on). */
