@@ -326,3 +326,7 @@
 :root body.in-hub #hub[data-view='rooms'] .open-rooms > .open-rooms-head:not(.online-head),
 :root body.in-hub #hub[data-view='rooms'] #open-rooms-list { display: none; }
 :root body.in-hub #hub[data-view='rooms'] .online-head { border-top: 0; }
+
+/* Form controls stay at 16px so phones do not zoom the page when one is focused. */
+:root body.in-hub #hub :is(#game-search, #game-players, #code-join input) { font-size: 16px; }
+:root body.in-hub #hub #game-players { padding-right: 24px; padding-left: 8px; }

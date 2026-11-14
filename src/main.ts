@@ -14,6 +14,18 @@ import { editTitle } from './ui/room-title.ts';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
 const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+// Comparison build: a second design (B) behind body.skin-b. Remove with src/styles/theme/skin-b.css once one is chosen.
+const skinParam = new URLSearchParams(location.search).get('skin');
+if (skinParam === 'a' || skinParam === 'b') localStorage.setItem('sideplay-skin', skinParam);
+document.body.classList.toggle('skin-b', localStorage.getItem('sideplay-skin') === 'b');
+const skinButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-skin]')];
+function syncSkin() { for (const button of skinButtons) button.setAttribute('aria-pressed', String((button.dataset.skin === 'b') === document.body.classList.contains('skin-b'))); }
+for (const button of skinButtons) button.onclick = () => {
+  localStorage.setItem('sideplay-skin', button.dataset.skin!);
+  document.body.classList.toggle('skin-b', button.dataset.skin === 'b');
+  syncSkin();
+};
+syncSkin();
 document.body.classList.toggle('has-touch', touch);
 const nameInput = $<HTMLInputElement>('nickname');
 const codeInput = $<HTMLInputElement>('room-code');
@@ -151,14 +163,15 @@ document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => 
 });
 // Arrow keys walk the library like a list box.
 document.querySelector<HTMLElement>('.game-list')!.addEventListener('keydown', event => {
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const step = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 0;
+  if (!step) return;
   const visible = [...document.querySelectorAll<HTMLElement>('.game-cell:not([hidden])')];
-  const next = visible[visible.findIndex(cell => cell.dataset.game === selectedGame) + (event.key === 'ArrowDown' ? 1 : -1)];
+  const next = visible[visible.findIndex(cell => cell.dataset.game === selectedGame) + step];
   if (!next) return;
   event.preventDefault();
   selectGame(next.dataset.game!);
   next.querySelector<HTMLButtonElement>('.game-option')?.focus();
-  next.scrollIntoView({ block: 'nearest' });
+  next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 });
 // Top tabs: the library, or every open room in one table.
 const viewTabs = [...document.querySelectorAll<HTMLButtonElement>('.client-nav [data-view]')];

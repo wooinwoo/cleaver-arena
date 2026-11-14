@@ -38,7 +38,7 @@ export function openRules(kind: string, title: string, text: string, subtitle?: 
   el.innerHTML = `
     <div class="rules-head">
       <div class="rules-art" aria-hidden="true">${gameArt(kind, true)}</div>
-      <div class="rules-heading"><p class="rules-eyebrow">이 게임의 규칙</p><h2 id="rules-title">${escape(title)}</h2>${subtitle ? `<p class="rules-subtitle">${escape(subtitle)}</p>` : ''}</div>
+      <div class="rules-heading"><p class="rules-eyebrow">규칙</p><h2 id="rules-title">${escape(title)}</h2>${subtitle ? `<p class="rules-subtitle">${escape(subtitle)}</p>` : ''}</div>
       <button type="button" class="rules-close" aria-label="규칙 닫기">✕</button>
     </div>
     <ol class="rules-list">${ruleSteps(text).map(step => `<li>${escape(step)}</li>`).join('')}</ol>
@@ -46,7 +46,7 @@ export function openRules(kind: string, title: string, text: string, subtitle?: 
       <span class="rules-thumb"><img src="https://i.ytimg.com/vi/${video.id}/hqdefault.jpg" alt="" loading="lazy" decoding="async" /><i aria-hidden="true">▶</i></span>
       <span class="rules-video-copy"><b>유튜브로 룰 영상 보기</b><small>${escape(video.title)} · ${escape(video.by)}</small>${video.note ? `<em>${escape(video.note)}</em>` : ''}</span>
     </a>` : ''}
-    <button type="button" class="primary rules-ok">알겠어요</button>`;
+    <button type="button" class="primary rules-ok">닫기</button>`;
   const thumb = el.querySelector<HTMLImageElement>('.rules-thumb img');
   if (thumb) thumb.onerror = () => thumb.remove();
   el.querySelector<HTMLButtonElement>('.rules-close')!.onclick = () => el.close();
