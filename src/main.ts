@@ -10,10 +10,10 @@ import { initGameFinder } from './ui/game-finder.ts';
 import { gameArt, gameAccent } from './ui/game-art.ts';
 import { openRules, ruleSteps } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
+import { account, logIn, logOut, onAccountChange, refreshAccount, signUp, wasMember } from './ui/account.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
-const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 // Comparison build: a second design (B) behind body.skin-b. Remove with src/styles/theme/skin-b.css once one is chosen.
 const skinParam = new URLSearchParams(location.search).get('skin');
 if (skinParam === 'a' || skinParam === 'b') localStorage.setItem('sideplay-skin', skinParam);
@@ -26,6 +26,7 @@ for (const button of skinButtons) button.onclick = () => {
   syncSkin();
 };
 syncSkin();
+const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 document.body.classList.toggle('has-touch', touch);
 const nameInput = $<HTMLInputElement>('nickname');
 const codeInput = $<HTMLInputElement>('room-code');
@@ -208,16 +209,31 @@ let pendingAfterGate: string | null = null;
 let lobbySocket: WebSocket | null = null;
 let lobbyRetry: ReturnType<typeof setTimeout> | undefined;
 
-function showGate() {
+type GateView = 'guest' | 'login' | 'signup' | 'member';
+/** Switches the start window between guest nickname, sign-in, sign-up and the signed-in account view. */
+function setGateView(view: GateView) {
+  for (const panel of document.querySelectorAll<HTMLElement>('#nickname-gate [data-view]')) panel.hidden = panel.dataset.view !== view;
+  for (const tab of document.querySelectorAll<HTMLButtonElement>('#gate-tabs [data-gate]')) {
+    tab.classList.toggle('selected', tab.dataset.gate === view);
+    tab.setAttribute('aria-pressed', String(tab.dataset.gate === view));
+  }
+  $('gate-tabs').hidden = view === 'member';
+  $('gate-error').textContent = '';
+  $('member-name').textContent = account().name;
+  document.querySelector<HTMLElement>('.gate-member-avatar')!.textContent = [...account().name][0] ?? '';
+  document.querySelector<HTMLInputElement>(`#nickname-gate [data-view="${view}"] input`)?.focus({ preventScroll: true });
+}
+/** `closable` is for opening the window over the hub from the account button; the first visit cannot skip it. */
+function showGate(view: GateView = 'guest', closable = false) {
   $('loading').hidden = true;
   $('hub').hidden = true;
   $('lobby').hidden = true;
   $('nickname-gate').hidden = false;
+  $('gate-close').hidden = !closable;
   document.body.classList.remove('in-hub');
   document.body.classList.add('in-gate');
-  const gateName = $<HTMLInputElement>('gate-name');
-  gateName.value = savedName();
-  gateName.focus({ preventScroll: true });
+  $<HTMLInputElement>('gate-name').value = account().member ? '' : savedName();
+  setGateView(view);
 }
 
 function closeLobbySocket() {
@@ -235,6 +251,15 @@ function connectLobby(name: string) {
     if (ws !== lobbySocket) return;
     const data = JSON.parse(event.data);
     if (data.type === 'lobby') renderOpenRooms(data);
+    else if (data.type === 'error' && typeof data.message === 'string' && document.body.classList.contains('in-hub')) {
+      // A guest whose nickname now belongs to an account has to sign in or pick another one.
+      closeLobbySocket();
+      const reserved = data.message.includes('가입된');
+      if (reserved) $<HTMLInputElement>('login-name').value = savedName();
+      showGate(reserved ? 'login' : 'guest');
+      if (reserved) $<HTMLInputElement>('login-password').focus({ preventScroll: true });
+      $('gate-error').textContent = data.message;
+    }
   };
   ws.onclose = () => {
     if (ws !== lobbySocket || !document.body.classList.contains('in-hub')) return;
@@ -273,7 +298,7 @@ function renderGameRooms() {
   roomList($('hd-rooms'), rooms, '열린 방이 없어요. 방을 만들면 여기에 표시돼요.');
 }
 /** Everything that depends on the lobby snapshot: side panel, game page, rooms table, tab badge, status bar. */
-function renderLobby(members: { name: string }[]) {
+function renderLobby(members: { name: string; member?: boolean }[]) {
   $('open-rooms').hidden = false;
   $('open-rooms').classList.toggle('is-empty', !lobbyRooms.length);
   $('open-rooms-status').textContent = lobbyOnline ? `${lobbyRooms.length}개` : '';
@@ -282,7 +307,7 @@ function renderLobby(members: { name: string }[]) {
     const item = document.createElement('li');
     const avatar = Object.assign(document.createElement('i'), { textContent: [...member.name.trim()][0] ?? '?' });
     const copy = document.createElement('span');
-    copy.append(Object.assign(document.createElement('b'), { textContent: member.name }), Object.assign(document.createElement('small'), { textContent: '로비' }));
+    copy.append(Object.assign(document.createElement('b'), { textContent: member.name }), Object.assign(document.createElement('small'), { textContent: member.member ? '회원 · 로비' : '로비' }));
     item.append(avatar, copy);
     return item;
   }));
@@ -290,13 +315,13 @@ function renderLobby(members: { name: string }[]) {
   roomList($('rooms-table'), lobbyRooms, '열린 방이 없어요. 라이브러리에서 게임을 골라 방을 만들 수 있어요.');
   renderGameRooms();
   $('nav-rooms-count').textContent = lobbyRooms.length ? String(lobbyRooms.length) : '';
-  $('me-status').textContent = lobbyOnline ? '온라인' : '연결 중';
+  $('me-status').textContent = `${account().member ? '회원' : '비회원'} · ${lobbyOnline ? '온라인' : '연결 중'}`;
   const status = $('hub-conn');
   status.dataset.state = lobbyOnline ? 'online' : 'connecting';
   status.textContent = lobbyOnline ? '서버 연결됨' : '서버에 연결하는 중…';
   $('hub-stats').textContent = lobbyOnline ? `접속 ${members.length}명 · 열린 방 ${lobbyRooms.length}개` : '';
 }
-function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<string, string | number>[] }) {
+function renderOpenRooms(data: { members?: { name: string; member?: boolean }[]; rooms?: Record<string, string | number>[] }) {
   lobbyOnline = true;
   lobbyRooms = (data.rooms ?? []) as unknown as OpenRoomRow[];
   renderLobby(data.members ?? []);
@@ -327,7 +352,63 @@ $('gate-form').addEventListener('submit', event => {
   else enterHome(name);
 });
 
+// —— 계정: 비회원은 닉네임만 정하고, 회원은 로그인해서 자기 닉네임을 쓴다.
+for (const tab of document.querySelectorAll<HTMLButtonElement>('#gate-tabs [data-gate]')) tab.onclick = () => setGateView(tab.dataset.gate as GateView);
+$('gate-close').onclick = () => enterHome(savedName());
+$('account-login').onclick = () => showGate('login', true);
+/** After signing in or up: play under the account nickname and carry on to wherever the visitor was going. */
+function signedIn(name: string) {
+  applyName(name);
+  const target = pendingAfterGate;
+  pendingAfterGate = null;
+  if (target) location.assign(target);
+  else enterHome(name);
+}
+async function submitAccount(form: HTMLFormElement, run: () => Promise<{ ok: boolean; message?: string; name?: string }>) {
+  const button = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+  $('gate-error').textContent = '';
+  button.disabled = true;
+  const reply = await run();
+  button.disabled = false;
+  if (reply.ok && account().member) signedIn(account().name);
+  else $('gate-error').textContent = reply.message ?? '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.';
+}
+$<HTMLFormElement>('login-form').addEventListener('submit', event => {
+  event.preventDefault();
+  void submitAccount(event.currentTarget as HTMLFormElement, () => logIn($<HTMLInputElement>('login-name').value.trim(), $<HTMLInputElement>('login-password').value));
+});
+$<HTMLFormElement>('signup-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const password = $<HTMLInputElement>('signup-password').value;
+  if (password !== $<HTMLInputElement>('signup-password2').value) { $('gate-error').textContent = '비밀번호 확인이 일치하지 않아요.'; return; }
+  void submitAccount(event.currentTarget as HTMLFormElement, () => signUp($<HTMLInputElement>('signup-name').value.trim(), password));
+});
+$('logout').onclick = async () => {
+  await logOut();
+  // The nickname stays reserved for the account, so a guest has to pick another one.
+  localStorage.removeItem('cleaver-name');
+  closeLobbySocket();
+  showGate('guest');
+};
+/** Top bar: members see their account, guests see a sign-in button beside the nickname they can edit. */
+function syncAccountChrome() {
+  const member = account().member;
+  document.body.classList.toggle('is-member', member);
+  $('account-login').hidden = member;
+  $('me-edit').setAttribute('aria-label', member ? '내 계정' : '닉네임 바꾸기');
+  $('me-status').textContent = `${member ? '회원' : '비회원'} · ${lobbyOnline ? '온라인' : '연결 중'}`;
+  for (const id of ['nickname', 't-name']) {
+    const input = document.getElementById(id) as HTMLInputElement | null;
+    if (!input) continue;
+    input.readOnly = member;
+    if (member) { input.value = account().name; input.title = '로그인한 계정의 닉네임으로 참가해요.'; }
+  }
+}
+onAccountChange(syncAccountChrome);
+syncAccountChrome();
+
 $('me-edit').onclick = () => {
+  if (account().member) { showGate('member', true); return; }
   const input = $<HTMLInputElement>('me-input');
   input.value = savedName();
   $('me-edit').hidden = true;
@@ -789,6 +870,25 @@ $('fullscreen').onclick = async () => {
   } catch { toast('전체 화면을 사용할 수 없어요. 브라우저 화면에서 계속 플레이할 수 있어요.'); }
 };
 
+/** Once per page load: line this page up with what the server says about the session cookie. */
+async function syncSession(home: boolean) {
+  const expected = wasMember();
+  const me = await refreshAccount();
+  if (!me) return;
+  if (me.member) {
+    if (savedName() === me.name) return;
+    applyName(me.name);
+    if (home && document.body.classList.contains('in-hub')) enterHome(me.name);
+  } else if (expected) {
+    // Signed out or expired elsewhere. The nickname still belongs to the account, so it cannot be kept as a guest name.
+    localStorage.removeItem('cleaver-name');
+    if (!home) return;
+    closeLobbySocket();
+    showGate('login');
+    $('gate-error').textContent = '로그인이 만료됐어요. 다시 로그인하거나 비회원으로 시작해 주세요.';
+  }
+}
+
 async function boot() {
 const params = new URLSearchParams(location.search);
 const gameId = params.get('game');
@@ -797,6 +897,7 @@ const createIntent = params.get('create') === '1';
 const practiceIntent = params.get('practice') === '1';
 const home = !gameId && !roomCode;
 
+void syncSession(home);
 if (home) {
   $('loading').hidden = true;
   const name = savedName();

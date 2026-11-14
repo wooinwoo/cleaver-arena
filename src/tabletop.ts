@@ -28,7 +28,7 @@ type PublicPoker = ReturnType<typeof pokerView>;
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView> | DaVinciView | CoupView;
 type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
   title?: string; host?: string | null;
-  players: { id: string; name: string; seat: number; ready: boolean; connected: boolean }[]; me: number; game: GameState | null };
+  players: { id: string; name: string; seat: number; ready: boolean; connected: boolean; member?: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
 const BLURBS: Partial<Record<TableId, string>> = { poker: '내 카드는 비밀. 눈치로 이기는 한 판.', davinci: '숨은 숫자를 찾아내는 추리 대결.', splendor: '보석을 모아 완성하는 나만의 전략.' };

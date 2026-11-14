@@ -81,7 +81,7 @@ function howToItems(rules: string) { return ruleSteps(rules).slice(0, 3).map(ste
 /** Refreshes the how-to when a room's rule variant changes. */
 export function renderHowTo(list: HTMLElement, rules: string) { list.innerHTML = howToItems(rules); }
 
-export interface SlotPlayer { id: string; name: string; seat: number; ready: boolean; connected: boolean; bot?: boolean }
+export interface SlotPlayer { id: string; name: string; seat: number; ready: boolean; connected: boolean; bot?: boolean; member?: boolean }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
   const node = document.createElement(tag); node.className = className;
@@ -105,7 +105,9 @@ export function renderSlots(list: HTMLElement, players: SlotPlayer[], options: {
     avatar.setAttribute('aria-hidden', 'true');
     const copy = el('span', 'slot-copy');
     const tags = [player.id === options.host ? '방장' : '', player.id === options.me ? '나' : '', bot ? '봇' : ''].filter(Boolean).join(' · ');
-    copy.append(el('strong', '', player.name), el('small', '', tags || `${player.seat + 1}번 자리`));
+    const name = el('strong', '', player.name);
+    if (player.member) name.append(el('span', 'slot-member', '회원'));
+    copy.append(name, el('small', '', tags || `${player.seat + 1}번 자리`));
     const state = el('span', 'slot-state', !player.connected ? '재접속 대기' : player.ready ? '준비 완료' : '준비 전');
     card.append(avatar, copy, state);
     return card;

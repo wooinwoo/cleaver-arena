@@ -157,7 +157,7 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     const me = view.players.find(p => p.id === myId);
     const host = view.players.find(p => !p.bot);
     if (playing) { renderHud(me); return; }
-    const signature = JSON.stringify([view.phase, view.title, view.winner, view.players.map(p => [p.id, p.name, p.ready, p.connected, p.slot, p.score])]);
+    const signature = JSON.stringify([view.phase, view.title, view.winner, view.players.map(p => [p.id, p.name, p.ready, p.connected, p.slot, p.score, p.member])]);
     if (signature === lobbySignature) return;
     lobbySignature = signature;
     const isHost = !!me && host?.id === me.id;
@@ -169,7 +169,7 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     $('t-title-edit').hidden = !isHost;
     document.body.dataset.tablePhase = view.phase;
     $('t-count').textContent = `${view.players.length}/${BUMPER_CAPACITY}명`;
-    renderSlots($('t-lobby-roster'), view.players.map(p => ({ id: p.id, name: p.name, seat: p.slot, ready: p.ready, connected: p.connected, bot: p.bot })),
+    renderSlots($('t-lobby-roster'), view.players.map(p => ({ id: p.id, name: p.name, seat: p.slot, ready: p.ready, connected: p.connected, bot: p.bot, member: p.member })),
       { capacity: BUMPER_CAPACITY, me: myId, host: host?.id ?? null, onInvite: copyLink });
     const alone = view.players.length < 2;
     $('t-start-title').textContent = view.phase === 'finished' ? view.winner : alone ? '봇을 넣거나 친구를 초대하세요' : '모두 준비하면 시작해요';

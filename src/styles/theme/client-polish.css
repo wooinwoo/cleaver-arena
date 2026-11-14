@@ -94,3 +94,35 @@
 :root #bh-scores li { border-radius: 4px; }
 :root #bh-leave { border-radius: 4px; background: #ffffff0a; border: 1px solid #ffffff1f; }
 :root #bh-banner[data-kind='note'], :root .bh-help { border-radius: 4px; background: #080c0ad9; }
+
+/* ---------- start window: guest nickname, sign in, sign up, account ---------- */
+:root .gate-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+:root .gate-head .gate-wordmark { margin: 0; }
+:root .gate-close { width: 32px; min-height: 32px; padding: 0; border-radius: 4px; background: #ffffff0a; border: 1px solid var(--app-line); color: var(--app-soft); font-size: 13px; }
+:root .gate-close:hover { background: #ffffff14; color: var(--app-text); }
+:root .gate-close[hidden], :root #gate-tabs[hidden], :root #nickname-gate [data-view][hidden] { display: none; }
+:root .gate-tabs { display: flex; gap: 2px; margin-bottom: 22px; padding: 2px; border-radius: 5px; background: #080c0a; border: 1px solid var(--app-line); }
+:root .gate-tabs button { flex: 1 1 0; min-height: 36px; margin: 0; padding: 0 8px; border: 0; border-radius: 3px; background: transparent; color: var(--app-muted); font-size: 14px; font-weight: 700; box-shadow: none; }
+:root .gate-tabs button:hover { color: var(--app-text); background: #ffffff0a; }
+:root .gate-tabs button.selected { background: var(--app-hover); color: var(--app-text); box-shadow: inset 0 1px 0 #ffffff14; }
+:root .gate-panel form label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 650; }
+:root .gate-panel form input { width: 100%; min-height: 48px; margin: 0 0 14px; padding: 0 14px; font-size: 16px; }
+:root .gate-panel form .primary { margin-top: 4px; min-height: 52px; }
+:root .gate-panel .primary:disabled { opacity: .6; }
+:root #gate-error { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: #ffab93; }
+:root #gate-error:empty { display: none; }
+:root .gate-member { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; padding: 12px; border-radius: 6px; background: #ffffff08; border: 1px solid var(--app-line); }
+:root .gate-member-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 4px; background: var(--app-accent); color: var(--app-accent-ink); font-family: var(--font-display); font-size: 20px; }
+:root .gate-member > span:last-child { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+:root .gate-member strong { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .gate-member small { font-size: 12px; color: #8fe0a8; }
+:root #logout { width: 100%; min-height: 46px; margin: 0; border-radius: 4px; background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line-strong); font-size: 15px; font-weight: 700; }
+:root #logout:hover { background: var(--app-hover); }
+/* Top bar: the sign-in button only belongs to the hub; members have no pencil because their nickname is fixed. */
+:root body:not(.in-hub) #account-login, :root #account-login[hidden] { display: none; }
+:root body.in-hub #account-login { background: var(--app-raised); color: var(--app-text); border-color: var(--app-line-strong); }
+:root body.is-member .me-pencil { display: none; }
+:root body.is-member #me-status { color: var(--lw-gold, #ebc377); }
+:root input[readonly] { opacity: .75; cursor: default; }
+/* Members are marked in player slots. */
+:root #table-page .slot-member { margin-left: 6px; padding: 1px 6px; border-radius: 3px; background: #ebc37729; color: #ebc377; font-size: 10px; font-weight: 800; vertical-align: 2px; }

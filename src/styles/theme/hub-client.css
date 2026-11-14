@@ -329,4 +329,5 @@
 
 /* Form controls stay at 16px so phones do not zoom the page when one is focused. */
 :root body.in-hub #hub :is(#game-search, #game-players, #code-join input) { font-size: 16px; }
-:root body.in-hub #hub #game-players { padding-right: 24px; padding-left: 8px; }
+:root body.in-hub #hub #game-players { padding-right: 24px; padding-left: 8px; font-weight: 500; }
+:root body.in-hub #hub #game-search::placeholder { font-size: 14px; }

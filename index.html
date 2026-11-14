@@ -40,6 +40,7 @@
           <input id="me-input" maxlength="12" hidden aria-label="닉네임 바꾸기" autocomplete="nickname" enterkeyhint="done" />
           <button id="me-edit" type="button" aria-label="닉네임 바꾸기"><span class="me-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span class="me-copy"><span id="me-name"></span><small id="me-status">연결 중</small></span><svg class="me-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z"/></svg></button>
         </div>
+        <button id="account-login" class="icon-button" type="button" hidden>로그인</button>
         <button id="games-menu" class="icon-button" hidden>‹ 라이브러리</button>
         <button id="sound" class="icon-button" aria-label="효과음 켜기" aria-pressed="false">소리 꺼짐</button>
         <button id="fullscreen" class="icon-button" aria-label="전체 화면 전환">전체 화면</button>
@@ -47,17 +48,50 @@
       </div>
     </header>
 
-    <section id="nickname-gate" hidden aria-label="닉네임 설정">
+    <section id="nickname-gate" hidden aria-label="시작하기">
       <div class="gate-panel">
-        <a class="gate-wordmark" href="/" aria-label="SIDEPLAY 홈"><img src="/icons/sideplay.svg" width="40" height="40" alt="" />SIDEPLAY</a>
-        <h1>닉네임을 정해 주세요</h1>
-        <p class="intro">방에서 다른 사람에게 보이는 이름이에요. 나중에 바꿀 수 있어요.</p>
-        <form id="gate-form">
+        <div class="gate-head">
+          <a class="gate-wordmark" href="/" aria-label="SIDEPLAY 홈"><img src="/icons/sideplay.svg" width="40" height="40" alt="" />SIDEPLAY</a>
+          <button type="button" id="gate-close" class="gate-close" aria-label="닫기" hidden>✕</button>
+        </div>
+        <div class="gate-tabs" id="gate-tabs" role="group" aria-label="시작 방법">
+          <button type="button" data-gate="guest" class="selected" aria-pressed="true">비회원</button>
+          <button type="button" data-gate="login" aria-pressed="false">로그인</button>
+          <button type="button" data-gate="signup" aria-pressed="false">회원가입</button>
+        </div>
+        <form id="gate-form" data-view="guest">
+          <h1>닉네임을 정해 주세요</h1>
+          <p class="intro">방에서 다른 사람에게 보이는 이름이에요. 가입 없이 바로 시작할 수 있어요.</p>
           <label for="gate-name">내 닉네임</label>
           <input id="gate-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="nickname" enterkeyhint="go" required />
           <button class="primary" type="submit">시작하기 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
         </form>
-        
+        <form id="login-form" data-view="login" hidden>
+          <h1>로그인</h1>
+          <p class="intro">가입한 닉네임과 비밀번호를 입력해 주세요.</p>
+          <label for="login-name">닉네임</label>
+          <input id="login-name" maxlength="12" autocomplete="username" required />
+          <label for="login-password">비밀번호</label>
+          <input id="login-password" type="password" minlength="8" maxlength="128" autocomplete="current-password" enterkeyhint="go" required />
+          <button class="primary" type="submit">로그인 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+        </form>
+        <form id="signup-form" data-view="signup" hidden>
+          <h1>회원가입</h1>
+          <p class="intro">닉네임과 비밀번호만 정하면 돼요. 가입한 닉네임은 다른 사람이 쓸 수 없어요.</p>
+          <label for="signup-name">닉네임 (2–12자)</label>
+          <input id="signup-name" minlength="2" maxlength="12" autocomplete="username" required />
+          <label for="signup-password">비밀번호 (8자 이상)</label>
+          <input id="signup-password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required />
+          <label for="signup-password2">비밀번호 확인</label>
+          <input id="signup-password2" type="password" minlength="8" maxlength="128" autocomplete="new-password" enterkeyhint="go" required />
+          <button class="primary" type="submit">가입하기 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+        </form>
+        <div id="member-view" data-view="member" hidden>
+          <h1>내 계정</h1>
+          <p class="gate-member"><span class="gate-member-avatar" aria-hidden="true"></span><span><strong id="member-name"></strong><small>회원</small></span></p>
+          <button type="button" id="logout">로그아웃</button>
+        </div>
+        <p id="gate-error" role="alert"></p>
       </div>
     </section>
 
