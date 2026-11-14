@@ -1,0 +1,165 @@
+/* One waiting room for every game (2026-11-14).
+   Same parts as the board-game tables: a slim room bar on top, the game itself filling the stage,
+   and a dark client-style card holding people, readiness and the one button that matters.
+   This file brings 문도피구's room (3D arena) onto that pattern. Imported last. */
+
+/* Lobby-window tokens (same palette as lobby-window.css), scoped to the cleaver lobby so the 3D HUD keeps its own look. */
+body:not(.in-match):not(.in-hub):not(.in-table) #lobby #room {
+  --wr-panel: #18241f;
+  --wr-raised: #223129;
+  --wr-line: #2b3d34;
+  --wr-text: #f2eee1;
+  --wr-muted: #9cafa3;
+  --wr-accent: #e2633f;
+  --wr-accent-ink: #fff8ef;
+  color: var(--wr-text);
+}
+
+/* ---------- desktop / tablet: arena full-bleed, bar on top, card bottom-left ---------- */
+@media (min-width: 761px) {
+  :root body:has(#room:not([hidden])):not(.in-match) > canvas { left: 0; width: 100%; top: 0; height: 100%; }
+  :root body:has(#room:not([hidden])):not(.in-match) #lobby {
+    position: absolute; inset: 52px 0 0 0; width: auto; padding: 0; overflow: visible;
+    background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none;
+  }
+  :root body:has(#room:not([hidden])):not(.in-match) #lobby #room { display: block; height: 100%; }
+  :root #lobby #room .room-bar {
+    pointer-events: auto; position: absolute; top: 16px; left: 24px; right: 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 10px 12px 10px 18px; border-radius: 6px; background: #18241ff2; border: 1px solid var(--wr-line);
+    box-shadow: 0 10px 30px #0000003d;
+  }
+  :root #lobby #room .room-card {
+    pointer-events: auto; position: absolute; left: 24px; bottom: 24px; width: 360px; max-height: calc(100% - 120px); overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 6px;
+    background: var(--wr-panel); border: 1px solid var(--wr-line); box-shadow: 0 18px 48px #00000059;
+  }
+  /* The view switcher belongs to room settings once a room exists; its hints moved to the match HUD. */
+  :root body:has(#room:not([hidden])):not(.in-match) .view-dock { display: none; }
+}
+
+/* ---------- phone: arena on top, bar + card stacked under it ---------- */
+@media (max-width: 760px) {
+  :root body:has(#room:not([hidden])):not(.in-match) #lobby { background: none; padding: 0; }
+  :root #lobby #room .room-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 10px; border-radius: 6px; background: var(--wr-panel); border: 1px solid var(--wr-line);
+  }
+  :root #lobby #room .room-card {
+    display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 6px;
+    background: var(--wr-panel); border: 1px solid var(--wr-line);
+  }
+  :root body:has(#room:not([hidden])):not(.in-match) .view-dock { display: none; }
+}
+
+/* ---------- bar contents ---------- */
+:root #lobby #room .room-name { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+:root #lobby #room .room-title { margin: 0; font-size: 18px; line-height: 1.3; color: var(--wr-text); min-width: 0; overflow-wrap: anywhere; }
+:root #lobby #room .room-name-edit { width: 30px; min-height: 30px; padding: 0; border-radius: 4px; background: var(--wr-raised); color: var(--wr-text); border: 1px solid var(--wr-line); font-size: 13px; }
+:root #lobby #room .invite {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; flex: 0 0 auto;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+}
+:root #lobby #room .invite > span { font-size: 13px; color: var(--wr-muted); grid-column: auto; }
+:root #lobby #room .invite strong {
+  grid-column: auto; margin: 0 4px 0 0; color: var(--wr-text); text-shadow: none;
+  font-family: ui-monospace, 'Cascadia Mono', monospace; font-size: 16px; letter-spacing: .1em;
+}
+:root #lobby #room .invite button {
+  grid-column: auto; width: auto; min-height: 38px; margin: 0; padding: 0 14px; border-radius: 4px; font-size: 13px;
+  background: var(--wr-panel); color: var(--wr-text); border: 1px solid var(--wr-line); box-shadow: none;
+}
+:root #lobby #room .invite button:hover { background: var(--wr-raised); }
+:root #lobby #room .invite #copy { background: var(--wr-accent); color: var(--wr-accent-ink); border-color: var(--wr-accent); }
+:root #lobby #room .invite #share[hidden] { display: none; }
+
+/* ---------- card contents ---------- */
+:root #lobby #room .roster-heading { display: flex; justify-content: space-between; align-items: baseline; margin: 0; }
+:root #lobby #room .roster-heading strong { font-size: 14px; color: var(--wr-text); }
+:root #lobby #room .roster-heading span { font-size: 13px; color: var(--wr-muted); }
+:root #lobby #room #players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+:root #lobby #room #players li {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 0;
+  border: 0; border-radius: 4px; background: var(--wr-raised); color: var(--wr-text); font-size: 14px;
+}
+:root #lobby #room #players .dot { flex: 0 0 auto; width: 24px; height: 24px; font-size: 12px; color: #1d2a24; }
+:root #lobby #room #players .player-name { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--wr-text); }
+:root #lobby #room #players .ready-state { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--wr-muted); }
+:root #lobby #room #players .ready-state.is-ready { color: var(--wr-accent); font-weight: 750; }
+:root #lobby #room #players .ready-state.is-ready::before { content: '✓ '; }
+:root #lobby #room #players .ready-state.is-away { color: #ffab93; }
+
+:root #lobby #room .settings-disclosure { margin: 0; border: 1px solid var(--wr-line); border-radius: 4px; background: var(--wr-panel); }
+:root #lobby #room .settings-disclosure > summary { padding: 10px 12px; font-size: 13px; color: var(--wr-text); cursor: pointer; }
+:root #lobby #room .settings-disclosure > summary span { color: var(--wr-muted); font-weight: 450; margin-left: 4px; }
+:root #lobby #room .settings-disclosure :is(legend, label, #settings-note) { color: var(--wr-muted); }
+:root #lobby #room .settings-disclosure :is(input, select) { background-color: #0d1512; color: var(--wr-text); border: 1px solid #3f5a4c; }
+:root #lobby #room #apply-settings { background: var(--wr-raised); color: var(--wr-text); border: 1px solid var(--wr-line); }
+
+:root #lobby #room #ready-help { margin: 0; font-size: 13px; line-height: 1.5; color: var(--wr-muted); }
+:root #lobby #room #ready-help:empty { display: none; }
+:root #lobby #room #ready {
+  width: 100%; min-height: 48px; margin: 2px 0 0; border-radius: 4px; font-size: 15px;
+  background: var(--wr-accent); color: var(--wr-accent-ink); box-shadow: none; border: 0; text-shadow: none;
+}
+:root #lobby #room #ready:not(:disabled):hover { background: #f0764f; }
+:root #lobby #room #leave { align-self: center; margin: 0; min-height: 36px; font-size: 13px; color: var(--wr-muted); background: none; text-decoration: underline; text-underline-offset: 3px; }
+:root #lobby #room :is(button, input, select, summary):focus-visible { outline: 3px solid #ebc377; outline-offset: 2px; }
+
+/* ---------- before a room: the entry form is the same client card ---------- */
+body:not(.in-match):not(.in-hub):not(.in-table) #lobby #entry {
+  --wr-panel: #18241f; --wr-raised: #223129; --wr-line: #2b3d34; --wr-text: #f2eee1; --wr-muted: #9cafa3; --wr-accent: #e2633f; --wr-accent-ink: #fff8ef;
+  color: var(--wr-text); background: var(--wr-panel); border: 1px solid var(--wr-line); border-radius: 6px; padding: 20px;
+  box-shadow: 0 18px 48px #00000059;
+}
+@media (min-width: 761px) {
+  :root body:has(#entry:not([hidden])):not(.in-match):not(.in-hub):not(.in-table) > canvas { left: 0; width: 100%; }
+  :root body:has(#entry:not([hidden])):not(.in-match):not(.in-hub):not(.in-table) #lobby { background: none; border: 0; box-shadow: none; padding: 0; backdrop-filter: none; -webkit-backdrop-filter: none; left: 24px; top: 76px; width: 360px; }
+}
+:root #lobby #entry :is(h1, label, .form-field label) { color: var(--wr-text); }
+:root #lobby #entry .intro, :root #lobby #entry .fineprint, :root #lobby #entry .riot-notice { color: var(--wr-muted); }
+:root #lobby #entry .link-button { color: var(--wr-accent); text-decoration: underline; text-underline-offset: 3px; background: none; }
+:root #lobby #entry :is(input, select) { background-color: #0d1512; color: var(--wr-text); border: 1px solid #3f5a4c; box-shadow: none; }
+:root #lobby #entry :is(input, select):focus { border-color: var(--wr-accent); box-shadow: 0 0 0 3px #e2633f40; }
+:root #lobby #entry input::placeholder { color: #7c8f84; }
+:root #lobby #entry #create { background: var(--wr-accent); color: var(--wr-accent-ink); box-shadow: none; text-shadow: none; border: 0; }
+:root #lobby #entry #create:not(:disabled):hover { background: #f0764f; }
+:root #lobby #entry .join-row button { background: var(--wr-panel); color: var(--wr-text); border: 1px solid var(--wr-line); }
+:root #lobby #entry #practice { color: var(--wr-text); }
+:root #lobby #entry :is(button, input, select):focus-visible { outline: 3px solid #ebc377; outline-offset: 2px; }
+@media (max-width: 760px) {
+  body:not(.in-match):not(.in-hub):not(.in-table) #lobby #entry { padding: 16px; box-shadow: none; }
+}
+
+/* View switcher (top / first person) in the same client pill language. */
+:root body:not(.in-match) .view-dock .view-switch { background: #18241ff2; border: 1px solid #2b3d34; box-shadow: 0 10px 28px #0000004d; }
+:root body:not(.in-match) .view-dock :is(#top-view, #fps-view) { background: transparent; color: #f2eee1; box-shadow: none; text-shadow: none; }
+:root body:not(.in-match) .view-dock :is(#top-view, #fps-view) span { color: #9cafa3; }
+:root body:not(.in-match) .view-dock :is(#top-view, #fps-view).selected { background: #e2633f; color: #fff8ef; }
+:root body:not(.in-match) .view-dock :is(#top-view, #fps-view).selected span { color: #ffe3d6; }
+:root body:not(.in-match) .view-dock :is(#view-note, #controls-help) { background: #0b0d14b3; color: #e9eee9; }
+:root #lobby :is(#entry, #room) select { background-image: linear-gradient(45deg, transparent 50%, #9cafa3 50%), linear-gradient(135deg, #9cafa3 50%, transparent 50%); }
+@media (max-width: 760px) {
+  /* Phone room bar: title on its own line, then code and the two buttons sharing the width. */
+  :root #lobby #room .room-bar { flex-direction: column; align-items: stretch; }
+  :root #lobby #room .invite { flex-wrap: wrap; width: 100%; }
+  :root #lobby #room .invite > span { flex: 0 0 auto; }
+  :root #lobby #room .invite strong { flex: 1 1 auto; }
+  :root #lobby #room .invite button { flex: 1 1 120px; min-width: 0; }
+  :root #lobby #room .room-card { min-width: 0; }
+  body:not(.in-match):not(.in-hub):not(.in-table) #lobby #entry { padding: 14px; }
+}
+/* Short phones (up to 700px tall): the form and room card need the whole screen; skip the arena preview there. */
+@media (max-width: 760px) and (max-height: 700px) {
+  body:not(.in-hub):not(.in-table):not(.in-match) > canvas { display: none; }
+  body:not(.in-hub):not(.in-table):not(.in-match) #lobby { margin-top: 8px; }
+}
+@media (max-width: 760px) and (max-height: 600px) {
+  /* The host can still pick the view in the room's 경기 설정. */
+  body:not(.in-hub):not(.in-table):not(.in-match) .view-dock { display: none; }
+  :root #lobby #room .room-card { gap: 8px; padding: 12px; }
+  :root #lobby #room .room-bar { padding: 10px 12px; margin-bottom: 8px; }
+  :root #lobby #room #players li { padding: 6px 10px; }
+  :root #lobby #room #ready { min-height: 44px; }
+}
+@media (max-width: 760px) and (max-height: 600px) { :root #lobby #room #ready-help { display: none; } }

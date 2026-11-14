@@ -44,7 +44,9 @@ try {
     await page.reload();
     await expect(page.locator('#hub')).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
-    await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(width <= 480 || (width > height && height <= 650) ? 6 : 9);
+    // The shelf scrolls instead of paging: every game is on it at every size.
+    await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(17);
+    await expect(page.locator('.game-pagination')).toBeHidden();
     const measured = await page.evaluate(() => {
       const hub = document.getElementById('hub')!;
       const targets = [...document.querySelectorAll<HTMLElement>('.game-option, .game-filters button, #me-edit')].filter(el => el.getClientRects().length);
@@ -55,18 +57,24 @@ try {
         background: getComputedStyle(document.body).backgroundColor,
       };
     });
-    if (measured.horizontal || measured.outside.length || (width <= 480 && measured.vertical)) issues.push(`${width}x${height}: ${JSON.stringify(measured)}`);
-    assert.equal(measured.background, 'rgb(246, 244, 237)');
+    if (measured.horizontal || measured.outside.length) issues.push(`${width}x${height}: ${JSON.stringify(measured)}`);
+    assert.equal(measured.background, 'rgb(12, 19, 16)', 'the hub uses the dark client palette');
     if (capture && (width === 390 || width === 1440)) await page.screenshot({ path: `artifacts/sideplay/hub-${width}.png`, animations: 'disabled' });
     console.log(`HUB ${width}x${height}: ${JSON.stringify(measured)}`);
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(6);
-  await activate('#game-next');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(3);
-  await activate('#game-previous');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(6);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(17);
+  // Bot-capable games offer a second door straight into a solo game.
+  // Picking a game in the library shows its page; bot-capable games offer a second door straight into a solo game.
+  await activate('.game-cell[data-game="gomoku"] .game-option');
+  await expect(page.locator('#hd-title')).toHaveText('오목');
+  await expect(page.locator('#hub-solo')).toHaveText('봇이랑 하기');
+  await activate('.game-cell[data-game="chess"] .game-option');
+  await expect(page.locator('#hd-title')).toHaveText('체스');
+  await expect(page.locator('#hub-solo')).toBeHidden();
+  await activate('.game-cell[data-game="bumper"] .game-option');
+  await expect(page.locator('#hub-solo')).toBeVisible();
   await page.locator('#game-search').fill('숫자');
   await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(1);
   await expect(page.locator('.game-cell[data-game="davinci"]')).toBeVisible();
@@ -74,40 +82,53 @@ try {
   await expect(page.locator('#game-empty')).toBeVisible();
   await activate('#game-reset');
   await expect(page.locator('#game-search')).toBeFocused();
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(6);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(17);
   await activate('[data-filter="mind"]');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(3);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(5);
   await expect(page.locator('[data-filter="mind"]')).toHaveAttribute('aria-pressed', 'true');
   await activate('[data-filter="all"]');
   await expect(page.locator('.game-cell[data-game="cleaver"] .game-players')).toHaveText('1–6인');
   await expect(page.locator('.game-cell[data-game="chess"] .game-players')).toHaveText('2인');
   await expect(page.locator('.game-cell[data-game="gomoku"] .game-players')).toHaveText('1–2인');
   await page.locator('#game-players').selectOption('1');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(2);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(10);
   await expect(page.locator('.game-cell[data-game="gomoku"]')).toBeVisible();
   await page.locator('#game-players').selectOption('3');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(5);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(10);
   await expect(page.locator('.game-cell[data-game="chess"]')).toBeHidden();
   await activate('[data-filter="mind"]');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(3);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(5);
   await page.locator('#game-players').selectOption('5');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(2);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(4);
   await page.locator('#game-search').fill('없는게임입니다');
   await activate('#game-reset');
   await expect(page.locator('#game-players')).toHaveValue('');
-  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(6);
+  await expect(page.locator('.game-cell:not([hidden])')).toHaveCount(17);
   await activate('.game-cell[data-game="chess"] .game-option');
+  await activate('#hub-play');
   await expect(page.locator('#t-room')).toBeVisible();
   await expect(page).toHaveTitle(/체스 · SIDEPLAY$/);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#0b0d14', 'game surfaces keep the existing palette');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#0c1310', 'a room opens as the dark client window until the match starts');
   await activate('#games-menu');
   await expect(page.locator('#hub')).toBeVisible();
+  // Rooms tab: every open room in one table, plus joining by code.
+  await activate('.client-nav [data-view="rooms"]');
+  await expect(page.locator('#hub-rooms')).toBeVisible();
+  await expect(page.locator('#hub-detail')).toBeHidden();
+  await page.locator('#code-join-input').fill('zz');
+  await page.locator('#code-join-input').press('Enter');
+  await expect(page.locator('#code-join-error')).toContainText('6자리');
+  await page.locator('#code-join-input').fill('ABCDEF');
+  await page.locator('#code-join-input').press('Enter');
+  await expect(page.locator('#code-join-error')).toContainText('열린 방 목록에 없는');
+  await activate('.client-nav [data-view="library"]');
+  await expect(page.locator('#hub-detail')).toBeVisible();
   const manifest = await (await page.request.get(`${base}/manifest.webmanifest`)).json();
   assert.equal(manifest.short_name, 'SIDEPLAY');
   assert.equal((await page.request.get(`${base}/icons/sideplay.svg`)).status(), 200);
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  assert.deepEqual(issues, [], 'The game library must fit phone screens without horizontal clipping or hidden pagination');
-  console.log(`PASS hub (${process.env.KEYBOARD_ONLY === '1' ? 'keyboard' : 'pointer'}): first visit, name edit/persistence, responsive shelf, pagination, filters, search/empty/reset, room creation, return and branding.`);
+  assert.deepEqual(issues, [], 'The game shelf must fit phone screens without horizontal clipping');
+  console.log(`PASS hub (${process.env.KEYBOARD_ONLY === '1' ? 'keyboard' : 'pointer'}): first visit, name edit/persistence, library at every size, filters, search/empty/reset, game page, room creation, return, rooms tab and branding.`);
   await context.close();
 } finally {
   await browser.close();

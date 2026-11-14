@@ -33,7 +33,8 @@ async function check(page: Page, surface: string, hud = false) {
       if (document.documentElement.scrollWidth > innerWidth + 1) found.push('page horizontal overflow');
       if (fitPage && document.documentElement.scrollHeight > innerHeight + 1) found.push(`page vertical overflow ${document.documentElement.scrollHeight} > ${innerHeight}`);
       const hub = document.querySelector<HTMLElement>('#hub');
-      if (fitPage && document.body.classList.contains('in-hub') && hub && hub.scrollHeight > hub.clientHeight + 1) found.push('game finder vertical overflow');
+      // The hub is a scrolling shelf, so only sideways overflow counts there.
+      if (document.body.classList.contains('in-hub') && hub && hub.scrollWidth > hub.clientWidth + 1) found.push('game finder horizontal overflow');
       const visible = (el: Element) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
       for (const selector of ['header', '#hub', '#lobby', '#t-board-wrap', '#t-players', '.table-status', '.poker-table', '#t-toolbar', '#t-action-bar', '.coup-board', '.davinci-board', '.poker-bet-size', '.table-invite', '.spell-settings']) {
         const el = document.querySelector<HTMLElement>(selector);
@@ -116,25 +117,24 @@ try {
     await expect(page.locator('#nickname-gate')).toBeHidden();
     if (view === 'top') {
       await page.setViewportSize({ width: 390, height: 844 });
-      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(6);
+      // The shelf scrolls: all games stay on it at every size, no pages.
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(17);
       await page.setViewportSize({ width: 667, height: 375 });
-      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(6);
-      await page.locator('#game-next').click();
-      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(3);
-      await page.locator('#game-previous').click();
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(17);
       await check(page, 'hub');
       await page.locator('#game-search').fill('숫자');
       await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(1);
       await page.locator('#game-search').fill('');
       await page.locator('.game-filters [data-filter="mind"]').click();
-      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(3);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(5);
       await page.locator('#game-search').fill('없는게임');
       await expect(page.locator('#game-empty')).toBeVisible();
       await page.locator('#game-reset').click();
-      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(9);
+      await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(17);
       await page.screenshot({ path: `${output}hub-with-open-rooms-390x844.png`, fullPage: true });
     }
     await page.locator('.game-cell[data-game="cleaver"] .game-option').click();
+    await page.locator('#hub-play').click();
     await page.locator('#loading').waitFor({ state: 'hidden', timeout: 60_000 });
     if (view === 'top') await check(page, 'cleaver-entry');
     await page.locator('#nickname').fill('가나다라마바사아자차카타');

@@ -23,9 +23,8 @@ input:focus-visible,select:focus-visible { outline: none; }
 #loading { background: var(--app-bg); }
 #loading span { color: var(--app-muted); }
 #loading strong { font-size: 24px; letter-spacing: 0; }
-.splash-mark rect { fill: var(--app-accent); }
-.splash-mark path { fill: var(--app-bg); }
-.splash-mark { filter: drop-shadow(0 0 24px #c8ff4d80); }
+/* Loading uses the same SIDEPLAY mark as the header (tile colours come from the SVG itself). */
+.splash-mark { filter: drop-shadow(0 0 24px #d75b3966); }
 #error:empty { display: none; }
 #toast { position: fixed; background: #171b28f2; color: var(--app-text); border: 1px solid #c8ff4d59; box-shadow: 0 12px 34px #00000080, 0 0 0 1px #00000060; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 12px; }
 body:not(.in-match) #toast { top: auto; bottom: max(18px, env(safe-area-inset-bottom)); width: max-content; max-width: calc(100% - 32px); pointer-events: none; }

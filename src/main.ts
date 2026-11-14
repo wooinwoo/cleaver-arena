@@ -1,12 +1,14 @@
 import './styles/index.css';
 import type { World } from './world.ts';
 import { COLORS } from './palette.ts';
-import { isTableId } from '../shared/catalog.ts';
+import { TABLE_GAMES, isTableId } from '../shared/catalog.ts';
+import { BUMPER_INFO } from '../shared/bumper.ts';
+import { tableBots } from '../shared/bots.ts';
 import { initTabletop } from './tabletop.ts';
 import type { ArenaMap, Game, Input } from '../shared/game.ts';
 import { initGameFinder } from './ui/game-finder.ts';
 import { gameArt, gameAccent } from './ui/game-art.ts';
-import { openRules } from './ui/rules-dialog.ts';
+import { openRules, ruleSteps } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -66,26 +68,117 @@ function applyName(name: string) {
   gateName.value = name;
   if (lobbySocket?.readyState === WebSocket.OPEN) lobbySocket.send(JSON.stringify({ type: 'hello', name }));
 }
+/** Leaves the hub for a game URL, asking for a nickname first when there is none. */
+function go(target: string) {
+  if (!savedName()) { pendingAfterGate = target; showGate(); return; }
+  const game = new URLSearchParams(target.split('?')[1] ?? '').get('game');
+  if (game) recordPlay(game);
+  location.assign(target);
+}
+type OpenRoomRow = { game: string; code: string; title: string; gameTitle?: string; players: number; capacity: number; host: string; note: string };
+/** Latest lobby snapshot; `lobbyOnline` is false until the lobby socket delivers one. */
+let lobbyRooms: OpenRoomRow[] = [], lobbyOnline = false;
+type PlayRecords = Record<string, { count: number; last: number }>;
+/** Launch history kept in this browser only. */
+function playRecords(): PlayRecords { try { return JSON.parse(localStorage.getItem('sideplay-plays') ?? '{}') ?? {}; } catch { return {}; } }
+function recordPlay(game: string) {
+  const all = playRecords();
+  all[game] = { count: (all[game]?.count ?? 0) + 1, last: Date.now() };
+  localStorage.setItem('sideplay-plays', JSON.stringify(all));
+}
+function lastPlayed(game: string) {
+  const record = playRecords()[game];
+  if (!record) return '기록 없음';
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(record.last).setHours(0, 0, 0, 0)) / 86_400_000);
+  return `${days <= 0 ? '오늘' : days === 1 ? '어제' : `${days}일 전`} · ${record.count}회`;
+}
+// Bot-capable table games get a 혼자 하기 door on their card, next to the friends one.
 document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => {
   const game = cell.dataset.game!;
-  const play = cell.querySelector<HTMLButtonElement>('.game-option');
-  if (play) play.onclick = () => {
-    const name = savedName();
-    if (!name) { pendingAfterGate = `/?game=${game}&create=1`; showGate(); return; }
-    location.assign(`/?game=${game}&create=1`);
-  };
+  if (!(game === 'bumper' || (isTableId(game) && tableBots[game])) || cell.querySelector('.game-sub')) return;
+  const solo = Object.assign(document.createElement('button'), { type: 'button', className: 'game-sub', textContent: '봇이랑 하기' });
+  solo.dataset.solo = game;
+  solo.onclick = () => go(`/?game=${game}&create=1&solo=1`);
+  cell.append(solo);
 });
 document.querySelectorAll<HTMLButtonElement>('[data-practice]').forEach(button => {
   button.onclick = () => {
-    const name = savedName();
-    if (!name) { pendingAfterGate = '/?game=cleaver&practice=1'; showGate(); return; }
-    location.assign('/?game=cleaver&practice=1');
+    go('/?game=cleaver&practice=1');
   };
 });
 initGameFinder();
-document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
 const CLEAVER_RULES = '경기장에 따라 1:1 반원 대결, 개인전, 팀전(2·4·6명, 최대 3:3)으로 붙어요. 중앙 와드가 있는 경기장에서는 와드 선을 넘지 않고 각자 반원 안에서만 움직여요. PC는 우클릭으로 이동하고 좌클릭 또는 Q로 식칼을 던져요. 모바일은 왼쪽 패드로 이동, 오른쪽 패드로 조준하고 손을 떼면 발사해요. 식칼에 맞으면 체력이 줄고 0이 되면 탈락해요. 점멸(F)은 마우스 방향으로 순간이동, 유체화(D)는 잠시 빠르게 달려요. 주문 대기시간은 방장이 경기 설정에서 정해요. 시점은 탑뷰(롤 시점)와 1인칭 중 방장이 고르고 참가자 모두 같은 시점으로 해요. 마지막까지 살아남은 사람 또는 팀이 이겨요.';
 $('rules-open').onclick = () => openRules('cleaver', '문도피구', CLEAVER_RULES);
+
+// —— 허브: 왼쪽 목록에서 게임을 고르면 가운데에 그 게임의 화면과 시작 버튼이 나온다.
+const GROUP_NAMES: Record<string, string> = { '3d': '3D', board: '보드', mind: '심리·추리' };
+function hubInfo(game: string) {
+  if (game === 'bumper') return { title: BUMPER_INFO.title, description: BUMPER_INFO.description, rules: BUMPER_INFO.rules };
+  if (isTableId(game)) return TABLE_GAMES[game];
+  return { title: '문도피구', description: '식칼을 던지고 피하는 실시간 3D 대전. 1:1부터 3:3 팀전까지 할 수 있어요.', rules: CLEAVER_RULES };
+}
+let selectedGame = '';
+function selectGame(game: string) {
+  const cell = document.querySelector<HTMLElement>(`.game-cell[data-game="${game}"]`);
+  if (!cell) return;
+  selectedGame = game;
+  localStorage.setItem('sideplay-last-game', game);
+  document.querySelectorAll('.game-cell.selected').forEach(other => other.classList.remove('selected'));
+  cell.classList.add('selected');
+  document.querySelectorAll('.game-option[aria-current]').forEach(other => other.removeAttribute('aria-current'));
+  cell.querySelector('.game-option')?.setAttribute('aria-current', 'true');
+  const info = hubInfo(game), solo = cell.querySelector<HTMLButtonElement>('.game-sub');
+  $('hub-detail').style.setProperty('--game-accent', gameAccent(game));
+  const art = document.querySelector<HTMLElement>('.hd-art')!;
+  art.innerHTML = gameArt(game);
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) art.animate([{ opacity: .35, transform: 'scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'ease-out' });
+  $('hd-title').textContent = info.title;
+  $('hd-desc').textContent = info.description;
+  const tags = [...(cell.dataset.groups ?? '').split(' ').map(group => GROUP_NAMES[group]), solo?.dataset.solo ? '봇 가능' : solo ? '혼자 연습 가능' : ''].filter(Boolean) as string[];
+  $('hd-players').textContent = cell.querySelector('.game-players')?.textContent ?? '';
+  $('hd-last').textContent = lastPlayed(game);
+  renderGameRooms();
+  document.querySelector('.hd-tags')!.replaceChildren(...tags.map(tag => Object.assign(document.createElement('li'), { textContent: tag })));
+  $('hd-steps').replaceChildren(...ruleSteps(info.rules).slice(0, 4).map(step => Object.assign(document.createElement('li'), { textContent: step })));
+  $('hub-solo').hidden = !solo;
+  $('hub-solo').textContent = solo?.textContent ?? '';
+}
+document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => {
+  const game = cell.dataset.game!, pick = cell.querySelector<HTMLButtonElement>('.game-option');
+  if (!pick) return;
+  pick.onclick = () => selectGame(game);
+  pick.ondblclick = () => go(`/?game=${game}&create=1`);
+});
+// Arrow keys walk the library like a list box.
+document.querySelector<HTMLElement>('.game-list')!.addEventListener('keydown', event => {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const visible = [...document.querySelectorAll<HTMLElement>('.game-cell:not([hidden])')];
+  const next = visible[visible.findIndex(cell => cell.dataset.game === selectedGame) + (event.key === 'ArrowDown' ? 1 : -1)];
+  if (!next) return;
+  event.preventDefault();
+  selectGame(next.dataset.game!);
+  next.querySelector<HTMLButtonElement>('.game-option')?.focus();
+  next.scrollIntoView({ block: 'nearest' });
+});
+// Top tabs: the library, or every open room in one table.
+const viewTabs = [...document.querySelectorAll<HTMLButtonElement>('.client-nav [data-view]')];
+for (const tab of viewTabs) tab.onclick = () => {
+  $('hub').dataset.view = tab.dataset.view!;
+  for (const other of viewTabs) { other.classList.toggle('selected', other === tab); other.setAttribute('aria-pressed', String(other === tab)); }
+};
+$('code-join').addEventListener('submit', event => {
+  event.preventDefault();
+  const code = $<HTMLInputElement>('code-join-input').value.trim().toUpperCase();
+  const valid = /^[A-F0-9]{6}$/.test(code);
+  const room = lobbyRooms.find(candidate => candidate.code.toUpperCase() === code);
+  $('code-join-error').textContent = !valid ? '방 코드 6자리를 확인해 주세요.' : !room ? '열린 방 목록에 없는 코드예요. 경기 중이거나 닫힌 방일 수 있어요.' : '';
+  if (valid && room) go(`/?game=${room.game}&room=${room.code}`);
+});
+$('hub-count').textContent = `게임 ${document.querySelectorAll('.game-cell').length}개`;
+$('hub-play').onclick = () => go(`/?game=${selectedGame}&create=1`);
+$('hub-solo').onclick = () => document.querySelector<HTMLButtonElement>(`.game-cell[data-game="${selectedGame}"] .game-sub`)?.click();
+$('hub-rules').onclick = () => { const info = hubInfo(selectedGame); openRules(selectedGame, info.title, info.rules); };
+selectGame(document.querySelector(`.game-cell[data-game="${localStorage.getItem('sideplay-last-game')}"]`) ? localStorage.getItem('sideplay-last-game')! : 'cleaver');
 $('room-title-edit').onclick = () => {
   if (!state || state.phase === 'playing' || state.phase === 'countdown') return;
   editTitle(document.querySelector<HTMLElement>('.room-title')!, state.title, title => socket?.send(JSON.stringify({ type: 'title', title })));
@@ -129,42 +222,71 @@ function connectLobby(name: string) {
     if (ws !== lobbySocket) return;
     const data = JSON.parse(event.data);
     if (data.type === 'lobby') renderOpenRooms(data);
-    else if (data.type === 'error') $('open-rooms-status').textContent = data.message;
   };
   ws.onclose = () => {
     if (ws !== lobbySocket || !document.body.classList.contains('in-hub')) return;
-    $('open-rooms-status').textContent = '연결 끊김 · 재시도 중';
+    lobbyOffline();
     lobbyRetry = setTimeout(() => { if (document.body.classList.contains('in-hub')) connectLobby(savedName()); }, 3000);
   };
-  ws.onerror = () => { if (ws === lobbySocket) $('open-rooms-status').textContent = '연결 실패'; };
+  ws.onerror = () => { if (ws === lobbySocket) lobbyOffline(); };
+}
+/** No server connection: say so instead of leaving stale rooms and counts on screen. */
+function lobbyOffline() {
+  lobbyOnline = false; lobbyRooms = [];
+  renderLobby([]);
 }
 
-function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<string, string | number>[] }) {
-  const members = data.members ?? [];
-  const rooms = (data.rooms ?? []) as { game: string; code: string; title: string; gameTitle?: string; players: number; capacity: number; host: string; note: string }[];
+/** One open room as a button row. The same markup serves the side panel, the game page and the 방 찾기 table. */
+function roomRow(room: OpenRoomRow) {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'open-room';
+  button.style.setProperty('--game-accent', gameAccent(room.game));
+  button.title = `${room.title} · ${room.note}`;
+  button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.gameTitle ?? '')}${room.gameTitle ? ' · ' : ''}방장 ${escapeHtml(room.host)}</small></span><span class="open-room-game">${escapeHtml(room.gameTitle ?? '')}</span><span class="open-room-host">${escapeHtml(room.host)}</span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
+  button.onclick = () => go(`/?game=${room.game}&room=${room.code}`);
+  item.append(button);
+  return item;
+}
+function roomList(list: HTMLElement, rooms: OpenRoomRow[], empty: string) {
+  if (rooms.length) list.replaceChildren(...rooms.map(roomRow));
+  else list.replaceChildren(Object.assign(document.createElement('li'), { className: 'open-empty', textContent: lobbyOnline ? empty : '서버에 연결하는 중…' }));
+}
+/** Open rooms of the game shown on the game page. */
+function renderGameRooms() {
+  const rooms = lobbyRooms.filter(room => room.game === selectedGame);
+  $('hd-open').textContent = lobbyOnline ? `${rooms.length}개` : '—';
+  roomList($('hd-rooms'), rooms, '열린 방이 없어요. 방을 만들면 여기에 표시돼요.');
+}
+/** Everything that depends on the lobby snapshot: side panel, game page, rooms table, tab badge, status bar. */
+function renderLobby(members: { name: string }[]) {
   $('open-rooms').hidden = false;
-  $('open-rooms-status').textContent = members.length ? `${members.length}명 접속 중 · 방 ${rooms.length}개` : `방 ${rooms.length}개`;
-  const list = $('open-rooms-list');
-  if (!rooms.length) {
-    list.innerHTML = '<li class="open-empty">지금 열려 있는 방이 없어요. 게임 카드를 눌러 하나 만들까요?</li>';
-    return;
-  }
-  list.replaceChildren(...rooms.map(room => {
+  $('open-rooms').classList.toggle('is-empty', !lobbyRooms.length);
+  $('open-rooms-status').textContent = lobbyOnline ? `${lobbyRooms.length}개` : '';
+  $('online-count').textContent = lobbyOnline ? `${members.length}명` : '';
+  $('online-list').replaceChildren(...members.slice(0, 40).map(member => {
     const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'open-room';
-    button.style.setProperty('--game-accent', gameAccent(room.game));
-    button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.gameTitle ?? '')}${room.gameTitle ? ' · ' : ''}${escapeHtml(room.note)} · 방장 ${escapeHtml(room.host)}</small></span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
-    button.onclick = () => {
-      const name = savedName();
-      const target = `/?game=${room.game}&room=${room.code}`;
-      if (!name) { pendingAfterGate = target; showGate(); return; }
-      location.assign(target);
-    };
-    item.append(button);
+    const avatar = Object.assign(document.createElement('i'), { textContent: [...member.name.trim()][0] ?? '?' });
+    const copy = document.createElement('span');
+    copy.append(Object.assign(document.createElement('b'), { textContent: member.name }), Object.assign(document.createElement('small'), { textContent: '로비' }));
+    item.append(avatar, copy);
     return item;
   }));
+  roomList($('open-rooms-list'), lobbyRooms, '열린 방 없음');
+  roomList($('rooms-table'), lobbyRooms, '열린 방이 없어요. 라이브러리에서 게임을 골라 방을 만들 수 있어요.');
+  renderGameRooms();
+  $('nav-rooms-count').textContent = lobbyRooms.length ? String(lobbyRooms.length) : '';
+  $('me-status').textContent = lobbyOnline ? '온라인' : '연결 중';
+  const status = $('hub-conn');
+  status.dataset.state = lobbyOnline ? 'online' : 'connecting';
+  status.textContent = lobbyOnline ? '서버 연결됨' : '서버에 연결하는 중…';
+  $('hub-stats').textContent = lobbyOnline ? `접속 ${members.length}명 · 열린 방 ${lobbyRooms.length}개` : '';
+}
+function renderOpenRooms(data: { members?: { name: string }[]; rooms?: Record<string, string | number>[] }) {
+  lobbyOnline = true;
+  lobbyRooms = (data.rooms ?? []) as unknown as OpenRoomRow[];
+  renderLobby(data.members ?? []);
 }
 
 function enterHome(name: string) {
@@ -175,7 +297,7 @@ function enterHome(name: string) {
   document.body.classList.add('in-hub');
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('loading').hidden = true;
-  $('connection').textContent = '게임을 선택해 주세요';
+  $('connection').textContent = '';
   $('me-name').textContent = name;
   nameInput.value = name;
   connectLobby(name);
@@ -375,7 +497,7 @@ function renderState() {
         const head = state.winner.endsWith(' 승리') ? state.winner.slice(0, -' 승리'.length) : state.winner;
         const headSpan = document.createElement('span'); headSpan.textContent = head; title.append(headSpan);
         if (head !== state.winner) { const tail = document.createElement('span'); tail.className = 'title-suffix'; tail.textContent = ' 승리'; title.append(tail); }
-        $('ready-help').textContent = `한 판 더? 모두 다시 준비하면 시작해요. (방금 ${state.round}라운드)`;
+        $('ready-help').textContent = `${state.round}라운드 종료 · 모두 다시 준비하면 다음 판을 시작해요.`;
         sound(me.hp > 0 ? 650 : 180, .3);
         toast(`${state.winner} · 다시 준비를 눌러 주세요`);
       }
@@ -412,7 +534,9 @@ function renderState() {
       const name = document.createElement('span'); name.className = 'player-name';
       name.textContent = `${p.name}${p.id === myId ? ' (나)' : ''}${state!.mode === 'teams' ? (p.team === 0 ? ' · 민트' : ' · 코랄') : ''}`;
       const ready = document.createElement('span'); ready.className = 'ready-state';
-      ready.textContent = !p.connected ? '재접속 대기' : p.ready ? '준비 완료' : '준비 중';
+      ready.textContent = !p.connected ? '재접속 대기' : p.ready ? '준비 완료' : '준비 전';
+      ready.classList.toggle('is-ready', p.connected && p.ready);
+      ready.classList.toggle('is-away', !p.connected);
       row.append(dot, name, ready); return row;
     }));
     $('count').textContent = `${state.players.length} / ${state.mode === 'duel' ? 2 : 6}명`;
@@ -424,7 +548,7 @@ function renderState() {
     }
     $('room-title-edit').hidden = !host || (state.phase !== 'lobby' && state.phase !== 'finished');
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
-    if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + (state.map !== 'arena' ? ' 중앙 와드를 넘지 않고 식칼을 던져요.' : ' 장애물로 식칼을 피하고 자유롭게 이동해요.') + (touch ? ' 조작: 왼손 이동 · 오른손 조준 · 손 떼면 발사.' : '');
+    if (state.phase === 'lobby') $('ready-help').textContent = (host ? '' : '방장이 시작해요 · ') + (state.mode === 'teams' ? '2·4·6명이 모여 모두 준비하면 시작해요.' : state.mode === 'duel' ? '둘 다 준비하면 시작해요.' : '2명 이상 모두 준비하면 시작해요.') + '';
   }
 }
 
@@ -490,7 +614,7 @@ $('copy').onclick = async () => {
     share.hidden = false;
     share.onclick = async () => {
       const url = `${location.origin}/?game=cleaver&room=${state?.code ?? session?.code}`;
-      try { await navigator.share({ title: 'SIDEPLAY', text: '우리 방에서 한 판 하자!', url }); }
+      try { await navigator.share({ title: 'SIDEPLAY', text: '문도피구 방 초대', url }); }
       catch { /* user cancelled */ }
     };
   }
@@ -668,6 +792,12 @@ if (home) {
   return;
 }
 if (isTableId(gameId)) { initTabletop(gameId, { create: createIntent }); return; }
+if (gameId === 'bumper') {
+  if (!savedName() && !roomCode) { pendingAfterGate = location.pathname + location.search; showGate(); return; }
+  const { initBumper } = await import('./bumper.ts');
+  initBumper({ create: createIntent, solo: params.get('solo') === '1' });
+  return;
+}
 
 // 초대 링크·문도 진입: 닉네임이 없으면 게이트를 거쳐 다시 돌아온다.
 if (!savedName() && !sessionStorage.getItem(sessionKey)) {
@@ -708,6 +838,12 @@ try {
     setTimeout(() => $('hit-flash').classList.remove('hit'), 150);
   };
   world.scene.executeWhenReady(() => { $('loading').hidden = true; });
+  // Never trap the page behind the splash: the lobby works without the arena, which keeps loading behind it.
+  setTimeout(() => {
+    if ($('loading').hidden) return;
+    $('loading').hidden = true;
+    toast('경기장을 마저 불러오는 중이에요. 그동안 방을 만들 수 있어요.');
+  }, 8000);
   setView('top');
   nameInput.value = savedName();
   if (roomCode || gameId === 'cleaver') {
@@ -767,7 +903,10 @@ try {
 void boot();
 
 // 앱처럼 설치·실행하기 위한 서비스워커 등록. 실패해도 게임 플레이에는 영향이 없다.
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+// Dev builds serve unhashed modules, so a worker there can mix stale and fresh files: drop it instead.
+if ('serviceWorker' in navigator && import.meta.env.DEV) {
+  void navigator.serviceWorker.getRegistrations().then(registrations => registrations.forEach(registration => void registration.unregister()));
+} else if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(cause => console.warn('service worker skipped', cause));
   });

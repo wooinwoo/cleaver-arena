@@ -39,9 +39,9 @@ try {
     await b.goto(`${base}/?game=${kind}&room=${code}`);
     await b.locator('#t-name').fill('코랄친구');
     if (variant) {
-      await b.locator('#t-variant').selectOption(variant);
+      // Invite arrivals never pick a rule: the room's rule applies, and the create-only controls stay hidden.
+      await expect(b.locator('#t-variant')).toBeHidden();
       await b.screenshot({ path: output + 'janggi-rules-mobile.png', fullPage: true });
-      await b.locator('#t-variant').selectOption('animal');
     }
     await b.locator('#t-code-input').press('Enter');
     await expect(a.locator('#t-players li')).toHaveCount(2);

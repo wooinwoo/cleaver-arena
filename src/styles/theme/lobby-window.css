@@ -1,0 +1,301 @@
+/* Lobby window (2026-11-14): every room looks like a game client until the match starts.
+   body.lobby-open = no room yet, waiting, or finished. A dark framed window holds the room title bar,
+   player slots, a live preview of the game and the start dock. While playing, the class is removed and
+   the table fills the page on the same dark palette, so boards and cards are the bright objects on screen.
+   Imported after the table shell. */
+
+:root body.in-table, :root body.lobby-open {
+  color-scheme: dark;
+  --app-bg: #0c1310;
+  --app-bg-soft: #111a16;
+  --app-panel: #18241f;
+  --app-panel-glass: #18241ff2;
+  --app-raised: #223129;
+  --app-hover: #2b3e34;
+  --app-line: #2b3d34;
+  --app-line-strong: #3f5a4c;
+  --app-text: #f2eee1;
+  --app-soft: #d0d9ce;
+  --app-muted: #9cafa3;
+  --app-faint: #7c8f84;
+  --app-accent: #e2633f;
+  --app-accent-strong: #f0764f;
+  --app-accent-ink: #fff8ef;
+  --app-accent-glow: #e2633f47;
+  --lw-ready: #8fe0a8;
+  --lw-gold: #ebc377;
+  --ink: var(--app-accent-ink);
+  --paper: var(--app-raised);
+  --mint: var(--lw-ready);
+  --muted: var(--app-muted);
+  color: var(--app-text);
+  background-color: var(--app-bg);
+  background-image:
+    radial-gradient(920px 560px at 16% -12%, color-mix(in srgb, var(--game-accent, #7fd6a0) 24%, transparent), transparent 66%),
+    radial-gradient(820px 560px at 98% 110%, #e2633f26, transparent 62%),
+    linear-gradient(180deg, #101914, #0a100d);
+  background-attachment: fixed;
+  scrollbar-color: #3f5a4c transparent;
+}
+:root body.in-table :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--lw-gold); outline-offset: 3px; }
+:root body.in-table label { color: var(--app-soft); }
+:root body.in-table :is(input, select) { background-color: #0d1512; border-color: var(--app-line-strong); }
+
+/* Elements that only exist for the lobby window. */
+#table-page #t-start[hidden], #table-page .t-dock[hidden], #table-page #t-lobby[hidden], #table-page #t-entry[hidden],
+#table-page #t-invite[hidden], #table-page #t-new-room[hidden] { display: none; }
+body:not(.lobby-open) #table-page .t-about { display: none; }
+
+/* ---------- the window ---------- */
+:root body.lobby-open #table-page {
+  width: min(1080px, calc(100% - 48px)); max-width: none; margin: 22px auto 40px; padding: 0; gap: 0;
+  border-radius: 10px; border: 1px solid #ffffff17; overflow: hidden;
+  background: linear-gradient(180deg, #1b2a23 0%, #151f1a 100%);
+  box-shadow: 0 40px 90px #000000b8, inset 0 1px 0 #ffffff12;
+}
+
+/* Title bar: game identity on the left, room code and invite on the right, capped with the game's colour. */
+:root body.lobby-open #table-page .table-bar {
+  margin: 0; padding: 14px 18px; gap: 14px; flex-wrap: nowrap;
+  background: #101915; border-bottom: 1px solid var(--app-line); border-top: 3px solid var(--game-accent, var(--lw-ready));
+}
+:root body.lobby-open #table-page .tb-art { width: 60px; height: 44px; border-radius: 10px; box-shadow: 0 6px 16px #00000066; }
+:root body.lobby-open #table-page .tb-copy h1 { font-size: 20px; }
+:root body.lobby-open #table-page .tb-copy small { display: block; }
+:root body.lobby-open #table-page .table-status,
+:root body.lobby-open #table-page .tb-people,
+:root body.lobby-open #table-page #t-leave { display: none; }
+:root body.lobby-open #table-page .tb-code {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px;
+  background: #0b110e; border: 1px solid var(--app-line); font-size: 12px; color: var(--app-muted);
+}
+:root body.lobby-open #table-page .tb-code strong { margin: 0; font-size: 17px; letter-spacing: .14em; color: var(--app-text); }
+:root body.lobby-open #table-page :is(#t-copy, .table-rules > summary) {
+  min-height: 40px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line);
+}
+:root body.lobby-open #table-page :is(#t-copy, .table-rules > summary):hover { background: var(--app-hover); border-color: var(--app-line-strong); }
+:root body.lobby-open #table-page #t-copy.copied { border-color: var(--lw-ready) !important; color: var(--lw-ready); }
+
+/* Body: slots (or the entry form) on the left, live preview on the right, start dock across the bottom. */
+:root body.lobby-open #table-page .table-stage { display: block; padding: 22px; }
+:root body.lobby-open #table-page .t-stage-area {
+  display: grid; align-items: start; gap: 16px 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 364px);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "main board" "main about" "dock dock";
+}
+:root body.lobby-open #table-page #t-start { grid-area: main; min-width: 0; width: auto; align-self: stretch; }
+:root body.lobby-open #table-page #t-board-wrap {
+  grid-area: board; position: relative; display: flex; justify-content: center; align-items: flex-start;
+  padding: 14px; border-radius: 16px; background: #0b110e; border: 1px solid var(--app-line); overflow: hidden;
+}
+/* List-like tables (cards, dice, yut) are taller than the panel: show the top and fade the rest. */
+:root body.lobby-open #table-page #t-board-wrap:has(> :is(.yut, .liardice-board, .onecard-board, .coup-board, .davinci-board, .splendor-board)) { max-height: 380px; }
+:root body.lobby-open #table-page #t-board-wrap:has(> :is(.yut, .liardice-board, .onecard-board, .coup-board, .davinci-board, .splendor-board))::after {
+  content: ''; position: absolute; inset: auto 0 0; height: 72px; background: linear-gradient(transparent, #0b110e); pointer-events: none;
+}
+:root body.lobby-open #table-page #t-board { max-width: 100%; }
+:root body.lobby-open #table-page .empty-board { width: 100%; height: auto; aspect-ratio: 4 / 3; border: 0; border-radius: 10px; background: none; }
+:root body.lobby-open #table-page .t-about { grid-area: about; display: flex; flex-direction: column; gap: 8px; padding: 0 4px; min-width: 0; }
+:root body.lobby-open #table-page .t-about strong { font-family: var(--font-display); font-size: 18px; line-height: 1.3; }
+:root body.lobby-open #table-page .t-about p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--app-soft); }
+#table-page .t-facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; padding: 0; list-style: none; }
+#table-page .t-facts li { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #ffffff0f; border: 1px solid #ffffff14; color: var(--app-soft); }
+
+/* Entry form (no room yet) */
+:root body.lobby-open #table-page :is(#t-entry, #t-lobby) { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+:root body.lobby-open #table-page #t-entry { max-width: 440px; }
+:root body.lobby-open #table-page .t-start-title { font-family: var(--font-display); font-size: 24px; line-height: 1.3; color: var(--app-text); overflow-wrap: anywhere; }
+:root body.lobby-open #table-page #t-entry label { margin: 0 0 -6px; font-size: 13px; color: var(--app-muted); }
+:root body.lobby-open #table-page #t-entry .t-create { display: flex; flex-direction: column; gap: 10px; }
+:root body.lobby-open #table-page #t-entry .primary { width: 100%; min-height: 52px; margin: 0; font-size: 16px; border-radius: 14px; }
+:root body.lobby-open #table-page #t-entry .join-row { display: flex; gap: 8px; margin: 0; }
+:root body.lobby-open #table-page #t-entry .join-row input { flex: 1; min-width: 0; }
+:root body.lobby-open #table-page #t-entry .join-row button { min-height: 46px; padding: 0 18px; }
+:root body.lobby-open #table-page #t-entry.invited .t-create { display: none; }
+:root body.lobby-open #table-page #t-entry.invited .join-row { flex-direction: column; }
+:root body.lobby-open #table-page #t-entry.invited .join-row input { width: 100%; text-align: center; letter-spacing: .14em; font-weight: 700; }
+:root body.lobby-open #table-page #t-new-room { align-self: flex-start; padding: 0; background: none; border: 0; font-size: 13px; color: var(--app-muted); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Room heading + slots */
+:root body.lobby-open #table-page .t-lobby-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+:root body.lobby-open #table-page .t-lobby-head .room-name { margin: 0; min-width: 0; flex: 0 1 auto; }
+:root body.lobby-open #table-page .t-lobby-head .room-name h2 { flex: 0 1 auto; font-size: 24px; }
+:root body.lobby-open #table-page #t-start-title { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--app-muted); }
+:root body.lobby-open[data-table-phase='finished'] #table-page #t-start-title {
+  order: -1; flex: 1 1 100%; font-family: var(--font-display); font-size: 30px; font-weight: 700; color: var(--lw-gold);
+}
+#table-page .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+#table-page .slot {
+  display: flex; align-items: center; gap: 12px; min-height: 78px; padding: 14px; border-radius: 14px;
+  background: var(--app-raised); border: 1px solid var(--app-line); min-width: 0;
+}
+#table-page .slot.me { border-color: color-mix(in srgb, var(--seat) 55%, var(--app-line)); background: color-mix(in srgb, var(--seat) 9%, var(--app-raised)); }
+#table-page .slot-avatar {
+  flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+  background: var(--seat, #ffffff14); color: #12201a; font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1;
+}
+#table-page .slot-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+#table-page .slot-copy strong { font-size: 16px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#table-page .slot-copy small { font-size: 12px; color: var(--app-muted); }
+#table-page .slot-state { flex: 0 0 auto; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #ffffff0f; color: var(--app-muted); }
+#table-page .slot.ready .slot-state { background: #8fe0a829; color: var(--lw-ready, #8fe0a8); }
+#table-page .slot.ready .slot-state::before { content: '✓ '; }
+#table-page .slot.away { opacity: .55; }
+#table-page .slot.empty { padding: 0; background: none; border: 0; }
+#table-page .slot-invite {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 78px; margin: 0; padding: 14px; text-align: left;
+  border-radius: 14px; background: transparent; border: 1px dashed var(--app-line-strong); color: var(--app-muted); cursor: pointer;
+}
+#table-page .slot-invite:hover { background: #ffffff0a; border-color: var(--app-muted); color: var(--app-text); }
+#table-page .slot-invite .slot-avatar { background: transparent; border: 1px dashed var(--app-line-strong); color: var(--app-muted); font-family: inherit; font-weight: 400; font-size: 24px; }
+#table-page .slot-invite .slot-copy strong { font-weight: 650; }
+#table-page .slot-empty-all { display: none; }
+
+/* Dock: what is needed to start, and the one big button. */
+:root body.lobby-open #table-page .t-dock {
+  grid-area: dock; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-top: 6px; padding-top: 18px; border-top: 1px solid var(--app-line);
+}
+:root body.lobby-open #table-page #t-ready-note { margin: 0; text-align: left; font-size: 14px; line-height: 1.5; color: var(--app-muted); }
+#table-page .t-dock-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+:root body.lobby-open #table-page .t-dock-actions button {
+  width: auto; min-width: 150px; min-height: 54px; margin: 0; padding: 0 26px; border-radius: 14px; font-size: 16px; font-weight: 800;
+}
+:root body.lobby-open #table-page .t-dock-actions button.primary { min-width: 210px; }
+:root body.lobby-open #table-page .t-dock-actions button:not(.primary) { background: var(--app-raised); color: var(--app-text); border: 1px solid var(--app-line-strong); box-shadow: none; }
+:root body.lobby-open #table-page .t-dock-actions button:not(.primary):hover { background: var(--app-hover); }
+:root body.lobby-open #table-page #t-error { margin: 14px 0 0; color: #ffab93; }
+:root body.lobby-open #table-page #t-error:empty { display: none; }
+:root body.lobby-open #table-page :is(#t-log, #t-toolbar, #t-hands, #t-action-bar) { display: none; }
+
+/* ---------- phones ---------- */
+@media (max-width: 760px) {
+  :root body.lobby-open #table-page { width: calc(100% - 20px); margin: 10px auto 16px; border-radius: 16px; }
+  :root body.lobby-open #table-page .table-bar { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+  :root body.lobby-open #table-page .tb-art { width: 48px; height: 36px; }
+  :root body.lobby-open #table-page .tb-copy h1 { font-size: 18px; }
+  :root body.lobby-open #table-page .tb-copy small { display: none; }
+  :root body.lobby-open #table-page #t-room { gap: 8px; }
+  :root body.lobby-open #table-page .tb-code { flex: 1 1 auto; margin: 0; min-height: 40px; }
+  :root body.lobby-open #table-page #t-copy { flex: 0 0 auto; }
+  :root body.lobby-open #table-page .table-stage { padding: 14px; }
+  :root body.lobby-open #table-page .t-stage-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "board" "main" "dock"; gap: 12px; }
+  :root body.lobby-open #table-page :is(#t-board-wrap, .t-about) { display: none; }
+  :root body.lobby-open #table-page .t-start-title { font-size: 20px; }
+  :root body.lobby-open #table-page .t-lobby-head .room-name h2 { font-size: 20px; }
+  :root body.lobby-open[data-table-phase='finished'] #table-page #t-start-title { font-size: 24px; }
+  #table-page .slots { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  #table-page .slot, #table-page .slot-invite { min-height: 54px; padding: 8px 12px; border-radius: 12px; }
+  #table-page .slot-avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 16px; }
+  #table-page .slot-copy strong { font-size: 15px; }
+  /* Free seats fold into one card on phones. */
+  #table-page .slot.empty ~ .slot.empty { display: none; }
+  #table-page .slot-empty-one { display: none; }
+  #table-page .slot-empty-all { display: block; }
+  :root body.lobby-open #table-page .t-dock { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 0; padding-top: 12px; }
+  :root body.lobby-open #table-page #t-ready-note { text-align: center; font-size: 13px; }
+  #table-page .t-dock-actions { flex-direction: column-reverse; }
+  :root body.lobby-open #table-page .t-dock-actions button, :root body.lobby-open #table-page .t-dock-actions button.primary { width: 100%; min-width: 0; min-height: 50px; }
+  /* The final board opens on demand after a game. */
+  :root body.lobby-open[data-table-phase='finished'][data-result-review] #table-page #t-board-wrap { display: flex; }
+}
+/* Invite arrivals: joining is the primary action. */
+:root body.lobby-open #table-page #t-entry.invited #t-join { min-height: 52px; font-size: 16px; border: 0; border-radius: 14px; background: var(--app-accent); color: var(--app-accent-ink); box-shadow: 0 8px 28px var(--app-accent-glow); }
+:root body.lobby-open #table-page #t-entry.invited #t-join:hover { background: var(--app-accent-strong); }
+/* Connection chip: hidden while it has nothing to say, green dot when connected. */
+:root body #connection:empty { display: none; }
+:root body.lobby-open #connection::before { background: var(--lw-ready); box-shadow: none; }
+
+/* Phones: two compact columns so a full six-player room still fits one screen. */
+@media (max-width: 760px) {
+  #table-page .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  #table-page .slot, #table-page .slot-invite { position: relative; min-height: 50px; padding: 7px 10px; gap: 8px; }
+  #table-page .slot-avatar { width: 32px; height: 32px; border-radius: 9px; font-size: 14px; }
+  #table-page .slot-copy strong { font-size: 14px; }
+  #table-page .slot-copy small { font-size: 11px; }
+  /* Readiness becomes a corner dot; the text stays for screen readers. */
+  #table-page .slot-state { position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; padding: 0; border-radius: 50%; font-size: 0; background: #ffffff2e; overflow: hidden; }
+  #table-page .slot.ready .slot-state { background: var(--lw-ready, #8fe0a8); }
+  #table-page .slot.ready .slot-state::before { content: none; }
+  :root body.lobby-open #table-page .t-lobby-head { gap: 2px 12px; }
+  :root body.lobby-open #table-page :is(#t-entry, #t-lobby) { gap: 10px; }
+}
+
+/* Quick how-to under the slots: the first three rule sentences. */
+#table-page .t-howto { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--app-line); }
+#table-page .t-howto > strong { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--app-faint); }
+#t-howto { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+#t-howto li { counter-increment: step; display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #ffffff08; border: 1px solid #ffffff0d; font-size: 13px; line-height: 1.55; color: var(--app-soft); }
+#t-howto li::before { content: counter(step); flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: #ffffff14; font-size: 12px; font-weight: 800; color: var(--app-text); }
+body:not(.lobby-open) #table-page .t-howto { display: none; }
+@media (max-width: 760px) { #table-page .t-howto { display: none; } }
+/* Section labels in the lobby share the client's small-caps style. */
+:root body.lobby-open #table-page .t-about strong { font-size: 16px; }
+
+/* The top bar is the shared client strip from hub-client.css; the room is a window on the client background below it. */
+
+/* The page colour behind every client screen (also what shows while a page loads or overscrolls). */
+html:has(body.in-table), html:has(body.in-hub), html:has(body.in-gate) { background: #0c1310; }
+
+/* ---------- while playing: boards and cards are the bright objects on a dark table ---------- */
+/* The main action of a turn (throw, bid, draw, check, confirm) keeps the accent even inside the toolbar,
+   where the generic toolbar-button rule would otherwise flatten it. */
+:root body.in-table #table-page :is(#t-toolbar, #t-board, #t-action-bar) .primary { background: var(--app-accent); color: var(--app-accent-ink); border: 0; }
+:root body.in-table #table-page :is(#t-toolbar, #t-board, #t-action-bar) .primary:not(:disabled):hover { background: var(--app-accent-strong); }
+:root body.in-table:not(.lobby-open) #table-page .table-bar { border-bottom-color: var(--app-line); }
+:root body.in-table:not(.lobby-open) #table-page .table-status { background: #ffffff0a; border: 1px solid var(--app-line); border-left: 3px solid var(--game-accent, var(--app-accent)); box-shadow: none; }
+:root body.in-table:not(.lobby-open) #table-page :is(#t-copy, .tb-leave, .tb-people > summary, .table-rules > summary) { background: #ffffff0a; color: var(--app-soft); border: 1px solid var(--app-line); }
+:root body.in-table:not(.lobby-open) #table-page :is(#t-copy, .tb-leave, .tb-people > summary, .table-rules > summary):hover { background: #ffffff14; color: var(--app-text); }
+/* Mid-game the room code and invite button are noise; they live in the people dropdown's neighbourhood only before a match. */
+:root body.in-table:not(.lobby-open) #table-page :is(.tb-code, #t-copy) { display: none; }
+:root body.in-table:not(.lobby-open) #table-page #t-action-bar { background: #ffffff0a; border: 1px solid var(--app-line); }
+:root body.in-table:not(.lobby-open) #table-page #t-log { color: var(--app-muted); }
+
+/* ---------- the lobby is a client page under the top bar, not a card on a web page (2026-11-14) ---------- */
+:root body.lobby-open { display: flex; flex-direction: column; min-height: 100dvh; background-image: radial-gradient(1100px 640px at 86% -12%, color-mix(in srgb, var(--game-accent, #7fd6a0) 18%, transparent), transparent 66%); }
+:root body.lobby-open #table-page { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; overflow: visible; background: none; box-shadow: none; }
+/* Room strip: which game and which room. */
+:root body.lobby-open #table-page .table-bar { padding: 10px 28px; border-top: 0; border-bottom: 1px solid var(--app-line); background: linear-gradient(180deg, #131c18, #0e1512); }
+:root body.lobby-open #table-page .tb-art { width: 56px; height: 42px; border-radius: 4px; box-shadow: 0 0 0 1px #ffffff1f, 0 4px 12px #00000080; }
+:root body.lobby-open #table-page .tb-code { min-height: 36px; border-radius: 4px; background: #080c0a; }
+:root body.lobby-open #table-page :is(#t-copy, .table-rules > summary) { min-height: 36px; border-radius: 4px; background: #ffffff0a; }
+:root body.lobby-open #table-page .table-stage { flex: 1 0 auto; display: flex; flex-direction: column; width: min(1400px, 100%); margin: 0 auto; padding: 24px 28px 0; }
+:root body.lobby-open #table-page .t-stage-area { flex: 1 0 auto; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); grid-template-rows: auto 1fr auto; gap: 18px 28px; }
+:root body.lobby-open #table-page #t-board-wrap { border-radius: 6px; background: #080c0a; }
+:root body.lobby-open #table-page .empty-board { border-radius: 4px; }
+#table-page .t-facts li { border-radius: 3px; padding: 3px 9px; }
+#table-page .slot, #table-page .slot-invite { border-radius: 6px; }
+#table-page .slot { background: linear-gradient(180deg, #1c2822, #18231e); box-shadow: inset 0 1px 0 #ffffff0d; }
+#table-page .slot.me { box-shadow: inset 3px 0 0 var(--seat), inset 0 1px 0 #ffffff0d; }
+#table-page .slot-avatar { border-radius: 4px; }
+#table-page .slot-state { border-radius: 3px; }
+#t-howto li { border-radius: 4px; }
+#t-howto li::before { border-radius: 3px; }
+:root body.lobby-open #table-page :is(input, select) { border-radius: 4px; }
+:root body.lobby-open #table-page #t-entry .primary,
+:root body.lobby-open #table-page #t-entry.invited #t-join { border-radius: 4px; background: linear-gradient(180deg, #f27a53, #d95632); box-shadow: 0 8px 22px #e2633f4d, inset 0 1px 0 #ffffff66; }
+:root body.lobby-open #table-page #t-entry .join-row button { border-radius: 4px; }
+/* Bottom bar: what is needed to start on the left, the start button on the right. Always in view. */
+:root body.lobby-open #table-page .t-dock {
+  position: sticky; bottom: 0; z-index: 3; margin: 6px -28px 0; padding: 14px 28px; border-top: 0;
+  background: #080c0a; box-shadow: 0 0 0 100vmax #080c0a; clip-path: inset(0 -100vmax);
+}
+:root body.lobby-open #table-page .t-dock-actions button { min-height: 52px; border-radius: 4px; }
+:root body.lobby-open #table-page .t-dock-actions button.primary { min-width: 230px; font-size: 17px; background: linear-gradient(180deg, #f27a53, #d95632); box-shadow: 0 8px 22px #e2633f4d, inset 0 1px 0 #ffffff66, inset 0 -1px 0 #00000033; }
+:root body.lobby-open #table-page .t-dock-actions button.primary:not(:disabled):hover { background: linear-gradient(180deg, #f88c68, #e2633f); }
+:root body.lobby-open #table-page .t-dock-actions button:not(.primary) { background: linear-gradient(180deg, #24332b, #1b2721); box-shadow: inset 0 1px 0 #ffffff14; }
+:root body.lobby-open #table-page #t-error { margin: 0 0 12px; }
+@media (max-width: 760px) {
+  :root body.lobby-open #table-page { width: 100%; margin: 0; border-radius: 0; }
+  :root body.lobby-open #table-page .table-bar { padding: 10px 12px; }
+  :root body.lobby-open #table-page .table-stage { padding: 12px 12px 0; }
+  :root body.lobby-open #table-page .t-stage-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; gap: 12px; }
+  :root body.lobby-open #table-page .t-dock { margin: 0 -12px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  #table-page .slot, #table-page .slot-invite { border-radius: 5px; }
+}
+@media (max-width: 760px) {
+  /* Extra height goes to the slots row, so the bottom bar stays at the bottom and nothing else stretches. */
+  :root body.lobby-open #table-page .t-stage-area { grid-template-rows: auto 1fr auto; align-items: start; }
+}

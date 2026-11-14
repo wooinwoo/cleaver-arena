@@ -6,7 +6,7 @@ import { tableBots } from '../../shared/bots.ts';
 function headcount(kind: string): [min: number, max: number] {
   return isTableId(kind) ? [tableBots[kind] ? 1 : TABLE_GAMES[kind].min, TABLE_GAMES[kind].max] : [1, 6];
 }
-/** Search, category selection and pagination share one card collection. */
+/** Search and category selection filter one scrolling shelf of cards (no pagination: the shelf grows with the catalog). */
 export function initGameFinder() {
   const root = document.getElementById('hub')!;
   const search = root.querySelector<HTMLInputElement>('#game-search')!;
@@ -39,10 +39,9 @@ export function initGameFinder() {
     const query = normalize(search.value);
     const count = Number(players.value);
     const matches = entries.filter(entry => (category === 'all' || entry.groups.includes(category)) && (!count || (entry.min <= count && count <= entry.max)) && entry.text.includes(query));
-    const size = compact.matches ? 6 : 9;
-    const pages = Math.max(1, Math.ceil(matches.length / size));
-    page = Math.min(page, pages - 1);
-    const visible = new Set(matches.slice(page * size, (page + 1) * size).map(entry => entry.cell));
+    const pages = 1;
+    page = 0;
+    const visible = new Set(matches.map(entry => entry.cell));
     for (const cell of cells) cell.hidden = !visible.has(cell);
     root.querySelector('#game-results')!.textContent = `${matches.length}개 게임`;
     root.querySelector('#game-page')!.textContent = `${page + 1} / ${pages}`;

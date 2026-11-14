@@ -10,7 +10,10 @@
   body.in-table .game-identity { margin-bottom: 22px; }
   .identity-art { height: 72px; flex-basis: 72px; }
   body:not(.in-hub):not(.in-table):not(.in-match) #lobby { width: calc(100% - 40px); padding: 0; margin-top: 18px; border: 0; background: none; }
-  body:not(.in-hub):not(.in-table):not(.in-match) > canvas { opacity: 0; }
+  /* Phones: the arena (Mundo + map preview) sits on top and the entry form follows it, per DESIGN.md.
+     It used to be hidden (opacity 0), so the models loaded but never showed. */
+  body:not(.in-hub):not(.in-table):not(.in-match) > canvas { position: absolute; inset: auto; top: 52px; left: 0; width: 100%; height: clamp(120px, 20svh, 220px); opacity: 1; }
+  body:not(.in-hub):not(.in-table):not(.in-match) #lobby { margin-top: calc(clamp(120px, 20svh, 220px) + 12px); }
   body[data-table-phase='lobby'] .game-identity { margin-bottom: 14px; }
   body[data-table-phase='lobby'] .identity-art { height: 48px; flex-basis: 62px; }
   #t-room > summary { min-height: 32px; padding: 4px 0; }

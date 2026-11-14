@@ -92,12 +92,11 @@ try {
   const code = await a.locator('#t-code').innerText();
   await b.goto(`${base}/?game=poker&room=${code}`);
   await b.locator('#t-name').fill('코랄친구');
-  await b.locator('#t-variant').selectOption('party');
   await b.locator('#t-join').tap();
   await expect(a.locator('#t-players li')).toHaveCount(2);
   for (const page of pages) {
     await expect(page.locator('#t-rules-title')).toContainText('1:1 승부룰');
-    await expect(page.locator('#t-ready-note')).toContainText('2 / 2명');
+    await expect(page.locator('#t-ready-note')).toContainText('/2명');
   }
   await press(a, '준비하기'); await press(b, '준비하기');
   await privateHand(1);

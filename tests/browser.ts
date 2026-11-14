@@ -31,7 +31,9 @@ async function page(mobile = false) {
   await tab.goto(base, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await expect(tab.locator('#loading')).toBeHidden({ timeout: 60_000 });
   await expect(tab.locator('#nickname-gate')).toBeHidden({ timeout: 10_000 });
+  // The hub is a client: pick the game in the library, then press play.
   await tab.locator('.game-cell[data-game="cleaver"] .game-option').click();
+  await tab.locator('#hub-play').click();
   return tab;
 }
 async function finishDuel(a: Page, b: Page, label: string) {
@@ -121,6 +123,7 @@ try {
     await tab.locator('#match-leave:visible, #leave:visible').click();
     await expect(tab.locator('#loading')).toBeHidden({ timeout: 60_000 });
     await tab.locator('.game-cell[data-game="cleaver"] .game-option').click();
+    await tab.locator('#hub-play').click();
   }
   await a.locator('#nickname').fill('민트친구'); await b.locator('#nickname').fill('코랄친구');
   await a.locator('#map').selectOption('arena');

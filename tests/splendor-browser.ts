@@ -80,6 +80,7 @@ try {
     await a.goto(base, { waitUntil: 'domcontentloaded' });
     await expect(a.locator('#nickname-gate')).toBeHidden({ timeout: 15_000 });
     await a.locator('.game-cell[data-game="splendor"] .game-option').click();
+    await a.locator('#hub-play').click();
     await expect(a.locator('#t-room')).toBeVisible({ timeout: 30_000 });
     const code = await a.locator('#t-code').innerText();
     for (let seat = 1; seat < seats; seat++) {

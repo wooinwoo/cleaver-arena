@@ -1,0 +1,192 @@
+/* Game-first tabletop shell (2026-11-13).
+   While playing, the board owns the page and the room is one slim bar: game · turn · people ▾ · rules · leave.
+   Colours come from the client palette in lobby-window.css.
+   Imported last and scoped under #table-page so it wins over the older sidebar rules without !important. */
+
+/* ---------- layout ---------- */
+body.in-table #table-page {
+  display: flex; flex-direction: column; gap: 0;
+  max-width: 1120px; margin: 0 auto; padding: 0 24px 32px;
+}
+body.in-table.in-splendor #table-page { max-width: 1420px; }
+
+/* Slim room bar */
+#table-page .table-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 0; border-bottom: 1px solid var(--app-line); margin-bottom: 18px;
+}
+#table-page .tb-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+#table-page .tb-art { flex: 0 0 auto; width: 52px; height: 40px; border-radius: 10px; overflow: hidden; display: block; }
+#table-page .tb-art svg { width: 100%; height: 100%; display: block; }
+#table-page .tb-copy { min-width: 0; }
+#table-page .tb-copy h1 { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.2; color: var(--app-text); }
+#table-page .tb-copy small { display: block; font-size: 13px; color: var(--app-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#table-page .tb-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+#table-page #t-room:not([hidden]) { display: flex; align-items: center; gap: 8px; }
+#table-page .tb-code { font-size: 13px; color: var(--app-muted); white-space: nowrap; padding: 0 4px; }
+#table-page .tb-code strong { font-family: ui-monospace, 'Cascadia Mono', monospace; font-size: 15px; letter-spacing: .08em; color: var(--app-text); margin-left: 4px; }
+#table-page :is(#t-copy, .tb-leave) { min-height: 38px; padding: 0 14px; font-size: 13px; border-radius: 10px; width: auto; margin: 0; }
+#table-page #t-copy.copied { border-color: var(--app-accent) !important; }
+
+/* Dropdowns: people + rules share one compact summary style */
+#table-page :is(.tb-people, .table-rules) { position: relative; margin: 0; padding: 0; border: 0; }
+#table-page :is(.tb-people, .table-rules) > summary {
+  display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer;
+  min-height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--app-line);
+  background: var(--app-panel); color: var(--app-text); font-size: 13px; font-weight: 650; white-space: nowrap;
+}
+#table-page :is(.tb-people, .table-rules) > summary::-webkit-details-marker { display: none; }
+#table-page .tb-people > summary::after { content: '▾'; color: var(--app-muted); font-size: 12px; }
+#table-page .table-rules > p { display: none; }
+#table-page .tb-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 260px;
+  padding: 14px 16px; border-radius: 14px; background: var(--app-panel); border: 1px solid var(--app-line);
+  box-shadow: 0 16px 40px #0000002e;
+}
+#table-page .tb-panel .room-name { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
+#table-page .tb-panel .room-name h2 { margin: 0; font-size: 15px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#table-page .tb-panel #t-players { margin: 4px 0 0; }
+#table-page .tb-panel #t-players li:last-child { border-bottom: 0; }
+
+/* Turn status lives in the bar (desktop: between game and actions). Hidden until a game exists. */
+#table-page .table-bar .table-status {
+  flex: 1 1 auto; width: auto; max-width: 520px; min-width: 0; min-height: 0; margin: 0;
+  padding: 8px 14px; border-radius: 12px; flex-direction: row; align-items: center; gap: 12px;
+}
+#table-page .table-status span { font-size: 13px; white-space: nowrap; }
+#table-page .table-status strong { font-size: 15px; text-align: right; }
+body.in-table:is(:not([data-table-phase]), [data-table-phase='lobby']) #table-page .table-status { display: none; }
+body.in-table[data-table-phase='playing'] #table-page .table-bar { padding: 8px 0; margin-bottom: 12px; }
+body.in-table[data-table-phase='playing'] #table-page .tb-copy small { display: none; }
+
+/* Stage */
+#table-page .table-stage { display: flex; flex-direction: column; align-items: center; width: 100%; }
+#table-page .t-stage-area { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#table-page #t-board-wrap { padding: 0; overflow: visible; }
+
+
+/* Lobby: the real empty board (gomoku) or the game cover, dimmed so the start card reads first. */
+#table-page .preview-board { opacity: .55; filter: saturate(.8); pointer-events: none; }
+/* Lobby preview: the game cover when a game has no board to show before it starts. */
+#table-page .preview-board { pointer-events: none; }
+#table-page .empty-board { display: block; width: min(100%, 620px); padding: 0; overflow: hidden; aspect-ratio: 4 / 3; min-height: 0; height: auto; }
+#table-page .empty-board .waiting-art, #table-page .empty-board .waiting-art svg { width: 100%; height: 100%; display: block; }
+body.in-table:is(:not([data-table-phase]), [data-table-phase='lobby']) #table-page .empty-board > :not(.waiting-art) { display: none; }
+
+/* The big boards get the room the sidebar used to take. */
+#table-page .gomoku-board { width: min(100%, 620px, calc(100dvh - 270px)); }
+#table-page .chess-board { width: min(100%, 600px, calc(100dvh - 270px)); }
+#table-page .quoridor-board { width: min(100%, 600px, calc(100dvh - 300px)); }
+#table-page #t-action-bar { max-width: 640px; }
+
+/* Bar chips */
+#table-page .table-rules > summary::after { content: none; }
+#table-page .table-bar .table-rules { display: block; }
+/* Before play the header's 게임 선택 is the way out. The header hides during play, so 나가기 takes over in the bar. */
+body.in-table:not([data-table-phase='playing']) #table-page #t-leave { display: none; }
+body.in-table[data-table-phase='playing'] #table-page #t-leave { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 760px) { body.in-table[data-table-phase='playing'] #table-page #t-leave { order: 3; min-height: 36px; padding: 0 10px; } }
+
+/* ---------- phones ---------- */
+@media (max-width: 760px) {
+  body.in-table #table-page { padding: 0 12px calc(20px + env(safe-area-inset-bottom)); }
+  /* Row 1: game · 규칙. Row 2: room code · invite · people. While playing: one row of status · people · 규칙. */
+  #table-page .table-bar { flex-wrap: wrap; gap: 8px; padding: 10px 0; margin-bottom: 12px; }
+  #table-page .tb-actions { display: contents; }
+  #table-page .tb-identity { order: 0; flex: 1 1 0; }
+  #table-page .tb-art { width: 40px; height: 32px; }
+  #table-page .tb-copy h1 { font-size: 18px; }
+  #table-page .tb-copy small { display: none; }
+  #table-page .table-bar .table-rules { order: 1; margin: 0; }
+  #table-page #t-room { order: 3; flex: 1 1 100%; }
+  #table-page .tb-code { margin-right: auto; }
+  #table-page :is(#t-copy, .tb-people > summary, .table-rules > summary) { min-height: 36px; padding: 0 11px; }
+  #table-page .table-bar .table-status { order: 4; flex: 1 1 100%; max-width: none; padding: 8px 12px; }
+  #table-page .table-status strong { font-size: 14px; }
+  #table-page .table-stage { display: flex !important; }
+  #table-page .gomoku-board, #table-page .chess-board, #table-page .quoridor-board { width: 100%; }
+  #table-page .empty-board { aspect-ratio: auto; height: clamp(240px, calc(100dvh - 270px), 380px); }
+  /* The people panel spans the bar so it never runs off a narrow screen. */
+  #table-page .table-bar { position: relative; }
+  #table-page .tb-people { position: static; }
+  #table-page .tb-panel { left: 0; right: 0; width: auto; }
+
+  body.in-table[data-table-phase='playing'] #table-page .table-bar { flex-wrap: nowrap; padding: 6px 0 0; margin-bottom: 8px; border-bottom: 0; }
+  body.in-table[data-table-phase='playing'] #table-page :is(.tb-identity, .tb-code, #t-copy) { display: none; }
+  body.in-table[data-table-phase='playing'] #table-page .table-bar .table-status { order: 0; flex: 1 1 0; padding: 6px 10px; flex-direction: column; align-items: flex-start; gap: 0; }
+  body.in-table[data-table-phase='playing'] #table-page .table-status span { font-size: 11px; }
+  body.in-table[data-table-phase='playing'] #table-page .table-status strong { font-size: 13px; text-align: left; }
+  body.in-table[data-table-phase='playing'] #table-page #t-room { order: 1; flex: 0 0 auto; }
+  body.in-table[data-table-phase='playing'] #table-page .table-bar .table-rules { order: 2; }
+  body.in-table[data-table-phase='playing'] #table-page .tb-people > summary { padding: 0 9px; }
+}
+
+/* Closed dropdown must not leave a box behind, and the people list is always a plain column here
+   (poker's old sidebar turned it into a grid). */
+#table-page .tb-people:not([open]) > .tb-panel { display: none; }
+#table-page .tb-panel #t-players { display: block; }
+@media (max-width: 760px) {
+  body.in-table[data-table-phase='playing'] #table-page .tb-people-label { display: none; }
+}
+
+/* Long turn text (poker, coup) wraps instead of being cut off. */
+@media (min-width: 761px) {
+  #table-page .table-bar .table-status { flex-wrap: wrap; row-gap: 2px; }
+  #table-page .table-bar .table-status > * { min-width: 0; flex-shrink: 1; white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 760px) {
+  /* Mid-game on a phone the row is status · people · 나가기; rules were read before the start. */
+  body.in-table[data-table-phase='playing'] #table-page .table-bar .table-rules { display: none; }
+  body.in-table[data-table-phase='playing'] #table-page .table-status strong { overflow-wrap: anywhere; }
+}
+
+/* Coup prints its own two-line log inside the board; the shared log under it was a duplicate. */
+#table-page .table-stage:has(.coup-board) #t-log { display: none; }
+#table-page #t-board-wrap { width: 100%; display: flex; justify-content: center; }
+#table-page :is(.coup-board, .davinci-board) { width: min(100%, 780px); max-width: none; }
+@media (max-width: 760px) {
+  /* Phones show the result first; the final board opens from 마지막 보드 보기. */
+  body[data-table-phase='finished']:not([data-result-review]) #table-page #t-board-wrap { display: none; }
+}
+
+/* A faded-out toast still painted its blurred frame. Hide it once the fade ends; show it at once on the next message. */
+#toast { transition: opacity .2s, transform .2s, visibility 0s linear .2s; }
+#toast:not(.visible) { visibility: hidden; }
+#toast.visible { visibility: visible; transition-delay: 0s; }
+
+
+/* Header chips: one line, pill-shaped, still a 44px touch target. */
+body > header .header-actions .icon-button { min-height: 44px; height: auto; padding: 0 14px; border-radius: 12px; line-height: 1; display: inline-flex; align-items: center; }
+@media (max-width: 760px) { body > header .header-actions .icon-button { padding: 0 11px; font-size: 12px; } }
+
+
+/* ---------- modular games (src/games/*) ---------- */
+/* The old #t-board max-width rule outranked each game's own width; give them their intended frame. */
+#table-page #t-board:is(.yut) { width: 100%; max-width: 560px; }
+#table-page #t-board:is(.liardice-board, .onecard-board) { width: 100%; max-width: 720px; }
+#table-page #t-board:is(.mancala-board) { max-width: 100%; }
+/* Turn controls (throw, bid, suit choice) read after the table, next to where the eye already is. */
+#table-page .table-stage:has(#t-board:is(.yut, .liardice-board, .onecard-board)) { display: flex; flex-direction: column; }
+#table-page .table-stage:has(#t-board:is(.yut, .liardice-board, .onecard-board)) > .t-stage-area { order: 1; }
+#table-page .table-stage:has(#t-board:is(.yut, .liardice-board, .onecard-board)) > #t-toolbar { order: 2; margin: 14px 0 0; }
+#table-page .table-stage:has(#t-board:is(.yut, .liardice-board, .onecard-board)) > :is(#t-action-bar, #t-error, #t-log) { order: 3; }
+/* These games print their own log inside the table. */
+#table-page .table-stage:has(#t-board:is(.yut, .onecard-board)) #t-log { display: none; }
+/* Long game names stay on one line in the room bar. */
+#table-page .tb-copy h1 { white-space: nowrap; }
+/* Liar's dice: the bid button carries a sentence; give it the room and keep it on one line where possible. */
+#table-page .ld-actions { width: min(100%, 420px); margin: 0 auto; }
+#table-page .ld-actions .ld-submit { flex: 2 1 0; }
+#table-page .ld-builder { width: 100%; }
+/* One-card: bigger cards on wide screens, the hand is the main control. */
+@media (min-width: 761px) {
+  #table-page .onecard-board .oc-card { width: 64px; height: 90px; border-radius: 9px; font-size: 18px; }
+}
+#table-page .ld-actions { width: min(100%, 480px); }
+#table-page .ld-actions .ld-submit { white-space: nowrap; }
+/* My own dice already sit large in 내 주사위; the roster row just counts them. */
+#table-page .ld-player.me .ld-dice { display: none; }
+/* The throw is the whole turn: make it the obvious button. */
+#table-page .yut-throw { min-width: 220px; min-height: 52px; font-size: 16px; border-radius: 14px; }
+
+#table-page #t-error { text-align: center; margin: 10px 0 0; }

@@ -24,3 +24,21 @@
 @import './theme/entry-room.css';
 @import './theme/rules-dialog.css';
 @import './theme/quoridor.css';
+@import './theme/table-shell.css';
+@import './theme/lobby-window.css';
+@import './theme/bumper.css';
+@import './theme/hub-client.css';
+@import './theme/waiting-room.css';
+
+/* Pairs with the critical <style> in index.html: reveal the page once these rules are live, and lift the
+   pre-style SVG cap (specific rules size every icon from here on). */
+html { visibility: visible; }
+svg { max-width: none; max-height: none; }
+
+/* Korean wraps at word boundaries (no '연/결하면' or a lone '요'); long unbroken strings may still break. */
+body { word-break: keep-all; overflow-wrap: break-word; }
+/* Header chips stay on one line on phones. */
+body > header :is(button, .icon-button, #connection) { white-space: nowrap; }
+
+/* Status chip and fine print only show when they actually say something. */
+#connection:empty, #entry-note:empty { display: none; }

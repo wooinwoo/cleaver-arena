@@ -1,14 +1,14 @@
 {
-  "name": "SIDEPLAY | 모였으면, 한 판 하자.",
+  "name": "SIDEPLAY",
   "short_name": "SIDEPLAY",
-  "description": "친구들이 모여서 노는 곳. 링크 하나로 실시간 대전부터 보드게임, 심리·추리 게임까지 함께 즐겨요.",
+  "description": "링크로 방을 열어 실시간 대전, 보드게임, 심리·추리 게임을 함께 하는 웹게임.",
   "lang": "ko",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f6f4ed",
-  "theme_color": "#f6f4ed",
+  "background_color": "#0c1310",
+  "theme_color": "#0c1310",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

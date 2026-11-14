@@ -3,16 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f6f4ed" />
-    <meta name="description" content="SIDEPLAY, 친구들이 모여서 노는 곳. 링크 하나로 문도피구, 체스, 오목부터 심리·추리 게임까지 모바일과 PC에서 함께 즐겨요." />
+    <meta name="theme-color" content="#0c1310" />
+    <meta name="description" content="SIDEPLAY — 링크로 방을 열어 문도피구, 체스, 오목, 보드·추리 게임을 모바일과 PC에서 함께 하는 웹게임." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SIDEPLAY" />
-    <title>SIDEPLAY | 모였으면, 한 판 하자.</title>
+    <title>SIDEPLAY</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" href="/icons/sideplay.svg" type="image/svg+xml" />
+    <!-- Until the app stylesheet applies (it arrives via JS in dev), show only the page colour instead of
+         unstyled markup: the bare logo SVG would otherwise paint at full viewport width. -->
+    <style>html { background: #0c1310; visibility: hidden; } svg { max-width: 64px; max-height: 64px; }</style>
   </head>
   <body>
     <!-- Design contract: 41b6ee0f. The requested SD laboratory arena overrides the concept roll.
@@ -25,11 +28,19 @@
     <header>
       <a class="brand" href="/" aria-label="SIDEPLAY 홈">
         <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="#d75b39"/><g fill="#fff9ed"><rect x="9" y="9" width="9" height="9" rx="3"/><rect x="22" y="9" width="9" height="9" rx="3"/><rect x="9" y="22" width="9" height="9" rx="3"/><circle cx="26.5" cy="26.5" r="4.5"/></g></svg>
-        <span>SIDEPLAY<small>친구들이 모여서 노는 곳</small></span>
+        <span>SIDEPLAY</span>
       </a>
+      <nav class="client-nav" aria-label="화면 전환">
+        <button type="button" data-view="library" class="selected" aria-pressed="true">라이브러리</button>
+        <button type="button" data-view="rooms" aria-pressed="false">방 찾기<span id="nav-rooms-count"></span></button>
+      </nav>
       <div class="header-actions">
-        <span id="connection" role="status">친구들과 가볍게 한 판</span>
-        <button id="games-menu" class="icon-button" hidden>게임 선택</button>
+        <span id="connection" role="status"></span>
+        <div class="me-chip">
+          <input id="me-input" maxlength="12" hidden aria-label="닉네임 바꾸기" autocomplete="nickname" enterkeyhint="done" />
+          <button id="me-edit" type="button" aria-label="닉네임 바꾸기"><span class="me-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span class="me-copy"><span id="me-name"></span><small id="me-status">연결 중</small></span><svg class="me-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z"/></svg></button>
+        </div>
+        <button id="games-menu" class="icon-button" hidden>‹ 라이브러리</button>
         <button id="sound" class="icon-button" aria-label="효과음 켜기" aria-pressed="false">소리 꺼짐</button>
         <button id="fullscreen" class="icon-button" aria-label="전체 화면 전환">전체 화면</button>
         <button id="install-app" class="icon-button" hidden>앱 설치</button>
@@ -39,93 +50,146 @@
     <section id="nickname-gate" hidden aria-label="닉네임 설정">
       <div class="gate-panel">
         <a class="gate-wordmark" href="/" aria-label="SIDEPLAY 홈"><img src="/icons/sideplay.svg" width="40" height="40" alt="" />SIDEPLAY</a>
-        <h1>나만 오면,<br /><em>한 판 시작.</em></h1>
-        <p class="intro">가입은 빼고, 재미만 챙겨요.<br />친구들이 부를 이름 하나면 준비 끝.</p>
+        <h1>닉네임을 정해 주세요</h1>
+        <p class="intro">방에서 다른 사람에게 보이는 이름이에요. 나중에 바꿀 수 있어요.</p>
         <form id="gate-form">
           <label for="gate-name">내 닉네임</label>
-          <input id="gate-name" maxlength="12" placeholder="친구들이 부를 내 이름" autocomplete="nickname" enterkeyhint="go" required />
-          <button class="primary" type="submit">SIDEPLAY 들어가기 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <input id="gate-name" maxlength="12" placeholder="닉네임 (최대 12자)" autocomplete="nickname" enterkeyhint="go" required />
+          <button class="primary" type="submit">시작하기 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
         </form>
-        <p class="gate-footnote">모바일도 PC도, 같은 방에서 만나요.</p>
+        
       </div>
     </section>
 
     <section id="hub" aria-label="게임 선택" hidden>
       <div class="hub-heading">
-        <div class="hub-welcome"><h1><span class="hub-greeting">모였으면,<br /></span><em>한 판 하자.</em></h1><p class="intro">게임 고르고, 링크 보내고. 오늘도 같이 놀아요.</p></div>
-        <div class="hub-host">
-          <svg class="hub-table-art" viewBox="0 0 280 150" aria-hidden="true"><g transform="translate(27 23) rotate(-12 48 48)"><rect width="96" height="96" rx="16" fill="#e4b85d"/><g fill="#fff7df"><circle cx="26" cy="26" r="7"/><circle cx="70" cy="26" r="7"/><circle cx="48" cy="48" r="7"/><circle cx="26" cy="70" r="7"/><circle cx="70" cy="70" r="7"/></g></g><g transform="translate(158 33) rotate(12 43 52)"><rect width="86" height="105" rx="12" fill="#244e43"/><rect x="8" y="8" width="70" height="89" rx="6" fill="none" stroke="#86a998" stroke-width="1.5"/><path d="m43 28 18 25-18 25-18-25z" fill="#ecbcb0"/></g><circle cx="137" cy="115" r="20" fill="#d75b39"/><circle cx="137" cy="115" r="13" fill="none" stroke="#f6d1be" stroke-width="2"/><path d="M137 6v14m-7-7h14M258 106v12m-6-6h12" stroke="#b0b7a2" stroke-width="2" stroke-linecap="round"/></svg>
-          <div class="me-chip">
-          <input id="me-input" maxlength="12" hidden aria-label="닉네임 바꾸기" autocomplete="nickname" enterkeyhint="done" />
-          <button id="me-edit" type="button" aria-label="닉네임 바꾸기"><span class="me-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span><span id="me-name"></span><svg class="me-pencil" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z"/></svg></button>
+        <div class="hub-welcome"><h1>게임 라이브러리</h1></div>
+      </div>
+      <div class="hub-rail">
+        <div class="hub-tools">
+          <div class="game-query">
+            <label class="sr-only" for="game-search">게임 검색</label>
+            <input id="game-search" type="search" placeholder="게임 검색" autocomplete="off" />
+            <label class="sr-only" for="game-players">인원</label>
+            <select id="game-players">
+              <option value="">인원 전체</option>
+              <option value="1">혼자</option>
+              <option value="2">2명</option>
+              <option value="3">3명</option>
+              <option value="4">4명</option>
+              <option value="5">5명</option>
+              <option value="6">6명</option>
+            </select>
+          </div>
+          <div class="game-filters" role="group" aria-label="게임 종류">
+            <button type="button" data-filter="all" class="selected" aria-pressed="true">전체</button>
+            <button type="button" data-filter="3d" aria-pressed="false">3D</button>
+            <button type="button" data-filter="board" aria-pressed="false">보드</button>
+            <button type="button" data-filter="mind" aria-pressed="false">심리·추리</button>
           </div>
         </div>
+        <div class="hub-footer"><p id="game-results" role="status" aria-live="polite">17개 게임</p><nav class="game-pagination" aria-label="게임 목록 페이지"><button id="game-previous" aria-label="이전 게임 목록">‹</button><span id="game-page" aria-live="polite">1 / 2</span><button id="game-next" aria-label="다음 게임 목록">›</button></nav></div>
+        <div class="game-list">
+          <div class="game-cell" data-game="cleaver" data-groups="3d">
+            <button class="game-option available" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>문도피구</strong><small><span class="game-desc">실시간 3D 대전 · 팀전은 짝수</span></small></span><b>친구랑 하기</b></button>
+            <button type="button" class="game-sub" data-practice="cleaver">혼자 연습하기</button>
+          </div>
+          <div class="game-cell" data-game="bumper" data-groups="3d">
+            <button class="game-option available" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>범퍼카</strong><small><span class="game-desc">실시간 3D 밀어내기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="quoridor" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿼리도</strong><small><span class="game-desc">길 막기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="gomoku" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>오목</strong><small><span class="game-desc">다섯 개 잇기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="poker" data-groups="3d mind">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>인디언포커</strong><small><span class="game-desc">3D 눈치 대결</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="janggi" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>십이장기</strong><small><span class="game-desc">열두 칸 수싸움</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="chess" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>체스</strong><small><span class="game-desc">정통 전략</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="splendor" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>스플렌더</strong><small><span class="game-desc">보석 모으기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="davinci" data-groups="mind">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>다빈치코드</strong><small><span class="game-desc">숫자 추리</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="coup" data-groups="mind">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿠데타</strong><small><span class="game-desc">블러핑 승부</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="reversi" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>리버시</strong><small><span class="game-desc">뒤집기 대결</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="connect4" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>사목</strong><small><span class="game-desc">네 개 잇기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="mancala" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>만칼라</strong><small><span class="game-desc">씨앗 뿌리기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="dots" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>점과 상자</strong><small><span class="game-desc">상자 차지</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="yut" data-groups="board">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>윷놀이</strong><small><span class="game-desc">윷 던져 완주</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="onecard" data-groups="mind">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>원카드</strong><small><span class="game-desc">카드 먼저 털기</span></small></span><b>친구랑 하기</b></button>
+          </div>
+          <div class="game-cell" data-game="liardice" data-groups="mind">
+            <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>거짓말 주사위</strong><small><span class="game-desc">주사위 블러핑</span></small></span><b>친구랑 하기</b></button>
+          </div>
+        </div>
+        <div id="game-empty" hidden><strong>맞는 게임이 없어요.</strong><button id="game-reset" type="button">전체 게임 보기</button></div>
       </div>
+      <section id="hub-detail" class="hub-detail" aria-label="선택한 게임">
+        <div class="hd-hero">
+          <div class="hd-art" aria-hidden="true"></div>
+          <div class="hd-heading"><ul class="hd-tags"></ul><h2 id="hd-title"></h2><p id="hd-desc"></p></div>
+        </div>
+        <div class="hd-playbar">
+          <button type="button" class="primary" id="hub-play"><span aria-hidden="true">▶</span>친구랑 하기</button>
+          <button type="button" id="hub-solo" hidden>봇이랑 하기</button>
+          <dl class="hd-stats">
+            <div><dt>인원</dt><dd id="hd-players"></dd></div>
+            <div><dt>열린 방</dt><dd id="hd-open"></dd></div>
+            <div><dt>최근 실행</dt><dd id="hd-last"></dd></div>
+          </dl>
+          <button type="button" id="hub-rules">규칙</button>
+        </div>
+        <div class="hd-content">
+          <section class="hd-panel"><h3>게임 방법</h3><ol id="hd-steps"></ol></section>
+          <section class="hd-panel"><h3>이 게임의 열린 방</h3><ul id="hd-rooms"></ul></section>
+        </div>
+      </section>
+      <section id="hub-rooms" class="hub-roomsview" aria-label="방 찾기">
+        <div class="hr-head">
+          <h2>방 찾기</h2>
+          <form id="code-join"><label class="sr-only" for="code-join-input">방 코드</label><input id="code-join-input" maxlength="6" placeholder="방 코드 6자리" autocomplete="off" enterkeyhint="go" /><button type="submit">코드로 입장</button></form>
+        </div>
+        <p id="code-join-error" role="alert"></p>
+        <div class="hr-table">
+          <div class="hr-cols" aria-hidden="true"><span></span><span>방 이름</span><span>게임</span><span>방장</span><span>인원</span><span></span></div>
+          <ul id="rooms-table"></ul>
+        </div>
+      </section>
       <div id="open-rooms" class="open-rooms" hidden>
-        <div class="open-rooms-head"><strong>지금 열려 있는 방</strong><span id="open-rooms-status">연결 중…</span></div>
+        <div class="open-rooms-head"><strong>열린 방</strong><span id="open-rooms-status">연결 중…</span></div>
         <ul id="open-rooms-list"></ul>
+        <div class="open-rooms-head online-head"><strong>접속 중</strong><span id="online-count"></span></div>
+        <ul id="online-list"></ul>
       </div>
-      <div class="hub-tools">
-        <div class="game-query">
-          <label class="sr-only" for="game-search">게임 검색</label>
-          <input id="game-search" type="search" placeholder="오늘은 무슨 게임?" autocomplete="off" />
-          <label class="sr-only" for="game-players">인원</label>
-          <select id="game-players">
-            <option value="">인원 전체</option>
-            <option value="1">혼자</option>
-            <option value="2">2명</option>
-            <option value="3">3명</option>
-            <option value="4">4명</option>
-            <option value="5">5명</option>
-            <option value="6">6명</option>
-          </select>
-        </div>
-        <div class="game-filters" role="group" aria-label="게임 종류">
-          <button type="button" data-filter="all" class="selected" aria-pressed="true">전체</button>
-          <button type="button" data-filter="3d" aria-pressed="false">3D</button>
-          <button type="button" data-filter="board" aria-pressed="false">보드</button>
-          <button type="button" data-filter="mind" aria-pressed="false">심리·추리</button>
-        </div>
-      </div>
-      <div class="game-list">
-        <div class="game-cell" data-game="cleaver" data-groups="3d">
-          <button class="game-option available" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>문도피구</strong><small><span class="game-desc">실시간 3D 대전 · 팀전은 짝수</span></small></span><b>방 만들기</b></button>
-          <button type="button" class="game-sub" data-practice="cleaver">혼자 연습</button>
-        </div>
-        <div class="game-cell" data-game="quoridor" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿼리도</strong><small><span class="game-desc">길 막기</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="gomoku" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>오목</strong><small><span class="game-desc">다섯 개 잇기</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="poker" data-groups="3d mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>인디언포커</strong><small><span class="game-desc">3D 눈치 대결</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="janggi" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>십이장기</strong><small><span class="game-desc">열두 칸 수싸움</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="chess" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>체스</strong><small><span class="game-desc">정통 전략</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="splendor" data-groups="board">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>스플렌더</strong><small><span class="game-desc">보석 모으기</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="davinci" data-groups="mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>다빈치코드</strong><small><span class="game-desc">숫자 추리</span></small></span><b>방 만들기</b></button>
-        </div>
-        <div class="game-cell" data-game="coup" data-groups="mind">
-          <button class="game-option available board-game-option" type="button"><span class="game-cover" aria-hidden="true"></span><span><strong>쿠데타</strong><small><span class="game-desc">블러핑 승부</span></small></span><b>방 만들기</b></button>
-        </div>
-      </div>
-      <div id="game-empty" hidden><strong>맞는 게임이 없어요.</strong><button id="game-reset" type="button">전체 게임 보기</button></div>
-      <div class="hub-footer"><p id="game-results" role="status" aria-live="polite">9개 게임</p><nav class="game-pagination" aria-label="게임 목록 페이지"><button id="game-previous" aria-label="이전 게임 목록">‹</button><span id="game-page" aria-live="polite">1 / 2</span><button id="game-next" aria-label="다음 게임 목록">›</button></nav></div>
+      <footer class="hub-status"><span id="hub-conn" data-state="connecting">서버에 연결하는 중…</span><span id="hub-stats"></span><span id="hub-count" class="hub-status-end"></span></footer>
     </section>
 
     <aside id="lobby" hidden>
       <section id="entry">
-        <div class="game-identity"><div class="identity-copy"><h1>문도피구</h1><p class="intro">던지고, 피하고. 마지막까지 살아남기. <button type="button" class="link-button" id="rules-open">게임 방법</button></p></div><div class="identity-art" aria-hidden="true"></div></div>
+        <div class="game-identity"><div class="identity-copy"><h1>문도피구</h1><p class="intro">실시간 3D 식칼 피구 · 최대 6명 <button type="button" class="link-button" id="rules-open">게임 방법</button></p></div><div class="identity-art" aria-hidden="true"></div></div>
         <form id="entry-form">
-          <div class="form-field field-wide"><label for="nickname">내 닉네임</label><input id="nickname" name="nickname" maxlength="12" placeholder="오늘의 식칼 장인" autocomplete="nickname" required /></div>
+          <div class="form-field field-wide"><label for="nickname">내 닉네임</label><input id="nickname" name="nickname" maxlength="12" placeholder="닉네임" autocomplete="nickname" required /></div>
           <div class="form-field"><label for="map">경기장</label><select id="map"><option value="baron">바론 둥지</option><option value="ward">원형 와드</option><option value="arena">장애물 경기장</option></select></div>
           <div class="form-field"><label for="mode">게임 방식</label><select id="mode"><option value="duel">1:1 대결</option><option value="teams">팀전 · 최대 3:3</option></select></div>
           <button class="primary" id="create" type="submit">친구 초대할 방 만들기 <span aria-hidden="true">↗</span></button>
@@ -133,13 +197,15 @@
         <div class="join-row"><label class="sr-only" for="room-code">초대받은 방 코드</label><input id="room-code" maxlength="6" placeholder="방 코드 6자리" autocomplete="off" enterkeyhint="go" /><button id="join">입장</button></div>
         <p class="fineprint">코드가 안 맞으면 호스트에게 새 링크를 요청해 주세요</p>
         <button class="text-button" id="practice">먼저 혼자 연습해 보기 · 조작도 익혀요</button>
-        <p class="fineprint" id="entry-note">회원가입 없이 · 최대 6명 · 모바일 & PC</p>
+        <p class="fineprint" id="entry-note"></p>
         <p class="riot-notice" lang="en">SIDEPLAY was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.</p>
       </section>
       <section id="room" hidden>
-        <p class="room-caption">우리만의 경기장</p>
+        <div class="room-bar">
         <div class="room-name"><h1 class="room-title">우리 방</h1><button type="button" id="room-title-edit" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></div>
         <div class="invite"><span>방 코드</span><strong id="code">—</strong><button id="copy">초대 링크 복사</button><button id="share" type="button" hidden>공유하기</button></div>
+        </div>
+        <div class="room-card">
         <div class="roster-heading"><strong id="room-mode">1:1 · 반원 대결</strong><span id="count">1 / 2명</span></div>
         <ul id="players"></ul>
         <details class="settings-disclosure"><summary>경기 설정 <span id="settings-summary">롤 시점 · 기본 주문</span></summary><fieldset id="room-settings">
@@ -153,9 +219,10 @@
           <button id="apply-settings" type="button">설정 적용</button>
           <p id="settings-note">방장이 설정하면 준비가 초기화돼요. 시작 후에는 바꿀 수 없어요.</p>
         </fieldset></details>
-        <p id="ready-help" class="help">둘 다 준비하면 시작해요. 중앙 와드를 넘지 않고 식칼을 던져요.</p>
+        <p id="ready-help" class="help">둘 다 준비하면 시작해요.</p>
         <button id="ready" class="primary">준비하기</button>
         <button id="leave" class="text-button">방 나가기</button>
+        </div>
       </section>
       <p id="error" role="alert"></p>
     </aside>
@@ -189,7 +256,7 @@
       <button id="fire" aria-label="식칼 발사">발사</button>
     </div>
     <div id="toast" role="status"></div>
-    <div id="loading"><svg class="splash-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#c8ff4d" /><path d="M8 7h17v12H14v8H8z" fill="#0b0d14" /></svg><strong>경기장 준비 중</strong><span>잠깐만, 식칼 챙기는 중…</span></div>
+    <div id="loading"><svg class="splash-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="#d75b39"/><g fill="#fff9ed"><rect x="9" y="9" width="9" height="9" rx="3"/><rect x="22" y="9" width="9" height="9" rx="3"/><rect x="9" y="22" width="9" height="9" rx="3"/><circle cx="26.5" cy="26.5" r="4.5"/></g></svg><strong>경기장 불러오는 중</strong></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

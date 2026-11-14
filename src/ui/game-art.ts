@@ -1,10 +1,20 @@
+import type { TableCover } from '../games/types.ts';
+import { COVER as reversi } from '../games/reversi.ts';
+import { COVER as onecard } from '../games/onecard.ts';
+import { COVER as yut } from '../games/yut.ts';
+import { COVER as connect4 } from '../games/connect4.ts';
+import { COVER as liardice } from '../games/liardice.ts';
+import { COVER as mancala } from '../games/mancala.ts';
+import { COVER as dots } from '../games/dots.ts';
+/** Covers that ship with the modular games (src/games/<id>.ts). */
+const MODULAR_COVERS: Record<string, TableCover> = { reversi, onecard, yut, connect4, liardice, mancala, dots };
 /** Original vector covers shared by the library, room identity and waiting stage. */
 const themes: Record<string, [string, string, string]> = {
   cleaver: ['#82d3c3', '#d0f1d7', '#4fe3c1'], quoridor: ['#e9b789', '#f8ddb4', '#ffb36b'],
   gomoku: ['#a0c7cd', '#dcebe6', '#7fd0e4'], poker: ['#d5a0c1', '#f3d8df', '#f39ad2'],
   janggi: ['#edc46e', '#fff0b3', '#ffd35c'], chess: ['#a6b6e6', '#dce5fc', '#9bb2ff'],
   splendor: ['#82cfa9', '#dcf1c1', '#6fe0a5'], davinci: ['#b0c5d6', '#e3ebef', '#a9c9e8'],
-  coup: ['#eea195', '#ffe0ba', '#ff8f7b'],
+  coup: ['#eea195', '#ffe0ba', '#ff8f7b'], bumper: ['#5fb89a', '#cdeedd', '#6fe0b6'],
 };
 let serial = 0;
 const rect = (x: number, y: number, w: number, h: number, color: string, r = 5) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${color}"/>`;
@@ -16,9 +26,9 @@ function pawn(x: number, y: number, color: string) {
 function board(cols: number, rows: number, dark: string, light: string) {
   return Array.from({ length: cols * rows }, (_, i) => rect((i % cols) * 25, Math.floor(i / cols) * 25, 24, 24, (i + Math.floor(i / cols)) % 2 ? dark : light, 2)).join('');
 }
-export function gameAccent(kind: string) { return (themes[kind] ?? themes.cleaver)[2]; }
+export function gameAccent(kind: string) { return (MODULAR_COVERS[kind]?.colors ?? themes[kind] ?? themes.cleaver)[2]; }
 export function gameArt(kind: string, compact = false): string {
-  const [dark, light] = themes[kind] ?? themes.cleaver;
+  const [dark, light] = MODULAR_COVERS[kind]?.colors ?? themes[kind] ?? themes.cleaver;
   const id = `cover-${++serial}`;
   let art = '';
   if (kind === 'cleaver') art = `<ellipse cx="154" cy="108" rx="100" ry="28" fill="#092f36"/><ellipse cx="154" cy="98" rx="100" ry="28" fill="#4fa593"/><ellipse cx="154" cy="98" rx="84" ry="21" fill="none" stroke="#9ce1bd" stroke-width="2"/><path d="m147 73 14 49" stroke="#bde9c6" stroke-width="2"/>${pawn(111, 94, '#baf3bc')}${pawn(202, 106, '#ffb39d')}<g transform="translate(163 35) rotate(-25)">${rect(-17, -12, 42, 24, '#eef3e8', 4)}${rect(-18, 11, 10, 24, '#243b40', 3)}${circle(17, -5, 2, '#5e8c8a')}</g><path d="m105 37 28-6m-21 17 16-4m63 10 30-9" stroke="#c7f7da" stroke-width="3" stroke-linecap="round"/>`;
@@ -30,6 +40,8 @@ export function gameArt(kind: string, compact = false): string {
   if (kind === 'splendor') art = `<g transform="translate(152 65)"><path d="m-49-16 21-29h56l21 29L0 47z" fill="#c6f4d6"/><path d="M-49-16H49L0 47z" fill="#53b991"/><path d="m-28-45 10 29L0 47 18-16 28-45z" fill="#96e4bb"/><path d="M-18-16H18L0 47z" fill="#ddffdf"/></g><g transform="translate(79 89) rotate(-15)"><path d="m-22-7 10-15h24L22-7 0 22z" fill="#99c5ff"/><path d="M-22-7H22L0 22z" fill="#658ec5"/></g><g transform="translate(226 82) rotate(20)"><path d="m-23-7 11-16h24L23-7 0 23z" fill="#f8bfaa"/><path d="M-23-7H23L0 23z" fill="#d37979"/></g><path d="M86 30v12m-6-6h12m125 71v14m-7-7h14" stroke="#e2efc0" stroke-width="2"/>`;
   if (kind === 'davinci') art = `<g transform="translate(65 31) rotate(-9 90 45)">${[0, 1, 2, 3].map((i) => `<g transform="translate(${i * 45} ${i % 2 * -8})">${rect(0, 5, 39, 77, '#182831', 6)}${rect(0, 0, 39, 77, i % 2 ? '#f4edde' : '#263b48', 6)}${rect(5, 5, 29, 65, 'none', 3)}${text(19, 49, ['3', '?', '8', '?'][i], i % 2 ? '#485c64' : '#d5e5dc', 34)}</g>`).join('')}</g>`;
   if (kind === 'coup') art = `<g transform="translate(104 15) rotate(-13 32 50)">${rect(0, 5, 68, 101, '#482530')}${rect(0, 0, 68, 101, '#ebc39f')}${rect(5, 5, 58, 91, '#93464c')}<path d="m17 28 10 9 7-15 8 15 10-9-4 29H21z" fill="#f2c27e"/><path d="M19 70h30M25 77h18" stroke="#db9a85" stroke-width="3"/></g><g transform="translate(161 28) rotate(14 29 44)">${rect(0, 5, 61, 89, '#482530')}${rect(0, 0, 61, 89, '#f9dfb8')}<path d="M10 30Q30 20 51 30L46 49Q30 63 15 49z" fill="#633b49"/><path d="m19 36 8 4m9 0 8-4" stroke="#f2c486" stroke-width="3"/></g>${circle(109, 119, 13, '#e5b77c')}${circle(109, 119, 8, '#c38d5b')}`;
+  if (kind === 'bumper') art = `<ellipse cx="150" cy="104" rx="112" ry="30" fill="#0b2a22"/><ellipse cx="150" cy="94" rx="112" ry="30" fill="#2f7a63"/><ellipse cx="150" cy="94" rx="98" ry="24" fill="none" stroke="#f2eee1" stroke-width="3" stroke-dasharray="10 8"/>${[[104, 86, '#bfe981', -14], [188, 96, '#ff9b80', 12]].map(([x, y, c, r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><ellipse cx="0" cy="13" rx="27" ry="8" fill="#0006"/><ellipse cx="0" cy="6" rx="28" ry="13" fill="#16211d"/><ellipse cx="0" cy="0" rx="25" ry="12" fill="${c}"/><ellipse cx="0" cy="-8" rx="13" ry="9" fill="#f2eee1"/></g>`).join('')}<path d="m140 62 8 10-9 4 10 8M157 58l-3 12 9-2-4 13" stroke="#fff3b8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M52 78h18M230 108h20M60 92h10" stroke="#d9f2e4" stroke-width="3" stroke-linecap="round"/>`;
+  if (MODULAR_COVERS[kind]) art = MODULAR_COVERS[kind].art;
   return `<svg viewBox="${compact ? '50 0 210 140' : '0 0 300 140'}" preserveAspectRatio="xMidYMid meet" style="background:linear-gradient(135deg,${dark},${light})" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="${id}" x2="1" y2="1"><stop stop-color="${dark}"/><stop offset="1" stop-color="${light}"/></linearGradient><filter id="${id}-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-opacity=".2"/></filter></defs><circle cx="260" cy="12" r="110" fill="#fff" opacity=".035"/><circle cx="20" cy="150" r="105" fill="#000" opacity=".06"/><g filter="url(#${id}-shadow)">${art}</g></svg>`;
 }
 export function gameIdentity(kind: string, title: string, description: string) {
@@ -39,5 +51,5 @@ export function gameIdentity(kind: string, title: string, description: string) {
   return `<div class="game-identity"><div class="identity-copy"><h1>${title}</h1><p class="table-description">${description}</p></div><div class="identity-art">${gameArt(kind, true)}</div></div>`;
 }
 export function gameWaiting(kind: string, title: string) {
-  return `<div class="waiting-art">${gameArt(kind)}</div><strong>다음 한 판은, ${title}.</strong><p>초대 링크 하나로 모여서 바로 시작하세요.</p>`;
+  return `<div class="waiting-art">${gameArt(kind)}</div><strong>${title}</strong>`;
 }
