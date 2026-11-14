@@ -43,6 +43,30 @@
 #t-toolbar .yut-chip { min-width: 52px; min-height: 44px; font-size: 16px; font-weight: 800; }
 #t-toolbar .yut-throw { min-height: 48px; padding: 10px 22px; font-size: 17px; }
 
+/* Game feel: thrown sticks tumble, the result punches in, captures shake, a finished piece lights the exit. */
+#t-toolbar .yut-last { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.yut-sticks { display: inline-flex; gap: 3px; align-items: center; height: 24px; flex: none; }
+.yut-stick { display: block; width: 7px; height: 22px; border-radius: 4px; background: #9a5b2e; border: 1px solid #5b3318; box-sizing: border-box; }
+.yut-stick.yut-flat { background: #f4e3c0; border-color: #6b3f1f; }
+.yut-stick.yut-flat.yut-marked { background: linear-gradient(#f4e3c0 0 38%, #3b2414 38% 46%, #f4e3c0 46% 54%, #3b2414 54% 62%, #f4e3c0 62%); }
+.yut-tumble .yut-stick { animation: yut-tumble .42s cubic-bezier(.3, .7, .4, 1) var(--fx-d, 0ms) both; }
+.yut-result { display: inline-block; }
+.yut-result.yut-punch { animation: yut-punch .26s cubic-bezier(.3, 1.6, .6, 1) var(--fx-d, 0ms) both; }
+.yut-shake { animation: yut-shake .32s ease-in-out var(--fx-d, 0ms) both; }
+.yut-exit.yut-done { animation: yut-done .5s ease-out both; }
+@keyframes yut-tumble {
+  0% { transform: translateY(-14px) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  70% { transform: translateY(2px) rotate(400deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+@keyframes yut-punch { from { transform: scale(1.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes yut-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-4px) rotate(-4deg); } 45% { transform: translateX(4px) rotate(4deg); } 70% { transform: translateX(-2px); } }
+@keyframes yut-done { 0% { box-shadow: 0 0 0 0 var(--app-accent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .yut-tumble .yut-stick, .yut-result.yut-punch, .yut-shake { animation: none; }
+}
+
 @media (max-width: 420px) {
   .yut-players { grid-template-columns: 1fr 1fr; }
   .yut-player { padding: 5px 7px; font-size: 12px; flex-wrap: wrap; }

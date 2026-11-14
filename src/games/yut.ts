@@ -3,6 +3,7 @@ import {
   type YutState, YUT_COLORS, YUT_COLOR_NAMES, YUT_DONE, YUT_HOME, YUT_LINES, YUT_NAMES, YUT_POINTS, yutTargets,
 } from '../../shared/yut.ts';
 import './yut.css';
+import { addSoundToggle, cue, delay, motion, track, turnCues } from './fx.ts';
 
 export const COVER: TableCover = {
   colors: ['#5a1e16', '#ffc27a', '#c0392b'],
@@ -35,6 +36,16 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, te
   return element;
 }
 
+/** Four sticks for a throw result: flat faces (light, the back-do stick marked) and round backs. */
+function sticks(value: number) {
+  const flats = value === 5 ? 0 : value === -1 ? 1 : value;
+  const flat = new Set(value === -1 ? [0] : [1, 2, 3, 0].slice(0, flats));
+  const wrap = el('span', 'yut-sticks');
+  wrap.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 4; i++) wrap.append(el('i', `yut-stick${flat.has(i) ? ' yut-flat' : ''}${i === 0 ? ' yut-marked' : ''}`));
+  return wrap;
+}
+
 function moveLabel(value: number, target: number | 'finish') {
   if (target === 'finish') return '말 내보내기';
   if (value === -1) return '빽도 · 1칸 뒤로';
@@ -49,6 +60,32 @@ export function render(ctx: TableRenderContext<YutState>) {
   if (key !== pickedKey) { pickedKey = key; picked = 0; }
   if (picked >= game.pending.length) picked = 0;
 
+  // What just happened: a move (lastMove changed) or else a throw.
+  const step = track('yut', ctx, g => Number(g.lastThrow !== null) + Number(g.lastMove !== null));
+  const prev = step?.prev ?? null;
+  const moved = prev && game.lastMove && JSON.stringify(game.lastMove) !== JSON.stringify(prev.lastMove) ? game.lastMove : null;
+  const threw = prev && !moved && game.lastThrow ? game.lastThrow : null;
+  /** Seats that just had pieces sent home by a capture. */
+  const victims = new Set<number>();
+  if (moved?.captured && prev) {
+    for (let seat = 0; seat < game.seats; seat++) {
+      const home = (pieces: number[]) => pieces.filter(p => p === YUT_HOME).length;
+      if (seat !== moved.seat && home(game.pieces[seat]) > home(prev.pieces[seat])) victims.add(seat);
+    }
+  }
+  let settle = 0;
+  if (threw) {
+    cue('sticks');
+    if (threw.value >= 4 && game.winner === null) cue('extra', 420);
+    settle = 450;
+  }
+  if (moved) {
+    cue('place', moved.to === YUT_DONE ? 0 : 320);
+    if (moved.to === YUT_DONE) cue('box', 120);
+    if (moved.captured) cue('capture', 360);
+    settle = moved.captured ? 700 : 380;
+  }
+
   // Players: colour, name, pieces waiting / on board / finished.
   const players = el('div', 'yut-players');
   for (let seat = 0; seat < game.seats; seat++) {
@@ -57,6 +94,7 @@ export function render(ctx: TableRenderContext<YutState>) {
     row.style.setProperty('--yut-color', YUT_COLORS[seat]);
     if (seat === game.turn && game.winner === null) row.classList.add('yut-turn');
     if (seat === game.winner) row.classList.add('yut-winner');
+    if (victims.has(seat)) delay(row, 360).classList.add('yut-shake');
     const name = el('strong', '', ctx.preview ? `${YUT_COLOR_NAMES[seat]}` : ctx.playerName(seat));
     const home = pieces.filter(p => p === YUT_HOME).length, done = pieces.filter(p => p === YUT_DONE).length;
     row.append(el('span', 'yut-dot'), name,
@@ -123,6 +161,17 @@ export function render(ctx: TableRenderContext<YutState>) {
       if (usable) { token.classList.add('yut-movable'); token.onclick = () => pick(pieces[0], token); }
       else token.disabled = true;
       field.append(token);
+      if (moved && moved.seat === seat && moved.to === position) {
+        // Slide in from where the group stood (or from 참먹이 for a new piece), then shake if it caught someone.
+        const start = YUT_POINTS[moved.from === YUT_HOME ? 0 : moved.from];
+        const end = YUT_POINTS[position];
+        motion(token, [
+          { left: `${start.x}%`, top: `${start.y}%`, transform: `translate(-50%, -50%) scale(${moved.from === YUT_HOME ? 0.5 : 1})` },
+          { transform: 'translate(-50%, -50%) scale(1.18)', offset: 0.6 },
+          { left: `${end.x}%`, top: `${end.y}%`, transform: 'translate(-50%, -50%) scale(1)' },
+        ], { duration: 340, easing: 'ease-out' });
+        if (moved.captured) delay(face, 360).classList.add('yut-shake');
+      }
     }
   }
   mat.append(field);
@@ -140,6 +189,7 @@ export function render(ctx: TableRenderContext<YutState>) {
     newPiece.disabled = !canEnter;
     if (canEnter) newPiece.onclick = () => pick(homePiece, newPiece);
     const exit = el('span', 'yut-exit', `완주 ${game.pieces[me].filter(p => p === YUT_DONE).length}/4`);
+    if (moved && moved.seat === me && moved.to === YUT_DONE) exit.classList.add('yut-done');
     homeRow.append(newPiece, exit);
   }
 
@@ -154,12 +204,22 @@ export function render(ctx: TableRenderContext<YutState>) {
 
   // Toolbar: last throw, pending chips, throw button.
   if (ctx.preview) return;
+  turnCues(ctx, step, settle);
   toolbar.hidden = false;
   toolbar.replaceChildren();
   if (game.lastThrow) {
     const value = game.lastThrow.value;
     const extra = value >= 4 && game.lastThrow.seat === game.turn && game.stage === 'throw';
-    toolbar.append(el('span', 'yut-last', `${YUT_COLOR_NAMES[game.lastThrow.seat]} ${YUT_NAMES[value]}${extra ? '! 한 번 더' : ''}`));
+    const label = el('span', 'yut-last');
+    const thrown = sticks(value);
+    const text = el('span', 'yut-result', `${YUT_COLOR_NAMES[game.lastThrow.seat]} ${YUT_NAMES[value]}${extra ? '! 한 번 더' : ''}`);
+    if (threw) {
+      thrown.classList.add('yut-tumble');
+      thrown.querySelectorAll<HTMLElement>('.yut-stick').forEach((stick, i) => delay(stick, i * 40));
+      delay(text, 300).classList.add('yut-punch');
+    }
+    label.append(thrown, text);
+    toolbar.append(label);
   }
   game.pending.forEach((value, index) => {
     const chip = el('button', 'yut-chip', YUT_NAMES[value]);
@@ -178,4 +238,5 @@ export function render(ctx: TableRenderContext<YutState>) {
     if (interactive) throwButton.onclick = () => { throwButton.disabled = true; ctx.act({ type: 'throw' }); };
     toolbar.append(throwButton);
   }
+  addSoundToggle(ctx);
 }

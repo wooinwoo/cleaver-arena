@@ -66,6 +66,22 @@
   outline-offset: 1px;
 }
 
+/* Game feel: a fresh disc falls --c4-rows rows from above its column, lands with a small bounce; a new winning line pulses. */
+.connect4-board .c4-cell.c4-fall { background: var(--c4-hole); box-shadow: inset 0 3px 5px #00000059; }
+.connect4-board .c4-cell.c4-fall::after { z-index: 1; animation: c4-mark .12s linear var(--c4-t, 300ms) both; }
+.connect4-board .c4-drop {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: c4-fall var(--c4-t, 300ms) cubic-bezier(.55, 0, 1, .7) both, c4-bounce .2s ease-out var(--c4-t, 300ms) 1 normal none;
+}
+.connect4-board .c4-pulse { animation: c4-pulse .45s ease-in-out var(--fx-d, 0ms) 2; }
+@keyframes c4-fall { from { transform: translateY(calc(var(--c4-rows, 1) * -122%)); } to { transform: none; } }
+@keyframes c4-mark { from { opacity: 0; } to { opacity: 1; } }
+@keyframes c4-bounce { 0%, 100% { transform: none; } 45% { transform: translateY(-14%); } }
+@keyframes c4-pulse { 50% { transform: scale(1.12); outline-color: #fff7c2; box-shadow: 0 0 0 5px #ffffff55, inset 0 -3px 0 #0000002e; } }
+@media (prefers-reduced-motion: reduce) { .connect4-board .c4-drop, .connect4-board .c4-cell.c4-fall::after, .connect4-board .c4-pulse { animation: none; } }
+
 /* Landing preview: a faint disc where the next drop would land. */
 .connect4-board .c4-landing.c4-ghost-0 { background: color-mix(in srgb, var(--c4-red) 55%, var(--c4-hole)); }
 .connect4-board .c4-landing.c4-ghost-1 { background: color-mix(in srgb, var(--c4-yellow) 55%, var(--c4-hole)); }

@@ -1,6 +1,7 @@
 import './liardice.css';
 import type { TableCover, TableRenderContext } from './types.ts';
 import type { liarDiceView } from '../../shared/liardice.ts';
+import { addSoundToggle, cue, delay, gap, track, turnCues } from './fx.ts';
 
 type View = ReturnType<typeof liarDiceView>;
 
@@ -38,6 +39,16 @@ export function render(ctx: TableRenderContext<View>) {
   const reveal = game.revealed && game.lastResult !== null;
   const result = game.lastResult;
   const faces = reveal && result ? result.dice : game.dice;
+  const step = track('liardice', ctx, g => g.round * 2 + Number(g.stage === 'reveal'));
+  const prev = step?.prev ?? null;
+  /** A new round (or a new game) just rolled: dice rattle under a cup that lifts off. */
+  const rolled = !!step && !reveal && game.stage === 'bid' && (!prev || game.round > prev.round);
+  /** Somebody called: dice flip face up one by one and the counted ones light up. */
+  const revealing = !!prev && reveal && !prev.revealed;
+  const raised = !!prev && !reveal && !rolled && !!game.bid && JSON.stringify(game.bid) !== JSON.stringify(prev.bid);
+  let settle = 0;
+  if (rolled) { cue('shake'); cue('roll', 420); settle = 600; }
+  if (raised) { cue('place'); settle = 260; }
 
   const summary = document.createElement('section');
   summary.className = 'ld-summary';
@@ -47,6 +58,7 @@ export function render(ctx: TableRenderContext<View>) {
   if (shown) {
     const label = document.createElement('span'); label.className = 'ld-bid-label'; label.textContent = `${ctx.playerName(shown.seat)}의 입찰`;
     const value = document.createElement('strong'); value.textContent = bidText(shown.count, shown.face);
+    if (raised) value.classList.add('ld-punch');
     bidLine.append(label, value, die(shown.face, 'small'));
   } else {
     bidLine.textContent = '아직 입찰이 없어요';
@@ -58,6 +70,7 @@ export function render(ctx: TableRenderContext<View>) {
   if (reveal && result) {
     const outcome = document.createElement('p');
     outcome.className = 'ld-outcome';
+    if (revealing) outcome.classList.add('ld-later');
     outcome.textContent = `실제 ${result.actual}개 / 입찰 ${result.bid.count}개 → ${ctx.playerName(result.loser)} 주사위 1개 잃음${result.eliminated ? ' · 탈락' : ''}`;
     summary.append(outcome);
   }
@@ -92,6 +105,28 @@ export function render(ctx: TableRenderContext<View>) {
     list.append(row);
   });
   board.append(list);
+  if (revealing && result) {
+    // Only dice actually on screen (the shell hides my own row's dice; they live in the 내 주사위 panel).
+    const all = [...list.querySelectorAll<HTMLElement>('.ld-die')].filter(element => element.getClientRects().length > 0);
+    const beat = gap(all.length, 320, 60);
+    cue('roll');
+    let hits = 0;
+    all.forEach((element, i) => {
+      delay(element, i * beat).classList.add('ld-flip');
+      if (element.classList.contains('counted')) {
+        element.classList.add('ld-hit');
+        element.style.setProperty('--fx-hit', `${Math.round(i * beat + 220)}ms`);
+        if (hits++ < 20) cue('sow', i * beat + 220);
+      }
+    });
+    settle = all.length * beat + 260;
+    const loser = list.children[result.loser] as HTMLElement | undefined;
+    if (loser) delay(loser, settle).classList.add('ld-shake');
+    const outcome = summary.querySelector<HTMLElement>('.ld-outcome');
+    if (outcome) delay(outcome, settle);
+    cue('capture', settle);
+    settle += 360;
+  }
 
   const mine = game.dice[me];
   if (!ctx.preview && mine && mine.length && !reveal) {
@@ -101,10 +136,20 @@ export function render(ctx: TableRenderContext<View>) {
     const dice = document.createElement('div'); dice.className = 'ld-dice large';
     for (const face of mine) dice.append(die(face, game.bid && face !== null && (face === game.bid.face || face === 1) ? 'match' : ''));
     own.append(title, dice);
+    if (rolled) {
+      dice.classList.add('ld-rattle');
+      const cup = document.createElement('span');
+      cup.className = 'ld-cup';
+      cup.setAttribute('aria-hidden', 'true');
+      dice.append(cup);
+      cup.addEventListener('animationend', () => cup.remove());
+    }
     board.append(own);
   }
+  if (rolled) list.querySelectorAll<HTMLElement>('.ld-die.hidden').forEach((element, i) => delay(element, (i % 5) * 30).classList.add('ld-jiggle'));
 
   if (ctx.preview) return;
+  turnCues(ctx, step, settle);
 
   if (reveal && result) {
     const tail = game.winner !== null
@@ -120,12 +165,13 @@ export function render(ctx: TableRenderContext<View>) {
       next.onclick = () => ctx.act({ type: 'next' });
       toolbar.append(next);
     }
+    addSoundToggle(ctx);
     return;
   }
 
-  if (!ctx.playing) return;
+  if (!ctx.playing) { addSoundToggle(ctx); return; }
   ctx.setTurn(ctx.canAct ? '내 차례 · 입찰을 올리거나 거짓말을 외치세요' : `${ctx.playerName(game.turn)} 차례`);
-  if (!ctx.canAct || game.stage !== 'bid') return;
+  if (!ctx.canAct || game.stage !== 'bid') { addSoundToggle(ctx); return; }
 
   const bid = game.bid;
   const key = `${game.round}:${bid ? `${bid.count}-${bid.face}-${bid.seat}` : '-'}`;
@@ -178,6 +224,7 @@ export function render(ctx: TableRenderContext<View>) {
     );
     wrap.append(stepper, facesRow, actions);
     toolbar.append(wrap);
+    addSoundToggle(ctx);
   };
   build();
 }

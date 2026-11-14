@@ -130,6 +130,56 @@
 .ld-call { font-weight: 700; }
 .ld-next { min-height: 44px; min-width: 120px; border-radius: 10px; }
 
+/* Game feel: a cup lifts off rattling dice at a new round, reveals flip dice one by one and light the counted ones. */
+.ld-dice.large { position: relative; }
+.ld-cup {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: min(220px, 90%);
+  height: calc(100% + 12px);
+  transform: translateX(-50%);
+  border-radius: 14px 14px 6px 6px;
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  background: linear-gradient(90deg, #9c3524, #c4472f 35%, #d9654b 50%, #c4472f 65%, #7d2a1d);
+  box-shadow: inset 0 -8px 0 #7d2a1d;
+  pointer-events: none;
+  z-index: 2;
+  animation: ld-cup .6s cubic-bezier(.5, 0, .7, .4) both;
+}
+.ld-rattle .ld-die { animation: ld-rattle .42s linear both; }
+.ld-die.ld-jiggle { animation: ld-rattle .36s linear var(--fx-d, 0ms) both; }
+.ld-die.ld-flip { animation: ld-flip .24s ease-out var(--fx-d, 0ms) both; }
+.ld-die.ld-flip.ld-hit { animation: ld-flip .24s ease-out var(--fx-d, 0ms) both, ld-hit .3s ease-out var(--fx-hit, 0ms) 1 normal none; }
+.ld-player.ld-shake { animation: ld-shake .34s ease-in-out var(--fx-d, 0ms) both; }
+.ld-outcome.ld-later { animation: ld-fade .25s ease-out var(--fx-d, 0ms) both; }
+.ld-bid strong.ld-punch { display: inline-block; animation: ld-punch .26s cubic-bezier(.3, 1.6, .6, 1) both; }
+@keyframes ld-cup {
+  0%, 55% { transform: translateX(-50%); opacity: 1; }
+  10% { transform: translateX(-50%) translateX(-4px) rotate(-3deg); }
+  20% { transform: translateX(-50%) translateX(4px) rotate(3deg); }
+  30% { transform: translateX(-50%) translateX(-4px) rotate(-2deg); }
+  40% { transform: translateX(-50%) translateX(3px) rotate(2deg); }
+  100% { transform: translateX(-50%) translateY(-70%); opacity: 0; }
+}
+@keyframes ld-rattle {
+  0%, 100% { transform: none; }
+  20% { transform: translate(-2px, 1px) rotate(-12deg); }
+  40% { transform: translate(2px, -1px) rotate(10deg); }
+  60% { transform: translate(-1px, 0) rotate(-6deg); }
+  80% { transform: translate(1px, 0) rotate(4deg); }
+}
+@keyframes ld-flip { from { transform: rotateY(90deg); opacity: .2; } to { transform: none; opacity: 1; } }
+@keyframes ld-hit { 0% { transform: scale(1); } 45% { transform: scale(1.25); box-shadow: 0 0 0 4px var(--app-accent); } 100% { transform: scale(1); } }
+@keyframes ld-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
+@keyframes ld-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ld-punch { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ld-rattle .ld-die, .ld-die.ld-jiggle, .ld-player.ld-shake, .ld-bid strong.ld-punch { animation: none; }
+  .ld-die.ld-flip, .ld-die.ld-flip.ld-hit { animation: ld-fade .2s ease-out var(--fx-d, 0ms) both; }
+  .ld-cup { animation: ld-fade .4s ease-out reverse both; }
+}
+
 @media (max-width: 400px) {
   .ld-dice.large .ld-die { --size: 44px; }
   .ld-die { --size: 22px; }

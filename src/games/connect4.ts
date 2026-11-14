@@ -1,12 +1,20 @@
 import type { TableCover, TableRenderContext } from './types.ts';
 import { COLOR_NAMES, COLS, ROWS, landingRow, type ConnectFourState } from '../../shared/connect4.ts';
 import './connect4.css';
+import { addSoundToggle, cue, delay, track, turnCues } from './fx.ts';
 
 export function render(ctx: TableRenderContext<ConnectFourState>) {
   const { board, toolbar, game } = ctx;
   board.className = 'connect4-board';
   const line = new Set(game.line ?? []);
   const active = ctx.canAct && !ctx.preview;
+  // Fresh drop: the disc falls from above its column (longer for lower rows) and bounces; a new winning line pulses after.
+  const step = track('connect4', ctx, g => g.count, 1);
+  const fresh = !!step?.prev && game.last !== null;
+  const row = fresh ? Math.floor(game.last! / COLS) : 0;
+  const fall = 170 + row * 45;
+  const newLine = fresh && !!game.line && !step!.prev!.line;
+  if (fresh) { cue('drop'); cue('land', fall); }
   for (let c = 0; c < COLS; c++) {
     const column = document.createElement('button');
     column.type = 'button';
@@ -22,6 +30,16 @@ export function render(ctx: TableRenderContext<ConnectFourState>) {
       if (value !== null) cell.classList.add(`c4-disc-${value}`);
       if (index === game.last) cell.classList.add('c4-last');
       if (line.has(index)) cell.classList.add('c4-win');
+      if (fresh && index === game.last && value !== null) {
+        // The hole stays drawn while a separate disc falls into it.
+        const disc = document.createElement('i');
+        disc.className = `c4-drop c4-disc-${value}`;
+        cell.classList.add('c4-fall');
+        cell.style.setProperty('--c4-rows', String(r + 0.75));
+        cell.style.setProperty('--c4-t', `${fall}ms`);
+        cell.append(disc);
+      }
+      if (newLine && line.has(index)) delay(cell, fall + 160 + game.line!.indexOf(index) * 70).classList.add('c4-pulse');
       if (r === landing && active) cell.classList.add('c4-landing', `c4-ghost-${game.turn}`);
       column.append(cell);
     }
@@ -40,6 +58,8 @@ export function render(ctx: TableRenderContext<ConnectFourState>) {
     tag.append(dot, `${COLOR_NAMES[seat]} · ${ctx.playerName(seat)}`);
     toolbar.append(tag);
   }
+  addSoundToggle(ctx);
+  turnCues(ctx, step, fresh ? fall + (newLine ? 300 : 80) : 0);
 }
 
 const discs = (() => {

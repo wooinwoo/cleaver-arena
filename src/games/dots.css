@@ -42,7 +42,8 @@
   pointer-events: none;
 }
 .dots-box[class*='seat-'] { background: color-mix(in srgb, var(--seat) 24%, transparent); }
-.dots-box.fresh { outline: 2px solid var(--seat); outline-offset: -2px; animation: dots-pop 0.4s ease-out; }
+.dots-box.fresh { outline: 2px solid var(--seat); outline-offset: -2px; }
+.dots-box.fx-pop { animation: dots-pop 0.32s cubic-bezier(.3, 1.5, .6, 1) var(--fx-d, 0ms) both; }
 
 .dots-line {
   position: relative;
@@ -89,11 +90,16 @@ button.dots-line:focus-visible { outline: none; }
 .dots-line.line-v.drawn.last::after { width: 6px; }
 
 @keyframes dots-pop {
-  from { transform: scale(0.8); opacity: 0.4; }
+  from { transform: scale(0.3); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+/* Game feel: the newest line grows from its first dot to the second. */
+.dots-line.line-h.fx-draw::after { transform-origin: left center; animation: dots-draw-h 0.2s ease-out both; }
+.dots-line.line-v.fx-draw::after { transform-origin: center top; animation: dots-draw-v 0.2s ease-out both; }
+@keyframes dots-draw-h { from { transform: translateY(-50%) scaleX(0); } to { transform: translateY(-50%) scaleX(1); } }
+@keyframes dots-draw-v { from { transform: translateX(-50%) scaleY(0); } to { transform: translateX(-50%) scaleY(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .dots-box.fresh { animation: none; }
+  .dots-box.fx-pop, .dots-line.fx-draw::after { animation: none; }
 }
 
 .dots-scores {

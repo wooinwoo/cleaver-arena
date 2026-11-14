@@ -2,6 +2,7 @@ import './reversi.css';
 import type { TableCover, TableRenderContext } from './types.ts';
 import { reversiMoves, type ReversiState } from '../../shared/reversi.ts';
 import { finished } from '../../shared/tabletop-types.ts';
+import { addSoundToggle, cue, delay, gap, track, turnCues } from './fx.ts';
 
 const COLOR = ['흑', '백'];
 
@@ -11,6 +12,21 @@ export function render(ctx: TableRenderContext<ReversiState>) {
   const active = ctx.canAct && !ctx.preview && !finished(game) && game.turn === ctx.me;
   const legal = new Set(active ? reversiMoves(game, ctx.me) : []);
   const flipped = new Set(game.flipped);
+  // Fresh move: the placed disc pops in, then flipped discs turn over outward from it.
+  const step = track('reversi', ctx, g => g.counts[0] + g.counts[1], 1);
+  const fresh = !!step?.prev && game.last !== null;
+  const order = new Map<number, number>();
+  let settle = 0;
+  if (fresh) {
+    const lr = Math.floor(game.last! / 8), lc = game.last! % 8;
+    const far = (i: number) => Math.max(Math.abs(Math.floor(i / 8) - lr), Math.abs((i % 8) - lc));
+    const beat = gap(game.flipped.length, 300, 70);
+    [...game.flipped].sort((a, b) => far(a) - far(b)).forEach((index, rank) => order.set(index, 90 + rank * beat));
+    cue('place');
+    for (const ms of order.values()) cue('flip', ms + 110);
+    settle = Math.max(220, ...[...order.values()].map(ms => ms + 240));
+    if (game.passed !== null && game.passed !== ctx.me && game.turn === ctx.me) cue('extra', settle);
+  }
 
   game.board.forEach((owner, index) => {
     const r = Math.floor(index / 8), c = index % 8;
@@ -24,6 +40,8 @@ export function render(ctx: TableRenderContext<ReversiState>) {
       const disc = document.createElement('span');
       disc.className = `reversi-disc reversi-disc-${owner}`;
       if (flipped.has(index)) disc.classList.add('reversi-flipped');
+      if (fresh && index === game.last) disc.classList.add('rv-pop');
+      if (order.has(index)) delay(disc, order.get(index)!).classList.add('rv-flip');
       button.append(disc);
     } else if (legal.has(index)) {
       const hint = document.createElement('span');
@@ -49,11 +67,13 @@ export function render(ctx: TableRenderContext<ReversiState>) {
     item.append(disc, label, count);
     return item;
   }));
+  addSoundToggle(ctx);
 
   if (ctx.playing && !finished(game) && game.passed !== null) {
     const mine = game.turn === ctx.me;
     ctx.setTurn(`${ctx.playerName(game.passed)} (${COLOR[game.passed]}) 둘 곳 없음 · ${mine ? '다시 내 차례' : `${ctx.playerName(game.turn)} 차례`}`);
   }
+  turnCues(ctx, step, settle);
 }
 
 /** Disc on the tilted cover board at column `col`, row `row` (0-7). */

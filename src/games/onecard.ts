@@ -4,6 +4,7 @@ import {
   type OneCardView, type OneCardSuit, ONECARD_SUITS, ONECARD_SUIT_SYMBOL, ONECARD_SUIT_NAME,
   oneCardInfo, oneCardName, oneCardPlayable,
 } from '../../shared/onecard.ts';
+import { centre, cue, delay, gap, motion, soundToggle, track, turnCues } from './fx.ts';
 
 /** A 7 tapped in my hand, waiting for a suit choice in the toolbar. */
 let pendingSeven: string | null = null;
@@ -32,6 +33,53 @@ function face(node: HTMLElement, id: string) {
 
 const oneBadge = () => el('span', 'oc-one', '원카드!');
 
+/** Slides the played card from its owner to the pile, or fans drawn cards in from the deck. Returns ms taken. */
+function playFx(game: OneCardView, prev: OneCardView, board: HTMLElement, me: number) {
+  const play = game.lastPlay!;
+  const owner = board.querySelector<HTMLElement>(play.seat === me ? '.oc-mine .oc-hand' : `.oc-opp[data-seat="${play.seat}"]`);
+  const deck = board.querySelector<HTMLElement>('.oc-deck');
+  const offset = (from: HTMLElement | null, to: Element) => {
+    if (!from) return null;
+    const a = centre(from, board), b = centre(to, board);
+    return { x: a.x - b.x, y: a.y - b.y };
+  };
+  if (play.card) {
+    const top = board.querySelector<HTMLElement>('.oc-top');
+    const d = top && offset(owner, top);
+    if (top && d) motion(top, [
+      { transform: `translate(${d.x}px, ${d.y}px) rotate(${play.seat === me ? -10 : 10}deg) scale(.7)`, opacity: 0.4 },
+      { transform: 'none', opacity: 1 },
+    ], { duration: 300, easing: 'cubic-bezier(.2, .8, .3, 1)' });
+    cue('card');
+    let end = 300;
+    if (game.attack > prev.attack) {
+      const attack = board.querySelector<HTMLElement>('.oc-attack');
+      if (attack) delay(attack, 280).classList.add('oc-shake');
+      deck?.classList.add('oc-warn');
+      cue('attack', 280);
+      end = 620;
+    }
+    if (game.direction !== prev.direction) board.querySelector<HTMLElement>('.oc-dir')?.classList.add('oc-punch');
+    if (play.seat === me && game.turn === me && prev.turn === me && game.winner === null) cue('extra', end);
+    return end;
+  }
+  // Drawn cards are appended to the end of the hand (or of the opponent's row of backs).
+  const drawn = play.drew;
+  if (!drawn || !deck) return 0;
+  const cards = [...board.querySelectorAll<HTMLElement>(play.seat === me ? '.oc-hand .oc-card' : `.oc-opp[data-seat="${play.seat}"] .oc-back`)].slice(-drawn);
+  const beat = gap(cards.length, 360, 90);
+  cards.forEach((card, i) => {
+    const d = offset(deck, card);
+    if (d) motion(card, [
+      { transform: `translate(${d.x}px, ${d.y}px) rotate(${(i - cards.length / 2) * 8}deg) scale(.6)`, opacity: 0 },
+      { opacity: 1, offset: 0.3 },
+      { transform: 'none', opacity: 1 },
+    ], { duration: 280, delay: i * beat, easing: 'cubic-bezier(.2, .8, .3, 1)', fill: 'backwards' });
+  });
+  for (let i = 0; i < Math.min(drawn, 8); i++) cue('draw', i * beat);
+  return 280 + cards.length * beat;
+}
+
 export function render(ctx: TableRenderContext<OneCardView>): void {
   const { board, toolbar, game, me } = ctx;
   board.replaceChildren();
@@ -40,6 +88,8 @@ export function render(ctx: TableRenderContext<OneCardView>): void {
   const playable = new Set(live ? oneCardPlayable(game, me) : []);
   if (!live || !pendingSeven || !playable.has(pendingSeven)) pendingSeven = null;
   const seats = game.counts.length;
+  const step = track('onecard', ctx, g => Number(g.lastPlay !== null));
+  const prev = step?.prev ?? null;
 
   // Opponents, in play order starting after me.
   const others = el('section', 'oc-others');
@@ -109,6 +159,7 @@ export function render(ctx: TableRenderContext<OneCardView>): void {
   }
   mine.append(head, hand);
   board.append(others, centre, log, mine);
+  const settle = prev && game.lastPlay ? playFx(game, prev, board, me) : 0;
 
   if (pendingSeven) {
     const seven = pendingSeven;
@@ -130,6 +181,8 @@ export function render(ctx: TableRenderContext<OneCardView>): void {
     toolbar.replaceChildren();
     toolbar.hidden = true;
   }
+  if (!ctx.preview) { toolbar.hidden = false; toolbar.append(soundToggle()); }
+  turnCues(ctx, step, settle);
 
   if (ctx.playing && !ctx.preview && game.winner === null) {
     const who = game.turn === me ? '내 차례' : `${ctx.playerName(game.turn)} 차례`;

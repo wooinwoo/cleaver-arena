@@ -48,6 +48,14 @@ button.oc-card.oc-pending{outline-color:#e2574c;transform:translateY(-6px)}
 .oc-ask{font-size:13px;font-weight:700}
 .oc-suit-pick,.oc-cancel{min-height:44px;min-width:64px;font-weight:700}
 .oc-suit-pick.oc-red{color:#c8352b}
+/* Game feel: attack counter shakes, deck flashes on a new attack, direction label punches when it flips. */
+.oc-shake{animation:oc-shake .36s ease-in-out var(--fx-d,0ms) both}
+.oc-deck.oc-warn{animation:oc-warn .5s ease-out .28s both}
+.oc-punch{animation:oc-punch .3s cubic-bezier(.3,1.6,.6,1) both}
+@keyframes oc-shake{0%,100%{transform:none}20%{transform:translateX(-5px) rotate(-3deg)}40%{transform:translateX(5px) rotate(3deg)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+@keyframes oc-warn{0%{box-shadow:0 0 0 0 #e2574c}100%{box-shadow:0 0 0 12px #e2574c00}}
+@keyframes oc-punch{from{transform:scale(1.5)}to{transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.oc-shake,.oc-punch{animation:none}}
 @media(max-width:480px){
   .oc-others{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
   .oc-card{width:42px;height:60px}

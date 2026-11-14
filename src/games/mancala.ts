@@ -1,6 +1,7 @@
 import './mancala.css';
 import type { TableCover, TableRenderContext } from './types.ts';
-import { type MancalaState, PITS, STORE, pitIndex } from '../../shared/mancala.ts';
+import { type MancalaState, PITS, STORE, opposite, pitIndex } from '../../shared/mancala.ts';
+import { calm, centre, cue, delay, gap, motion, soundToggle, track, turnCues } from './fx.ts';
 
 const SEED_COLORS = ['#e2574c', '#f2b134', '#4fa3d9', '#6fbf73', '#b67ad9', '#f0efe9'];
 const MAX_DOTS = 10;
@@ -24,12 +25,71 @@ function fill(cell: HTMLElement, count: number, index: number) {
   cell.append(seeds(count, index), number);
 }
 
+/**
+ * Replays the last sowing: a seed hops from the emptied pit through each sown pit (a tick and a bump per seed),
+ * then a capture flash and an extra-turn badge. Returns how long it takes in ms.
+ */
+function sowFx(game: MancalaState, cells: Map<number, HTMLElement>, wood: HTMLElement, origin: number) {
+  const path = game.lastSow;
+  const beat = Math.max(40, gap(path.length, 600, 110));
+  path.forEach((index, i) => {
+    const cell = cells.get(index);
+    if (cell) delay(cell, (i + 1) * beat - 40).classList.add('mc-hit');
+    if (i < 24) cue('sow', (i + 1) * beat);
+  });
+  let end = path.length * beat;
+  const from = cells.get(origin);
+  if (from && !calm()) {
+    const flyer = document.createElement('i');
+    flyer.className = 'mc-flyer';
+    flyer.setAttribute('aria-hidden', 'true');
+    wood.append(flyer);
+    const at = (element: HTMLElement) => centre(element, wood);
+    const start = at(from);
+    const frames: Keyframe[] = [{ transform: `translate(${start.x}px, ${start.y}px) scale(1)`, offset: 0 }];
+    let prev = start;
+    path.forEach((index, i) => {
+      const cell = cells.get(index);
+      if (!cell) return;
+      const next = at(cell);
+      frames.push({ transform: `translate(${(prev.x + next.x) / 2}px, ${(prev.y + next.y) / 2 - 10}px) scale(1.45)`, offset: (i + 0.5) / path.length });
+      frames.push({ transform: `translate(${next.x}px, ${next.y}px) scale(1)`, offset: (i + 1) / path.length });
+      prev = next;
+    });
+    const run = motion(flyer, frames, { duration: end, easing: 'linear' });
+    if (run) run.onfinish = () => flyer.remove(); else flyer.remove();
+  }
+  if (game.captured) {
+    const last = path[path.length - 1];
+    for (const index of [last, opposite(last), STORE[game.last!.seat]]) {
+      const cell = cells.get(index);
+      if (cell) delay(cell, end + 40).classList.add('mc-capture');
+    }
+    cue('capture', end + 40);
+    end += 380;
+  }
+  if (game.extraTurn) {
+    const badge = delay(document.createElement('span'), end);
+    badge.className = 'mc-extra';
+    badge.textContent = '한 번 더!';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.addEventListener('animationend', () => badge.remove());
+    wood.append(badge);
+    cue('extra', end);
+    end += 250;
+  }
+  return end;
+}
+
 export function render(ctx: TableRenderContext<MancalaState>) {
   const { game, me } = ctx;
   const them = 1 - me;
   const sown = new Set(game.lastSow);
   const origin = game.last ? pitIndex(game.last.seat, game.last.pit) : -1;
   const live = !ctx.preview && ctx.playing && ctx.canAct && game.turn === me;
+  const step = track('mancala', ctx, g => g.moves, 1);
+  const fresh = !!step?.prev && !!game.last && game.lastSow.length > 0;
+  const cells = new Map<number, HTMLElement>();
 
   ctx.board.className = 'mancala-board';
   const wood = document.createElement('div');
@@ -41,6 +101,7 @@ export function render(ctx: TableRenderContext<MancalaState>) {
     cell.className = `mc-store mc-store-${side}${sown.has(index) ? ' mc-sown' : ''}`;
     cell.setAttribute('aria-label', `${ctx.playerName(seat)} 창고, 씨앗 ${game.pits[index]}개`);
     fill(cell, game.pits[index], index);
+    cells.set(index, cell);
     wood.append(cell);
   };
 
@@ -63,6 +124,7 @@ export function render(ctx: TableRenderContext<MancalaState>) {
       cell.append(tag);
     }
     fill(cell, count, index);
+    cells.set(index, cell);
     if (button) {
       const element = cell as HTMLButtonElement;
       element.type = 'button';
@@ -78,6 +140,7 @@ export function render(ctx: TableRenderContext<MancalaState>) {
   for (let column = 1; column <= PITS; column++) pit(me, column - 1, 'bottom', column);
   store(me, 'me');
   ctx.board.append(wood);
+  const settle = fresh ? sowFx(game, cells, wood, origin) : 0;
 
   // Toolbar: store totals and feedback on the last move.
   ctx.toolbar.hidden = false;
@@ -103,6 +166,7 @@ export function render(ctx: TableRenderContext<MancalaState>) {
     note.textContent = parts.join(' · ');
     bar.append(note);
   }
+  if (!ctx.preview) bar.append(soundToggle());
   ctx.toolbar.append(bar);
 
   if (!ctx.preview && ctx.playing && game.winner === null && !game.draw && game.extraTurn) {
@@ -111,6 +175,7 @@ export function render(ctx: TableRenderContext<MancalaState>) {
       ? `${name} 차례 · 창고에 끝나 한 번 더 둡니다`
       : `${name} 차례 · 한 번 더 둡니다`);
   }
+  turnCues(ctx, step, settle);
 }
 
 const coverPits = (() => {

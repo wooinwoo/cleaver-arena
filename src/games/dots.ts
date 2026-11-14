@@ -1,6 +1,7 @@
 import './dots.css';
 import type { TableCover, TableRenderContext } from './types.ts';
 import { SIZE, lineIndex, type DotsState, type LineDir } from '../../shared/dots.ts';
+import { addSoundToggle, cue, delay, track, turnCues } from './fx.ts';
 
 /** Per-seat colours, readable on a light background. Keep in sync with dots.css. */
 const COLORS = ['#2563eb', '#dc2626', '#15803d', '#c2410c'];
@@ -16,6 +17,15 @@ export function render(ctx: TableRenderContext<DotsState>) {
   board.className = 'dots-board';
   const interactive = ctx.canAct && !ctx.preview;
   const last = game.last;
+  // Fresh line: it draws from one dot to the other, then any boxes it closed fill with a pop.
+  const step = track('dots', ctx, g => g.count, 1);
+  const fresh = !!step?.prev && !!last;
+  const claimed = fresh ? game.claimed : [];
+  if (fresh) {
+    cue('line');
+    claimed.forEach((_, i) => cue('box', 200 + i * 110));
+  }
+  const settle = fresh ? 200 + claimed.length * 110 + (claimed.length ? 200 : 0) : 0;
 
   for (let r = 0; r <= SIZE; r++) for (let c = 0; c <= SIZE; c++) {
     const dot = document.createElement('span');
@@ -32,6 +42,8 @@ export function render(ctx: TableRenderContext<DotsState>) {
     if (owner !== null) {
       box.classList.add(`seat-${owner}`);
       if (game.claimed.includes(r * SIZE + c)) box.classList.add('fresh');
+      const order = claimed.indexOf(r * SIZE + c);
+      if (order >= 0) delay(box, 200 + order * 110).classList.add('fx-pop');
       box.textContent = ctx.playerName(owner).trim().slice(0, 1) || String(owner + 1);
       box.setAttribute('aria-label', `${r + 1}행 ${c + 1}열 상자 · ${ctx.playerName(owner)}`);
     }
@@ -47,7 +59,7 @@ export function render(ctx: TableRenderContext<DotsState>) {
     place(element, dir === 'h' ? 2 * r : 2 * r + 1, dir === 'h' ? 2 * c + 1 : 2 * c);
     if (owner !== null) {
       element.classList.add('drawn', `seat-${owner}`);
-      if (last && last.dir === dir && last.r === r && last.c === c) element.classList.add('last');
+      if (last && last.dir === dir && last.r === r && last.c === c) element.classList.add('last', ...(fresh ? ['fx-draw'] : []));
       element.setAttribute('aria-label', `${label} · ${ctx.playerName(owner)}`);
     } else if (open) {
       const button = element as HTMLButtonElement;
@@ -83,6 +95,8 @@ export function render(ctx: TableRenderContext<DotsState>) {
     scores.append(chip);
   });
   toolbar.append(scores);
+  addSoundToggle(ctx);
+  turnCues(ctx, step, settle);
 }
 
 const coverArt = (() => {

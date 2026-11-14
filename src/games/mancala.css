@@ -84,6 +84,56 @@ button.mc-pit[aria-pressed="true"], button.mc-pit.selected, button.mc-pit.is-sel
 .mc-sown { box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 0 0 2px rgba(242, 177, 52, .8); }
 .mc-origin { border-style: dashed; border-color: #f2b134; }
 
+/* Game feel: a seed hops along the last sowing, each sown pit bumps as it lands, captures flash, extra turns get a badge. */
+.mc-wood { position: relative; }
+.mc-flyer {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f2b134;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(0, 0, 0, .25);
+  pointer-events: none;
+  z-index: 3;
+}
+.mc-hit .mc-count, .mc-hit .mc-seeds { animation: mc-hit .22s ease-out var(--fx-d, 0ms) both; }
+.mc-capture { animation: mc-capture .38s ease-in-out var(--fx-d, 0ms) both; }
+.mc-extra {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #f2b134;
+  color: #3b2412;
+  font-weight: 800;
+  font-size: 15px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: mc-extra .95s ease-out var(--fx-d, 0ms) both;
+}
+@keyframes mc-hit { 0% { transform: scale(1); } 45% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes mc-capture {
+  0%, 100% { filter: none; }
+  40% { filter: brightness(1.6) saturate(1.4); box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5), 0 0 0 4px #ff7a59; }
+}
+@keyframes mc-extra {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  35%, 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-hit .mc-count, .mc-hit .mc-seeds { animation: none; }
+  .mc-extra { animation-name: mc-extra-still; }
+  @keyframes mc-extra-still { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
+}
+
 .mc-toolbar {
   display: flex;
   flex-wrap: wrap;

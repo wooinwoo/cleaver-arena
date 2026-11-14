@@ -41,9 +41,24 @@
 }
 .reversi-disc-0 { background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
 .reversi-disc-1 { background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
-.reversi-flipped { animation: reversi-flip .3s ease-out; }
-@keyframes reversi-flip { from { transform: scaleX(.1); } to { transform: scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { .reversi-flipped { animation: none; } }
+/* Game feel: a fresh disc pops in; flipped discs show their old colour, turn edge-on, then the new one (staggered by --fx-d). */
+.reversi-disc.rv-pop { animation: rv-pop .24s cubic-bezier(.3, 1.5, .6, 1) both; }
+.reversi-disc-0.rv-flip { animation: rv-flip-to-0 .24s ease-in-out var(--fx-d, 0ms) both; }
+.reversi-disc-1.rv-flip { animation: rv-flip-to-1 .24s ease-in-out var(--fx-d, 0ms) both; }
+@keyframes rv-pop { from { transform: scale(.25); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+@keyframes rv-flip-to-0 {
+  0% { transform: scaleX(1); background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
+  50% { transform: scaleX(0); background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
+  50.01% { transform: scaleX(0); background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
+  100% { transform: scaleX(1); background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
+}
+@keyframes rv-flip-to-1 {
+  0% { transform: scaleX(1); background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
+  50% { transform: scaleX(0); background: radial-gradient(circle at 35% 30%, #4a5a5e, #161e20 70%); }
+  50.01% { transform: scaleX(0); background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
+  100% { transform: scaleX(1); background: radial-gradient(circle at 35% 30%, #ffffff, #dcd8c8 75%); }
+}
+@media (prefers-reduced-motion: reduce) { .reversi-disc.rv-pop, .reversi-disc.rv-flip { animation: none; } }
 
 .reversi-hint {
   display: block;
