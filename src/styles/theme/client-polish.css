@@ -3,9 +3,9 @@
    Same language as hub-client.css: 2–6px corners, 1px lines, flat dark surfaces, one accent button. Imported last. */
 
 /* ---------- rules dialog: a client window ---------- */
-:root .rules-dialog { width: min(640px, calc(100% - 32px)); border-radius: 6px; border: 1px solid #ffffff1f; background: var(--app-bg-soft, #0e1512); box-shadow: 0 30px 80px #000000d9; }
+:root .rules-dialog { width: min(640px, calc(100% - 32px)); border-radius: 6px; border: 1px solid #ffffff1f; background: var(--app-bg-soft, #171c25); box-shadow: 0 30px 80px #000000d9; }
 :root .rules-dialog::backdrop { background: #05070ad1; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-:root .rules-head { gap: 14px; padding: 14px 16px; background: #080c0a; border-bottom: 1px solid var(--app-line); }
+:root .rules-head { gap: 14px; padding: 14px 16px; background: #0d1117; border-bottom: 1px solid var(--app-line); }
 :root .rules-art { flex: 0 0 60px; height: 46px; border-radius: 4px; box-shadow: 0 0 0 1px #ffffff1f; }
 :root .rules-eyebrow { margin: 0 0 2px; font-size: 11px; letter-spacing: .08em; text-transform: none; color: var(--app-faint); }
 :root .rules-dialog h2 { font-size: 22px; }
@@ -26,7 +26,7 @@
 }
 
 /* ---------- toast ---------- */
-:root #toast { border-radius: 4px; border: 1px solid #ffffff24; background: #080c0af2; color: var(--app-text); box-shadow: 0 14px 34px #000000a6; backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root #toast { border-radius: 4px; border: 1px solid #ffffff24; background: #0d1117f2; color: var(--app-text); box-shadow: 0 14px 34px #000000a6; backdrop-filter: none; -webkit-backdrop-filter: none; }
 
 /* ---------- running tables ---------- */
 :root body.in-table:not(.lobby-open) #table-page .table-status,
@@ -68,32 +68,32 @@
 :root body:not(.in-match) .view-dock :is(#view-note, #controls-help) { border-radius: 4px; }
 
 /* ---------- 3D match HUDs (문도피구, 범퍼카): the client's flat dark panels instead of neon pills ---------- */
-:root body.in-match { --hud-good: #8fe0a8; --hud-warn: #ff8a5c; --hud-gold: #ebc377; }
-:root body.in-match .match-bar, :root body.in-match .health-panel { background: #080c0ad9; border: 1px solid #ffffff1f; border-radius: 6px; box-shadow: 0 10px 28px #00000080; }
-:root body.in-match .match-bar strong { color: #f0ece0; }
+:root body.in-match { --hud-good: #8fe0a8; --hud-warn: #ff8a5c; --hud-gold: #7fb2ec; }
+:root body.in-match .match-bar, :root body.in-match .health-panel { background: #0d1117d9; border: 1px solid #ffffff1f; border-radius: 6px; box-shadow: 0 10px 28px #00000080; }
+:root body.in-match .match-bar strong { color: #e9edf3; }
 :root body.in-match #timer.low { color: var(--hud-warn); }
 :root body.in-match #health-fill { background: var(--hud-good); box-shadow: none; border-radius: 2px; }
 :root body.in-match #health-fill.low { background: var(--hud-warn); box-shadow: none; }
 :root body.in-match .health-track { border-radius: 2px; background: #ffffff1a; }
-:root body.in-match #spell-controls button { border-radius: 6px; border: 1px solid #ffffff2e; background: #080c0ad9; color: #f0ece0; box-shadow: none; }
-:root body.in-match #spell-controls button:not(:disabled) { background: #080c0ad9; color: #f0ece0; border-color: var(--hud-gold); box-shadow: inset 0 -3px 0 var(--hud-gold); }
-:root body.in-match #spell-controls button:disabled { background: #080c0a99; color: #93a69a; border-color: #ffffff1a; }
+:root body.in-match #spell-controls button { border-radius: 6px; border: 1px solid #ffffff2e; background: #0d1117d9; color: #e9edf3; box-shadow: none; }
+:root body.in-match #spell-controls button:not(:disabled) { background: #0d1117d9; color: #e9edf3; border-color: var(--hud-gold); box-shadow: inset 0 -3px 0 var(--hud-gold); }
+:root body.in-match #spell-controls button:disabled { background: #0d111799; color: #8b97a8; border-color: #ffffff1a; }
 :root body.in-match #spell-controls kbd { border-radius: 3px; }
 /* Colours and corners only: sizes stay with the responsive rules so touch targets and tiny screens keep working. */
-:root body.in-match > header .icon-button, :root body.in-match #match-leave { border-radius: 4px; background: #080c0ad9; border: 1px solid #ffffff1f; color: #c9d2c8; box-shadow: none; }
-:root body.in-match > header .icon-button:hover, :root body.in-match #match-leave:hover { background: #1c2822; color: #f0ece0; }
-:root body.in-match #connection { border-radius: 4px; background: #080c0ad9; border: 1px solid #ffffff1f; }
+:root body.in-match > header .icon-button, :root body.in-match #match-leave { border-radius: 4px; background: #0d1117d9; border: 1px solid #ffffff1f; color: #c5cdd8; box-shadow: none; }
+:root body.in-match > header .icon-button:hover, :root body.in-match #match-leave:hover { background: #1e2533; color: #e9edf3; }
+:root body.in-match #connection { border-radius: 4px; background: #0d1117d9; border: 1px solid #ffffff1f; }
 :root body.in-match #connection::before { background: var(--hud-good); box-shadow: none; }
 :root body.in-match .brand svg { transform: none; filter: none; }
 :root body.in-match #announcement { text-shadow: 0 4px 18px #000000cc; }
 :root body.in-match :is(#view-note, #controls-help) { border-radius: 4px; }
-:root body.in-match .pad-thumb { background: #f0ece0d9; }
+:root body.in-match .pad-thumb { background: #e9edf3d9; }
 :root body.in-match .aim-pad .pad-thumb { background: #ff8a5cd9; }
 /* 범퍼카 HUD */
-:root .bh-top { border-radius: 6px; background: #080c0ad9; border: 1px solid #ffffff1f; }
+:root .bh-top { border-radius: 6px; background: #0d1117d9; border: 1px solid #ffffff1f; }
 :root #bh-scores li { border-radius: 4px; }
 :root #bh-leave { border-radius: 4px; background: #ffffff0a; border: 1px solid #ffffff1f; }
-:root #bh-banner[data-kind='note'], :root .bh-help { border-radius: 4px; background: #080c0ad9; }
+:root #bh-banner[data-kind='note'], :root .bh-help { border-radius: 4px; background: #0d1117d9; }
 
 /* ---------- start window: guest nickname, sign in, sign up, account ---------- */
 :root .gate-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -101,7 +101,7 @@
 :root .gate-close { width: 32px; min-height: 32px; padding: 0; border-radius: 4px; background: #ffffff0a; border: 1px solid var(--app-line); color: var(--app-soft); font-size: 13px; }
 :root .gate-close:hover { background: #ffffff14; color: var(--app-text); }
 :root .gate-close[hidden], :root #gate-tabs[hidden], :root #nickname-gate [data-view][hidden] { display: none; }
-:root .gate-tabs { display: flex; gap: 2px; margin-bottom: 22px; padding: 2px; border-radius: 5px; background: #080c0a; border: 1px solid var(--app-line); }
+:root .gate-tabs { display: flex; gap: 2px; margin-bottom: 22px; padding: 2px; border-radius: 5px; background: #0d1117; border: 1px solid var(--app-line); }
 :root .gate-tabs button { flex: 1 1 0; min-height: 36px; margin: 0; padding: 0 8px; border: 0; border-radius: 3px; background: transparent; color: var(--app-muted); font-size: 14px; font-weight: 700; box-shadow: none; }
 :root .gate-tabs button:hover { color: var(--app-text); background: #ffffff0a; }
 :root .gate-tabs button.selected { background: var(--app-hover); color: var(--app-text); box-shadow: inset 0 1px 0 #ffffff14; }
@@ -109,7 +109,7 @@
 :root .gate-panel form input { width: 100%; min-height: 48px; margin: 0 0 14px; padding: 0 14px; font-size: 16px; }
 :root .gate-panel form .primary { margin-top: 4px; min-height: 52px; }
 :root .gate-panel .primary:disabled { opacity: .6; }
-:root #gate-error { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: #ffab93; }
+:root #gate-error { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: #a9dcb8; }
 :root #gate-error:empty { display: none; }
 :root .gate-member { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; padding: 12px; border-radius: 6px; background: #ffffff08; border: 1px solid var(--app-line); }
 :root .gate-member-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 4px; background: var(--app-accent); color: var(--app-accent-ink); font-family: var(--font-display); font-size: 20px; }
@@ -122,7 +122,7 @@
 :root body:not(.in-hub) #account-login, :root #account-login[hidden] { display: none; }
 :root body.in-hub #account-login { background: var(--app-raised); color: var(--app-text); border-color: var(--app-line-strong); }
 :root body.is-member .me-pencil { display: none; }
-:root body.is-member #me-status { color: var(--lw-gold, #ebc377); }
+:root body.is-member #me-status { color: var(--lw-gold, #7fb2ec); }
 :root input[readonly] { opacity: .75; cursor: default; }
 /* Members are marked in player slots. */
-:root #table-page .slot-member { margin-left: 6px; padding: 1px 6px; border-radius: 3px; background: #ebc37729; color: #ebc377; font-size: 10px; font-weight: 800; vertical-align: 2px; }
+:root #table-page .slot-member { margin-left: 6px; padding: 1px 6px; border-radius: 3px; background: #7fb2ec29; color: #7fb2ec; font-size: 10px; font-weight: 800; vertical-align: 2px; }

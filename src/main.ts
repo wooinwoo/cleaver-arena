@@ -14,19 +14,9 @@ import { account, logIn, logOut, onAccountChange, refreshAccount, signUp, wasMem
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
-// Comparison build: designs B and C behind body.skin-b / body.skin-c. Remove the losers' stylesheets and this switch once one is chosen.
-const SKINS = ['a', 'b', 'c'];
-const skinParam = new URLSearchParams(location.search).get('skin');
-if (skinParam && SKINS.includes(skinParam)) localStorage.setItem('sideplay-skin', skinParam);
-function applySkin(skin: string) {
-  for (const other of SKINS) document.body.classList.toggle(`skin-${other}`, other !== 'a' && other === skin);
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-skin]')) button.setAttribute('aria-pressed', String(button.dataset.skin === skin));
-}
-applySkin(SKINS.includes(localStorage.getItem('sideplay-skin') ?? '') ? localStorage.getItem('sideplay-skin')! : 'a');
-for (const button of document.querySelectorAll<HTMLButtonElement>('[data-skin]')) button.onclick = () => {
-  localStorage.setItem('sideplay-skin', button.dataset.skin!);
-  applySkin(button.dataset.skin!);
-};
+// The comparison designs are gone; forget a choice an earlier visit stored.
+localStorage.removeItem('sideplay-skin');
+document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
 const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 document.body.classList.toggle('has-touch', touch);
 const nameInput = $<HTMLInputElement>('nickname');

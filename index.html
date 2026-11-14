@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0c1310" />
+    <meta name="theme-color" content="#12161d" />
     <meta name="description" content="SIDEPLAY — 링크로 방을 열어 문도피구, 체스, 오목, 보드·추리 게임을 모바일과 PC에서 함께 하는 웹게임." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -15,9 +15,9 @@
     <link rel="icon" href="/icons/sideplay.svg" type="image/svg+xml" />
     <!-- Until the app stylesheet applies (it arrives via JS in dev), show only the page colour instead of
          unstyled markup: the bare logo SVG would otherwise paint at full viewport width. -->
-    <style>html { background: #0c1310; visibility: hidden; } svg { max-width: 64px; max-height: 64px; }</style>
+    <style>html { background: #12161d; visibility: hidden; } svg { max-width: 64px; max-height: 64px; }</style>
   </head>
-  <body>
+  <body class="theme-slate">
     <!-- Design contract: 41b6ee0f. The requested SD laboratory arena overrides the concept roll.
     Experience: friends enter the arena through a compact invitation desk.
     World: deep petrol laboratory, mint and coral teams, warm cream controls.
@@ -222,7 +222,7 @@
         <div class="open-rooms-head online-head"><strong>접속 중</strong><span id="online-count"></span></div>
         <ul id="online-list"></ul>
       </div>
-      <footer class="hub-status"><span id="hub-conn" data-state="connecting">서버에 연결하는 중…</span><span id="hub-stats"></span><span class="skin-switch" role="group" aria-label="디자인 비교">디자인<button type="button" data-skin="a">A</button><button type="button" data-skin="b">B</button><button type="button" data-skin="c">C</button></span><span id="hub-count" class="hub-status-end"></span></footer>
+      <footer class="hub-status"><span id="hub-conn" data-state="connecting">서버에 연결하는 중…</span><span id="hub-stats"></span><span id="hub-count" class="hub-status-end"></span></footer>
     </section>
 
     <aside id="lobby" hidden>

@@ -58,7 +58,7 @@ try {
       };
     });
     if (measured.horizontal || measured.outside.length) issues.push(`${width}x${height}: ${JSON.stringify(measured)}`);
-    assert.equal(measured.background, 'rgb(12, 19, 16)', 'the hub uses the dark client palette');
+    assert.equal(measured.background, 'rgb(18, 22, 29)', 'the hub uses the slate client palette');
     if (capture && (width === 390 || width === 1440)) await page.screenshot({ path: `artifacts/sideplay/hub-${width}.png`, animations: 'disabled' });
     console.log(`HUB ${width}x${height}: ${JSON.stringify(measured)}`);
   }
@@ -108,7 +108,7 @@ try {
   await activate('#hub-play');
   await expect(page.locator('#t-room')).toBeVisible();
   await expect(page).toHaveTitle(/체스 · SIDEPLAY$/);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#0c1310', 'a room opens as the dark client window until the match starts');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#12161d', 'a room opens in the slate client palette until the match starts');
   await activate('#games-menu');
   await expect(page.locator('#hub')).toBeVisible();
   // Rooms tab: every open room in one table, plus joining by code.
