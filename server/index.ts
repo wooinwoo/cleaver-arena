@@ -6,6 +6,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { addPlayer, castSpell, createGame, parseInput, startRound, tick, type Game, type Player } from '../shared/game.ts';
 import { attachTabletop } from './tabletop.ts';
+import { attachBumper } from './bumper.ts';
 import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, sanitizeTitle, type OpenRoom } from './lobby.ts';
 
 type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
@@ -42,9 +43,10 @@ export function createArenaServer() {
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
   const closeTables = attachTabletop(server, registry);
+  const bumper = attachBumper(server, registry);
   const lobby = attachLobby(server, registry);
   server.on('upgrade', (req, socket, head) => {
-    if (req.url === '/table-ws' || req.url === '/lobby-ws') return;
+    if (req.url === '/table-ws' || req.url === '/lobby-ws' || req.url === '/bumper-ws') return;
     if (req.url !== '/ws' || clients.size >= 120) { socket.destroy(); return; }
     if (req.headers.origin) {
       try { if (new URL(req.headers.origin).host !== req.headers.host) { socket.destroy(); return; } }
@@ -206,7 +208,7 @@ export function createArenaServer() {
     server, rooms,
     async close() {
       clearInterval(simulation); clearInterval(broadcast); clearInterval(heartbeat);
-      closeTables(); lobby.close();
+      closeTables(); bumper.close(); lobby.close();
       for (const ws of clients.keys()) ws.terminate();
       wss.close();
       await new Promise<void>(done => server.close(() => done()));
