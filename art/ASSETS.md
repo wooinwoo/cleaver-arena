@@ -18,7 +18,7 @@
 
 위 두 원본과 캐릭터·맵의 권리는 Riot Games에 있다. 변환 스크립트가 원본 에셋에 새 라이선스를 부여하지는 않는다. 이 저장소는 수익을 내지 않는 공개 팬 프로젝트다.
 
-SIDEPLAY was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
+QDING was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
 
 ## 인디언포커
 

@@ -1,14 +1,14 @@
 {
-  "name": "SIDEPLAY",
-  "short_name": "SIDEPLAY",
+  "name": "QDING",
+  "short_name": "QDING",
   "description": "링크로 방을 열어 실시간 대전, 보드게임, 심리·추리 게임을 함께 하는 웹게임.",
   "lang": "ko",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0c1310",
-  "theme_color": "#0c1310",
+  "background_color": "#12161d",
+  "theme_color": "#12161d",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

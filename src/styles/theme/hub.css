@@ -1,4 +1,4 @@
-/* SIDEPLAY: a warm, daylight game shelf. Match surfaces keep their dark palette. */
+/* QDING: a warm, daylight game shelf. Match surfaces keep their dark palette. */
 :is(body.in-hub, body.in-gate) {
   color-scheme: light;
   --app-bg: #f6f4ed;

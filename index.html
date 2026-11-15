@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#12161d" />
-    <meta name="description" content="SIDEPLAY — 링크로 방을 열어 문도피구, 체스, 오목, 보드·추리 게임을 모바일과 PC에서 함께 하는 웹게임." />
+    <meta name="description" content="QDING — 링크로 방을 열어 문도피구, 체스, 오목, 보드·추리 게임을 모바일과 PC에서 함께 하는 웹게임." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="SIDEPLAY" />
-    <title>SIDEPLAY</title>
+    <meta name="apple-mobile-web-app-title" content="QDING" />
+    <title>QDING</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <link rel="icon" href="/icons/sideplay.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/qding.svg" type="image/svg+xml" />
     <!-- Until the app stylesheet applies (it arrives via JS in dev), show only the page colour instead of
          unstyled markup: the bare logo SVG would otherwise paint at full viewport width. -->
     <style>html { background: #12161d; visibility: hidden; } svg { max-width: 64px; max-height: 64px; }</style>
@@ -26,9 +26,9 @@
     Limits: procedural original models, compact geometry, no decorative postprocessing. -->
     <canvas id="game" aria-label="3D 식칼 피구 경기장. 우클릭으로 이동하고 좌클릭으로 발사하세요." tabindex="0"></canvas>
     <header>
-      <a class="brand" href="/" aria-label="SIDEPLAY 홈">
-        <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="#d75b39"/><g fill="#fff9ed"><rect x="9" y="9" width="9" height="9" rx="3"/><rect x="22" y="9" width="9" height="9" rx="3"/><rect x="9" y="22" width="9" height="9" rx="3"/><circle cx="26.5" cy="26.5" r="4.5"/></g></svg>
-        <span>SIDEPLAY</span>
+      <a class="brand" href="/" aria-label="QDING 홈">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="11" fill="#45b864"/><g fill="#ffffff"><path fill-rule="evenodd" d="M19 8a11 11 0 1 0 0 22 11 11 0 1 0 0-22Zm0 5.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 1 1 0-11.6Z"/><path d="M21.2 24.6 24.6 21.2l6.4 6.4a2.4 2.4 0 0 1-3.4 3.4Z"/></g><circle cx="31.5" cy="8.6" r="2.7" fill="#f2c94c"/><path d="M31.5 2.6v1.6M37.5 8.6h-1.6M35.7 4.4l-1.1 1.1" stroke="#f2c94c" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>QDING</span>
       </a>
       <nav class="client-nav" aria-label="화면 전환">
         <button type="button" data-view="library" class="selected" aria-pressed="true">라이브러리</button>
@@ -51,7 +51,7 @@
     <section id="nickname-gate" hidden aria-label="시작하기">
       <div class="gate-panel">
         <div class="gate-head">
-          <a class="gate-wordmark" href="/" aria-label="SIDEPLAY 홈"><img src="/icons/sideplay.svg" width="40" height="40" alt="" />SIDEPLAY</a>
+          <a class="gate-wordmark" href="/" aria-label="QDING 홈"><img src="/icons/qding.svg" width="40" height="40" alt="" />QDING</a>
           <button type="button" id="gate-close" class="gate-close" aria-label="닫기" hidden>✕</button>
         </div>
         <div class="gate-tabs" id="gate-tabs" role="group" aria-label="시작 방법">
@@ -243,7 +243,7 @@
         <p class="fineprint">코드가 안 맞으면 호스트에게 새 링크를 요청해 주세요</p>
         <button class="text-button" id="practice">먼저 혼자 연습해 보기 · 조작도 익혀요</button>
         <p class="fineprint" id="entry-note"></p>
-        <p class="riot-notice" lang="en">SIDEPLAY was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.</p>
+        <p class="riot-notice" lang="en">QDING was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.</p>
       </section>
       <section id="room" hidden>
         <div class="room-bar">
@@ -304,7 +304,7 @@
       <button id="fire" aria-label="식칼 발사">발사</button>
     </div>
     <div id="toast" role="status"></div>
-    <div id="loading"><svg class="splash-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="#d75b39"/><g fill="#fff9ed"><rect x="9" y="9" width="9" height="9" rx="3"/><rect x="22" y="9" width="9" height="9" rx="3"/><rect x="9" y="22" width="9" height="9" rx="3"/><circle cx="26.5" cy="26.5" r="4.5"/></g></svg><strong>경기장 불러오는 중</strong></div>
+    <div id="loading"><svg class="splash-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="11" fill="#45b864"/><g fill="#ffffff"><path fill-rule="evenodd" d="M19 8a11 11 0 1 0 0 22 11 11 0 1 0 0-22Zm0 5.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 1 1 0-11.6Z"/><path d="M21.2 24.6 24.6 21.2l6.4 6.4a2.4 2.4 0 0 1-3.4 3.4Z"/></g><circle cx="31.5" cy="8.6" r="2.7" fill="#f2c94c"/><path d="M31.5 2.6v1.6M37.5 8.6h-1.6M35.7 4.4l-1.1 1.1" stroke="#f2c94c" stroke-width="1.6" stroke-linecap="round"/></svg><strong>경기장 불러오는 중</strong></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

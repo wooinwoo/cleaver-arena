@@ -23,7 +23,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(base);
   await expect(page.locator('#nickname-gate')).toBeVisible();
-  await expect(page).toHaveTitle(/SIDEPLAY/);
+  await expect(page).toHaveTitle(/QDING/);
   await expect(page.locator('#gate-name')).toBeFocused();
   if (capture) await page.screenshot({ path: 'artifacts/sideplay/gate-mobile.png', animations: 'disabled' });
   await page.locator('#gate-name').fill('가나다라마바사아자차카타');
@@ -107,7 +107,7 @@ try {
   await activate('.game-cell[data-game="chess"] .game-option');
   await activate('#hub-play');
   await expect(page.locator('#t-room')).toBeVisible();
-  await expect(page).toHaveTitle(/체스 · SIDEPLAY$/);
+  await expect(page).toHaveTitle(/체스 · QDING$/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--app-bg').trim()), '#12161d', 'a room opens in the slate client palette until the match starts');
   await activate('#games-menu');
   await expect(page.locator('#hub')).toBeVisible();
@@ -145,8 +145,8 @@ try {
   await activate('#hd-back');
   await expect(page.locator('#hub-home')).toBeVisible();
   const manifest = await (await page.request.get(`${base}/manifest.webmanifest`)).json();
-  assert.equal(manifest.short_name, 'SIDEPLAY');
-  assert.equal((await page.request.get(`${base}/icons/sideplay.svg`)).status(), 200);
+  assert.equal(manifest.short_name, 'QDING');
+  assert.equal((await page.request.get(`${base}/icons/qding.svg`)).status(), 200);
   assert.deepEqual(errors, [], 'No browser runtime errors');
   assert.deepEqual(issues, [], 'The game shelf must fit phone screens without horizontal clipping');
   console.log(`PASS hub (${process.env.KEYBOARD_ONLY === '1' ? 'keyboard' : 'pointer'}): first visit, name edit/persistence, library at every size, filters, search/empty/reset, game page, room creation, return, rooms tab and branding.`);

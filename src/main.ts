@@ -944,7 +944,7 @@ function renderState() {
     if (state.phase === 'lobby') {
       const title = document.querySelector<HTMLElement>('.room-title')!;
       if (!title.querySelector('input') && title.textContent !== state.title) title.textContent = state.title;
-      document.title = `${state.title} · SIDEPLAY`;
+      document.title = `${state.title} · QDING`;
     }
     $('room-title-edit').hidden = !host || (state.phase !== 'lobby' && state.phase !== 'finished');
     $('ready').textContent = me.ready ? '준비 취소' : '준비하기';
@@ -1016,7 +1016,7 @@ $('copy').onclick = async () => {
     share.hidden = false;
     share.onclick = async () => {
       const url = `${location.origin}/?game=cleaver&room=${state?.code ?? session?.code}`;
-      try { await navigator.share({ title: 'SIDEPLAY', text: '문도피구 방 초대', url }); }
+      try { await navigator.share({ title: 'QDING', text: '문도피구 방 초대', url }); }
       catch { /* user cancelled */ }
     };
   }

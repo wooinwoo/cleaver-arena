@@ -46,7 +46,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   $('game').hidden = true;
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('games-menu').hidden = false;
-  document.title = `${config.title} · SIDEPLAY`;
+  document.title = `${config.title} · QDING`;
   const section = document.createElement('section'); section.id = 'table-page';
   const headcount = config.min === config.max ? `${config.max}인` : `${config.min}–${config.max}인`;
   section.innerHTML = roomShell({
@@ -382,7 +382,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     const heading = $('t-title');
     if (!heading.querySelector('input') && heading.textContent !== roomTitle) heading.textContent = roomTitle;
     $('t-title-edit').hidden = room.host !== me.id || shownPhase() === 'playing';
-    document.title = `${roomTitle} · SIDEPLAY`;
+    document.title = `${roomTitle} · QDING`;
     resultReview.hidden = room.phase !== 'finished';
     const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
     const solo = !!tableBots[kind] && room.players.length === 1;

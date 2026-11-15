@@ -1,4 +1,4 @@
-# SIDEPLAY
+# QDING
 
 **친구와 초대 링크 하나로 같은 방에 모여 실시간 3D 대전과 보드·카드 게임을 하는 멀티플레이 웹게임입니다.**
 
@@ -12,7 +12,7 @@
 
 | 로비 | 인디언포커 |
 |---|---|
-| ![게임을 고르고 열린 방에 들어가는 SIDEPLAY 로비](docs/media/sideplay-lobby.webp) | ![상대가 이마에 댄 카드를 보고 베팅하는 1인칭 3D 인디언포커](docs/media/sideplay-poker.webp) |
+| ![게임을 고르고 열린 방에 들어가는 QDING 로비](docs/media/sideplay-lobby.webp) | ![상대가 이마에 댄 카드를 보고 베팅하는 1인칭 3D 인디언포커](docs/media/sideplay-poker.webp) |
 
 > 로비 캡처는 지금의 로비로 바꾸기 전 화면입니다. 지금의 로비와 방 화면 구성은 [DESIGN.md](DESIGN.md)에 적혀 있습니다.
 
@@ -25,7 +25,7 @@
 | 자기 카드·남은 덱·예약 카드가 네트워크로 새면 게임이 깨진다. | 비공개 정보는 참가자별 응답에서 서버가 숨긴다. | [포커](shared/poker.ts), [스플렌더](shared/splendor.ts), [원카드](shared/onecard.ts), [거짓말 주사위](shared/liardice.ts) |
 | 통신망이 바뀌면 경기에서 튕긴다. | 20초 동안 같은 세션으로 재접속하고, 이전 연결은 최대 10회 재시도로 정리한다. | [재접속 검사](tests/reconnect-browser.ts) |
 
-> SIDEPLAY was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
+> QDING was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games. Riot Games does not endorse or sponsor this project.
 >
 > 문도피구의 문도 모델과 바론 둥지 맵은 Riot Games의 리그 오브 레전드 자산입니다. 비상업 팬 프로젝트로만 사용하며, 출처와 변환 과정은 [에셋 출처](art/ASSETS.md)에 기록합니다.
 

@@ -18,7 +18,7 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
   $('hub').hidden = true; $('lobby').hidden = true; $('loading').hidden = true; $('game').hidden = true;
   document.querySelector<HTMLElement>('.view-dock')!.hidden = true;
   $('games-menu').hidden = false;
-  document.title = `${BUMPER_INFO.title} · SIDEPLAY`;
+  document.title = `${BUMPER_INFO.title} · QDING`;
 
   const canvas = document.createElement('canvas');
   canvas.id = 'bumper-canvas';
@@ -199,7 +199,7 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     const bots = view.players.length - humans.length;
     const heading = $('t-title');
     if (!heading.querySelector('input')) heading.textContent = view.title;
-    document.title = `${view.title} · SIDEPLAY`;
+    document.title = `${view.title} · QDING`;
     $('t-title-edit').hidden = !isHost;
     document.body.dataset.tablePhase = view.phase;
     $('t-count').textContent = `${view.players.length}/${BUMPER_CAPACITY}명`;
