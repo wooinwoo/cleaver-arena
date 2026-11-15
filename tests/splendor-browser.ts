@@ -79,7 +79,7 @@ try {
     // 홈 카드 탭 = 방 만들기(생성 의도): 닉네임이 있으면 입장 폼 없이 바로 방으로 간다.
     await a.goto(base, { waitUntil: 'domcontentloaded' });
     await expect(a.locator('#nickname-gate')).toBeHidden({ timeout: 15_000 });
-    await a.locator('.game-cell[data-game="splendor"] .game-option').click();
+    await a.locator('.game-cell[data-game="splendor"] .game-option, #home-shelves .home-shelf:not(#home-recent) .home-tile[data-game="splendor"]').filter({ visible: true }).first().click();
     await a.locator('#hub-play').click();
     await expect(a.locator('#t-room')).toBeVisible({ timeout: 30_000 });
     const code = await a.locator('#t-code').innerText();

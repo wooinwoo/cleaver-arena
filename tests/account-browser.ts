@@ -41,7 +41,7 @@ try {
   assert.equal(await member.evaluate(() => document.cookie.includes('sideplay_session')), false, 'scripts cannot read the session');
 
   // A member plays under the account nickname and is marked in the room.
-  await member.locator('.game-cell[data-game="gomoku"] .game-option').click();
+  await member.locator('.game-cell[data-game="gomoku"] .game-option, #home-shelves .home-shelf:not(#home-recent) .home-tile[data-game="gomoku"]').filter({ visible: true }).first().click();
   await member.locator('#hub-play').click();
   await expect(member.locator('#t-room')).toBeVisible();
   await expect(member.locator('.slot.me .slot-member')).toHaveText('회원');

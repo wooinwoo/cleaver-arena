@@ -133,7 +133,7 @@ try {
       await expect(page.locator('.game-list .game-cell:not([hidden])')).toHaveCount(17);
       await page.screenshot({ path: `${output}hub-with-open-rooms-390x844.png`, fullPage: true });
     }
-    await page.locator('.game-cell[data-game="cleaver"] .game-option').click();
+    await page.locator('.game-cell[data-game="cleaver"] .game-option, #home-shelves .home-shelf:not(#home-recent) .home-tile[data-game="cleaver"]').filter({ visible: true }).first().click();
     await page.locator('#hub-play').click();
     await page.locator('#loading').waitFor({ state: 'hidden', timeout: 60_000 });
     if (view === 'top') await check(page, 'cleaver-entry');

@@ -127,6 +127,8 @@ function setLibraryPage(page: 'home' | 'game') {
   $('hub').dataset.page = page;
   $('library-home').setAttribute('aria-pressed', String(page === 'home'));
   if (page === 'home') renderRecentShelf();
+  placeTools();
+  scheduleFeature();
 }
 function selectGame(game: string, options: { quiet?: boolean } = {}) {
   if (!options.quiet) setLibraryPage('game');
@@ -216,28 +218,50 @@ $('hub-count').textContent = `게임 ${document.querySelectorAll('.game-cell').l
 $('hub-play').onclick = () => go(`/?game=${selectedGame}&create=1`);
 $('hub-solo').onclick = () => document.querySelector<HTMLButtonElement>(`.game-cell[data-game="${selectedGame}"] .game-sub`)?.click();
 $('hub-rules').onclick = () => { const info = hubInfo(selectedGame); openRules(selectedGame, info.title, info.rules); };
-// —— 라이브러리 홈: 모든 게임을 분류별 표지 격자로 보여준다. 목록이 길어져도 넓은 화면에서 고를 수 있다.
+// —— 라이브러리 홈 (넓은 화면): 추천 게임 배너, 검색·분류 바, 분류별 표지 카드. 카드에서 바로 시작할 수 있다.
+const libraryCells = [...document.querySelectorAll<HTMLElement>('.game-list .game-cell')];
+const cellOf = (game: string) => libraryCells.find(cell => cell.dataset.game === game);
+const gameTitle = (game: string) => cellOf(game)?.querySelector('.game-option strong')?.textContent ?? game;
+/** The fastest way in: the bot or practice door when the game has one, otherwise a new room. */
+function quickStart(game: string) {
+  const solo = cellOf(game)?.querySelector<HTMLButtonElement>('.game-sub');
+  return solo ? { label: solo.textContent ?? '바로 시작', run: () => solo.click() } : { label: '방 만들기', run: () => go(`/?game=${game}&create=1`) };
+}
+function gameTags(game: string) {
+  const cell = cellOf(game);
+  const solo = cell?.querySelector<HTMLElement>('.game-sub');
+  return [cell?.querySelector('.game-players')?.textContent ?? '', ...(cell?.dataset.groups ?? '').split(' ').map(group => GROUP_NAMES[group] ?? ''),
+    solo ? (solo.dataset.solo ? '봇 가능' : '혼자 연습') : ''].filter(Boolean);
+}
 const homeTiles = new Map<string, HTMLButtonElement[]>();
 function homeTile(cell: HTMLElement) {
   const game = cell.dataset.game!;
+  const card = document.createElement('div');
+  card.className = 'home-card';
+  card.dataset.game = game;
+  card.style.setProperty('--game-accent', gameAccent(game));
   const tile = document.createElement('button');
   tile.type = 'button';
   tile.className = 'home-tile';
   tile.dataset.game = game;
-  tile.style.setProperty('--game-accent', gameAccent(game));
   const art = document.createElement('span'); art.className = 'home-art'; art.setAttribute('aria-hidden', 'true'); art.innerHTML = gameArt(game);
   const copy = document.createElement('span'); copy.className = 'home-copy';
-  const solo = cell.querySelector<HTMLElement>('.game-sub');
-  const tags = [cell.querySelector('.game-players')?.textContent ?? '', solo ? (solo.dataset.solo ? '봇 가능' : '혼자 연습') : ''].filter(Boolean).join(' · ');
-  copy.append(Object.assign(document.createElement('strong'), { textContent: cell.querySelector('.game-option strong')?.textContent ?? game }),
-    Object.assign(document.createElement('small'), { textContent: tags }));
+  const firstGroup = GROUP_NAMES[(cell.dataset.groups ?? '').split(' ')[0]];
+  copy.append(Object.assign(document.createElement('strong'), { textContent: gameTitle(game) }),
+    Object.assign(document.createElement('small'), { textContent: gameTags(game).filter(tag => tag !== firstGroup).join(' · ') }));
   const rooms = document.createElement('span'); rooms.className = 'home-rooms';
   tile.append(art, copy, rooms);
-  tile.hidden = cell.hidden;
   tile.onclick = () => { selectGame(game); $('hub-detail').scrollTop = 0; };
-  tile.ondblclick = () => go(`/?game=${game}&create=1`);
+  tile.ondblclick = () => quickStart(game).run();
+  // Hover (or keyboard focus) shows a one-click start on the card itself.
+  const start = quickStart(game);
+  const play = Object.assign(document.createElement('button'), { type: 'button', className: 'home-play', textContent: start.label });
+  play.setAttribute('aria-label', `${gameTitle(game)} ${start.label}`);
+  play.onclick = start.run;
+  card.append(tile, play);
+  card.hidden = tile.hidden = cell.hidden;
   homeTiles.set(game, [...(homeTiles.get(game) ?? []), tile]);
-  return tile;
+  return card;
 }
 function homeShelf(label: string, cells: HTMLElement[], id?: string) {
   const shelf = document.createElement('section');
@@ -250,29 +274,124 @@ function homeShelf(label: string, cells: HTMLElement[], id?: string) {
   shelf.append(head, grid);
   return shelf;
 }
-const libraryCells = [...document.querySelectorAll<HTMLElement>('.game-list .game-cell')];
-$('home-shelves').append(...LIBRARY_GROUPS.map(([group, label]) => homeShelf(label, libraryCells.filter(cell => cell.dataset.libraryGroup === group))));
-$('home-count').textContent = `게임 ${libraryCells.length}개`;
+$('home-shelves').append(...LIBRARY_GROUPS.map(([group, label]) => homeShelf(`${label} 게임`, libraryCells.filter(cell => cell.dataset.libraryGroup === group))));
 /** Recently launched games (this browser only), rebuilt each time the home opens. */
 function renderRecentShelf() {
   document.getElementById('home-recent')?.remove();
   for (const [game, tiles] of homeTiles) homeTiles.set(game, tiles.filter(tile => tile.isConnected));
   const records = playRecords();
   const recent = Object.keys(records).sort((a, b) => records[b].last - records[a].last)
-    .map(game => libraryCells.find(cell => cell.dataset.game === game)).filter((cell): cell is HTMLElement => !!cell).slice(0, 6);
-  if (recent.length) $('home-shelves').prepend(homeShelf('최근 실행', recent, 'home-recent'));
+    .map(game => cellOf(game)).filter((cell): cell is HTMLElement => !!cell).slice(0, 4);
+  if (recent.length) {
+    const shelf = homeShelf('최근 플레이', recent, 'home-recent');
+    $('home-shelves').prepend(shelf);
+  }
   renderHomeRooms();
 }
-/** Open-room badges on the home tiles. */
+/** Open-room badges on the home tiles and the featured game. */
 function renderHomeRooms() {
   for (const [game, tiles] of homeTiles) {
     const count = lobbyRooms.filter(room => room.game === game).length;
     for (const tile of tiles) tile.querySelector('.home-rooms')!.textContent = count ? `열린 방 ${count}` : '';
   }
+  renderFeatureRooms();
 }
-// Search and filters hide list rows; the home tiles follow them.
-const tileSync = new MutationObserver(() => { for (const cell of libraryCells) for (const tile of homeTiles.get(cell.dataset.game!) ?? []) tile.hidden = cell.hidden; });
+// Search and filters hide list rows; the home cards follow them.
+function syncHomeCards() {
+  for (const cell of libraryCells) for (const tile of homeTiles.get(cell.dataset.game!) ?? []) tile.hidden = (tile.parentElement as HTMLElement).hidden = cell.hidden;
+  const shown = libraryCells.filter(cell => !cell.hidden).length;
+  $('home-count').textContent = shown === libraryCells.length ? `게임 ${shown}개` : `${shown} / ${libraryCells.length}개`;
+  for (const shelf of document.querySelectorAll<HTMLElement>('#home-shelves .home-shelf')) {
+    shelf.querySelector('h3 small')!.textContent = String(shelf.querySelectorAll('.home-card:not([hidden])').length);
+  }
+}
+const tileSync = new MutationObserver(syncHomeCards);
 for (const cell of libraryCells) tileSync.observe(cell, { attributes: true, attributeFilter: ['hidden'] });
+syncHomeCards();
+
+// Featured banner: a large cover that cycles through a few games, with start buttons right on it.
+const FEATURED = ['bumper', 'liardice', 'splendor', 'cleaver', 'yut', 'onecard'].filter(game => cellOf(game));
+const FEATURE_MS = 7000;
+let featureIndex = 0, featureTimer: ReturnType<typeof setTimeout> | undefined, featurePaused = false;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const feature = $('home-feature');
+feature.innerHTML = `<div class="feature-stage"><div class="feature-art" aria-hidden="true"></div>
+  <div class="feature-copy"><p class="feature-kicker">추천 게임</p><h2 class="feature-title"></h2><p class="feature-desc"></p><ul class="feature-tags"></ul>
+  <div class="feature-actions"><button type="button" class="feature-play primary"></button><button type="button" class="feature-room">친구랑 하기</button><button type="button" class="feature-info">게임 정보</button></div>
+  <p class="feature-live" hidden></p></div></div>
+  <div class="feature-picks" role="group" aria-label="추천 게임 고르기"></div>`;
+const featurePicks = FEATURED.map((game, index) => {
+  const pick = document.createElement('button');
+  pick.type = 'button'; pick.className = 'feature-pick'; pick.dataset.game = game;
+  pick.style.setProperty('--game-accent', gameAccent(game));
+  pick.innerHTML = `<span class="pick-art" aria-hidden="true">${gameArt(game, true)}</span><span class="pick-copy"><strong></strong><small></small></span><i class="pick-progress" aria-hidden="true"></i>`;
+  pick.querySelector('strong')!.textContent = gameTitle(game);
+  pick.querySelector('small')!.textContent = gameTags(game).slice(0, 2).join(' · ');
+  pick.onclick = () => showFeature(index, true);
+  return pick;
+});
+feature.querySelector('.feature-picks')!.append(...featurePicks);
+function renderFeatureRooms() {
+  const live = feature.querySelector<HTMLElement>('.feature-live');
+  if (!live) return;
+  const count = lobbyRooms.filter(room => room.game === FEATURED[featureIndex]).length;
+  live.hidden = !count;
+  live.textContent = count ? `지금 열린 방 ${count}개 · 방 찾기에서 바로 참가` : '';
+}
+function showFeature(index: number, chosen = false) {
+  featureIndex = (index + FEATURED.length) % FEATURED.length;
+  const game = FEATURED[featureIndex], info = hubInfo(game), start = quickStart(game);
+  const solo = !!cellOf(game)?.querySelector('.game-sub');
+  feature.style.setProperty('--game-accent', gameAccent(game));
+  $('hub-home').style.setProperty('--feature-accent', gameAccent(game));
+  const art = feature.querySelector<HTMLElement>('.feature-art')!;
+  art.innerHTML = gameArt(game);
+  if (!reduceMotion.matches) art.animate([{ opacity: 0, transform: 'scale(1.04)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  feature.querySelector('.feature-title')!.textContent = info.title;
+  feature.querySelector('.feature-desc')!.textContent = info.description;
+  feature.querySelector('.feature-tags')!.replaceChildren(...gameTags(game).map(tag => Object.assign(document.createElement('li'), { textContent: tag })));
+  const play = feature.querySelector<HTMLButtonElement>('.feature-play')!;
+  play.textContent = start.label; play.onclick = start.run;
+  const room = feature.querySelector<HTMLButtonElement>('.feature-room')!;
+  room.hidden = !solo; room.onclick = () => go(`/?game=${game}&create=1`);
+  feature.querySelector<HTMLButtonElement>('.feature-info')!.onclick = () => { selectGame(game); $('hub-detail').scrollTop = 0; };
+  featurePicks.forEach((pick, at) => { pick.classList.toggle('selected', at === featureIndex); pick.setAttribute('aria-pressed', String(at === featureIndex)); });
+  renderFeatureRooms();
+  if (chosen) featurePaused = true;
+  scheduleFeature();
+}
+function scheduleFeature() {
+  clearTimeout(featureTimer);
+  const running = FEATURED.length > 1 && !featurePaused && !reduceMotion.matches && $('hub').dataset.page === 'home' && !document.hidden;
+  feature.classList.toggle('cycling', running);
+  // Restart the progress bar on the selected pick.
+  const bar = featurePicks[featureIndex]?.querySelector<HTMLElement>('.pick-progress');
+  if (bar) { bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; }
+  if (running) featureTimer = setTimeout(() => showFeature(featureIndex + 1), FEATURE_MS);
+}
+feature.addEventListener('pointerenter', () => { featurePaused = true; scheduleFeature(); });
+feature.addEventListener('pointerleave', () => { featurePaused = false; scheduleFeature(); });
+feature.addEventListener('focusin', () => { featurePaused = true; scheduleFeature(); });
+document.addEventListener('visibilitychange', scheduleFeature);
+if (FEATURED.length) showFeature(Math.max(0, FEATURED.indexOf(localStorage.getItem('sideplay-last-game') ?? '')));
+else feature.hidden = true;
+
+// Wide screens: the home has no side list, so the search and category tools move into its top bar.
+const wideHome = window.matchMedia('(min-width: 761px)');
+const hubTools = document.querySelector<HTMLElement>('.hub-tools')!, toolsParent = hubTools.parentElement!, toolsAnchor = hubTools.nextElementSibling;
+const gameEmpty = $('game-empty'), emptyParent = gameEmpty.parentElement!, emptyAnchor = gameEmpty.nextElementSibling;
+function placeTools() {
+  const home = wideHome.matches && $('hub').dataset.page === 'home';
+  if (home && hubTools.parentElement !== $('home-tools')) { $('home-tools').append(hubTools); $('home-shelves').before(gameEmpty); }
+  if (!home && hubTools.parentElement === $('home-tools')) { toolsParent.insertBefore(hubTools, toolsAnchor); emptyParent.insertBefore(gameEmpty, emptyAnchor); }
+}
+wideHome.addEventListener('change', placeTools);
+// "/" jumps to search, like most launchers.
+document.addEventListener('keydown', event => {
+  if (event.key !== '/' || !document.body.classList.contains('in-hub') || (event.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
+  event.preventDefault();
+  $<HTMLInputElement>('game-search').focus();
+});
 $('library-home').onclick = () => setLibraryPage('home');
 $('hd-back').onclick = () => setLibraryPage('home');
 selectGame(document.querySelector(`.game-cell[data-game="${localStorage.getItem('sideplay-last-game')}"]`) ? localStorage.getItem('sideplay-last-game')! : 'cleaver', { quiet: true });

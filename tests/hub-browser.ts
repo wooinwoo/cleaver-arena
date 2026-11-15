@@ -128,6 +128,17 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(page.locator('#hub-home')).toBeVisible();
   await expect(page.locator('#hub-home .home-tile:not([hidden])')).toHaveCount(await page.locator('.game-cell').count() + (await page.locator('#home-recent .home-tile').count()));
+  // The wide home: a featured banner with a start button, search in the top bar, and cards that start a game on hover.
+  await expect(page.locator('.hub-rail')).toBeHidden();
+  await expect(page.locator('#home-feature .feature-title')).not.toBeEmpty();
+  await expect(page.locator('#home-feature .feature-play')).toBeVisible();
+  await expect(page.locator('#home-tools #game-search')).toBeVisible();
+  await page.locator('#game-search').fill('숫자');
+  await expect(page.locator('#hub-home .home-card:not([hidden])')).toHaveCount(1);
+  await expect(page.locator('#home-feature')).toBeVisible();
+  await page.locator('#game-search').fill('');
+  await page.locator('#home-shelves .home-card[data-game="reversi"]').last().hover();
+  await expect(page.locator('#home-shelves .home-card[data-game="reversi"] .home-play').last()).toHaveText('봇이랑 하기');
   await activate('#hub-home .home-shelf:not(#home-recent) .home-tile[data-game="chess"]');
   await expect(page.locator('#hub-detail')).toBeVisible();
   await expect(page.locator('#hd-title')).toHaveText('체스');
