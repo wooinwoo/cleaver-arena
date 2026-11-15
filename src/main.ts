@@ -8,6 +8,8 @@ import { initTabletop } from './tabletop.ts';
 import type { ArenaMap, Game, Input } from '../shared/game.ts';
 import { initGameFinder } from './ui/game-finder.ts';
 import { gameArt, gameAccent } from './ui/game-art.ts';
+import { favorites, isFavorite, onFavoritesChange, toggleFavorite } from './ui/favorites.ts';
+import { initThemeLab } from './ui/theme-lab.ts';
 import { openRules, ruleSteps } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
 import { account, logIn, logOut, onAccountChange, refreshAccount, signUp, wasMember } from './ui/account.ts';
@@ -16,6 +18,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const canvas = $<HTMLCanvasElement>('game');
 // The comparison designs are gone; forget a choice an earlier visit stored.
 localStorage.removeItem('sideplay-skin');
+initThemeLab();
 document.querySelector<HTMLElement>('#entry .identity-art')!.innerHTML = gameArt('cleaver', true);
 const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 document.body.classList.toggle('has-touch', touch);
@@ -155,6 +158,7 @@ function selectGame(game: string, options: { quiet?: boolean } = {}) {
   $('hd-steps').replaceChildren(...ruleSteps(info.rules).slice(0, 4).map(step => Object.assign(document.createElement('li'), { textContent: step })));
   $('hub-solo').hidden = !solo;
   $('hub-solo').textContent = solo?.textContent ?? '';
+  if (document.getElementById('hub-fav')) syncFavorites();
 }
 document.querySelectorAll<HTMLElement>('.game-cell[data-game]').forEach(cell => {
   const game = cell.dataset.game!, pick = cell.querySelector<HTMLButtonElement>('.game-option');
@@ -218,6 +222,19 @@ $('hub-count').textContent = `게임 ${document.querySelectorAll('.game-cell').l
 $('hub-play').onclick = () => go(`/?game=${selectedGame}&create=1`);
 $('hub-solo').onclick = () => document.querySelector<HTMLButtonElement>(`.game-cell[data-game="${selectedGame}"] .game-sub`)?.click();
 $('hub-rules').onclick = () => { const info = hubInfo(selectedGame); openRules(selectedGame, info.title, info.rules); };
+$('hub-fav').onclick = () => toggleFavorite(selectedGame);
+/** Hearts everywhere follow the stored favourites: game page button, side list marks, home cards and the 찜 shelf. */
+function syncFavorites() {
+  const fav = isFavorite(selectedGame);
+  $('hub-fav').setAttribute('aria-pressed', String(fav));
+  $('hub-fav').textContent = fav ? '찜함' : '찜하기';
+  for (const cell of document.querySelectorAll<HTMLElement>('.game-list .game-cell')) cell.classList.toggle('favorite', isFavorite(cell.dataset.game!));
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.home-fav')) {
+    const on = isFavorite(button.dataset.game!);
+    button.setAttribute('aria-pressed', String(on));
+    button.setAttribute('aria-label', `${gameTitle(button.dataset.game!)} ${on ? '찜 해제' : '찜하기'}`);
+  }
+}
 // —— 라이브러리 홈 (넓은 화면): 추천 게임 배너, 검색·분류 바, 분류별 표지 카드. 카드에서 바로 시작할 수 있다.
 const libraryCells = [...document.querySelectorAll<HTMLElement>('.game-list .game-cell')];
 const cellOf = (game: string) => libraryCells.find(cell => cell.dataset.game === game);
@@ -258,7 +275,10 @@ function homeTile(cell: HTMLElement) {
   const play = Object.assign(document.createElement('button'), { type: 'button', className: 'home-play', textContent: start.label });
   play.setAttribute('aria-label', `${gameTitle(game)} ${start.label}`);
   play.onclick = start.run;
-  card.append(tile, play);
+  const heart = Object.assign(document.createElement('button'), { type: 'button', className: 'home-fav', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3 4.6 13a4.8 4.8 0 0 1 6.8-6.8l.6.6.6-.6a4.8 4.8 0 1 1 6.8 6.8Z"/></svg>' });
+  heart.dataset.game = game;
+  heart.onclick = () => toggleFavorite(game);
+  card.append(tile, play, heart);
   card.hidden = tile.hidden = cell.hidden;
   homeTiles.set(game, [...(homeTiles.get(game) ?? []), tile]);
   return card;
@@ -278,6 +298,7 @@ $('home-shelves').append(...LIBRARY_GROUPS.map(([group, label]) => homeShelf(`${
 /** Recently launched games (this browser only), rebuilt each time the home opens. */
 function renderRecentShelf() {
   document.getElementById('home-recent')?.remove();
+  document.getElementById('home-favorites')?.remove();
   for (const [game, tiles] of homeTiles) homeTiles.set(game, tiles.filter(tile => tile.isConnected));
   const records = playRecords();
   const recent = Object.keys(records).sort((a, b) => records[b].last - records[a].last)
@@ -286,6 +307,10 @@ function renderRecentShelf() {
     const shelf = homeShelf('최근 플레이', recent, 'home-recent');
     $('home-shelves').prepend(shelf);
   }
+  const liked = favorites().map(game => cellOf(game)).filter((cell): cell is HTMLElement => !!cell);
+  if (liked.length) $('home-shelves').prepend(homeShelf('찜한 게임', liked, 'home-favorites'));
+  syncHomeCards();
+  syncFavorites();
   renderHomeRooms();
 }
 /** Open-room badges on the home tiles and the featured game. */
@@ -392,6 +417,9 @@ document.addEventListener('keydown', event => {
   event.preventDefault();
   $<HTMLInputElement>('game-search').focus();
 });
+onFavoritesChange(() => { if ($('hub').dataset.page === 'home') renderRecentShelf(); else syncFavorites(); });
+// A category or 찜 filter already lists the matches; the 찜 and 최근 shelves would only repeat them.
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-filter]')) button.addEventListener('click', () => { $('hub-home').dataset.shelfFilter = button.dataset.filter ?? 'all'; });
 $('library-home').onclick = () => setLibraryPage('home');
 $('hd-back').onclick = () => setLibraryPage('home');
 selectGame(document.querySelector(`.game-cell[data-game="${localStorage.getItem('sideplay-last-game')}"]`) ? localStorage.getItem('sideplay-last-game')! : 'cleaver', { quiet: true });

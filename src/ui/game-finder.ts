@@ -1,6 +1,7 @@
 import { gameArt, gameAccent } from './game-art.ts';
 import { TABLE_GAMES, isTableId } from '../../shared/catalog.ts';
 import { tableBots } from '../../shared/bots.ts';
+import { isFavorite, onFavoritesChange } from './favorites.ts';
 
 /** Playable headcount; 1 means a bot can fill in. 문도피구 runs 1 (practice bot) to 6; only team mode needs an even count, so 3 or 5 play free-for-all. */
 function headcount(kind: string): [min: number, max: number] {
@@ -38,7 +39,7 @@ export function initGameFinder() {
   function render() {
     const query = normalize(search.value);
     const count = Number(players.value);
-    const matches = entries.filter(entry => (category === 'all' || entry.groups.includes(category)) && (!count || (entry.min <= count && count <= entry.max)) && entry.text.includes(query));
+    const matches = entries.filter(entry => (category === 'all' || (category === 'fav' ? isFavorite(entry.cell.dataset.game ?? '') : entry.groups.includes(category))) && (!count || (entry.min <= count && count <= entry.max)) && entry.text.includes(query));
     const pages = 1;
     page = 0;
     const visible = new Set(matches.map(entry => entry.cell));
@@ -46,6 +47,7 @@ export function initGameFinder() {
     root.querySelector('#game-results')!.textContent = `${matches.length}개 게임`;
     root.querySelector('#game-page')!.textContent = `${page + 1} / ${pages}`;
     root.querySelector<HTMLElement>('#game-empty')!.hidden = matches.length > 0;
+    root.querySelector('#game-empty strong')!.textContent = category === 'fav' && !query && !count ? '찜한 게임이 없어요. 게임 카드의 ♥를 눌러 찜해 보세요.' : '맞는 게임이 없어요.';
     previous.disabled = page === 0;
     next.disabled = page === pages - 1;
     root.querySelector<HTMLElement>('.game-pagination')!.hidden = pages === 1;
@@ -66,5 +68,6 @@ export function initGameFinder() {
     search.value = ''; players.value = ''; filters[0].click(); search.focus();
   };
   compact.addEventListener('change', () => { page = 0; render(); });
+  onFavoritesChange(render);
   render();
 }

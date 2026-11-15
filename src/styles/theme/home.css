@@ -133,3 +133,33 @@
     .home-tile .home-art svg, :root body.in-hub .home-play { transition: none; }
   }
 }
+
+/* Hearts on the home cards: shown on hover, always shown once the game is a favourite. */
+@media (min-width: 761px) {
+  :root body.in-hub .home-fav {
+    position: absolute; left: 10px; top: 10px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; min-height: 0; margin: 0; padding: 0;
+    border: 0; border-radius: 50%; background: #0d1117c7; color: #e9edf3; box-shadow: 0 6px 16px #00000066;
+    opacity: 0; transform: translateY(-4px); transition: opacity .16s, transform .16s, background-color .16s;
+  }
+  :root body.in-hub .home-fav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+  :root body.in-hub .home-card:is(:hover, :focus-within) .home-fav, :root body.in-hub .home-fav[aria-pressed='true'] { opacity: 1; transform: translateY(-4px); }
+  :root body.in-hub .home-fav:hover { background: #1e2533; }
+  :root body.in-hub .home-fav[aria-pressed='true'] { color: #ff6b8a; }
+  :root body.in-hub .home-fav[aria-pressed='true'] svg { fill: currentColor; }
+  .home-card .home-rooms:not(:empty) { left: 52px; }
+  #home-favorites h3 span::before { content: '♥'; margin-right: 8px; color: #ff6b8a; }
+}
+@media (max-width: 760px) { .home-fav { display: none; } }
+
+.hub-home[data-shelf-filter]:not([data-shelf-filter='all']) :is(#home-favorites, #home-recent) { display: none; }
+
+/* Colour lab panel (only with ?theme=lab; see src/ui/theme-lab.ts). Its own colours are fixed so it reads in every palette. */
+.theme-lab { position: fixed; left: 12px; bottom: 40px; z-index: 200; width: 220px; padding: 10px; border: 1px solid #ffffff2e; border-radius: 6px; background: #0b0c0ff2; color: #f2f2f2; box-shadow: 0 18px 44px #000000b3; font-size: 13px; }
+.theme-lab .theme-lab-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.theme-lab strong { font-size: 12px; letter-spacing: .08em; }
+:root body .theme-lab button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; margin: 0 0 4px; padding: 0 9px; border: 1px solid transparent; border-radius: 4px; background: #ffffff0d; color: #f2f2f2; font-size: 13px; font-weight: 700; text-align: left; box-shadow: none; }
+:root body .theme-lab button:hover { background: #ffffff1a; }
+:root body .theme-lab button[aria-pressed='true'] { border-color: #ffffffb3; background: #ffffff1f; }
+.theme-lab button i { flex: none; width: 26px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px #ffffff40; }
+:root body .theme-lab .theme-lab-close { width: 28px; min-height: 28px; margin: 0; padding: 0; justify-content: center; background: transparent; font-size: 18px; }
+.theme-lab-note { margin: 4px 2px 0; font-size: 12px; line-height: 1.4; color: #b8b8b8; }

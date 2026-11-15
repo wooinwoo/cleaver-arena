@@ -141,3 +141,14 @@ html:has(body.theme-slate) { background: #12161d; }
 /* The room's result heading speaks from this player's side: gold for a win, red for a loss, blue for a draw. */
 :root body.lobby-open[data-table-phase='finished'] #table-page #t-start-title[data-tone='lose'] { color: #ff8f7a; }
 :root body.lobby-open[data-table-phase='finished'] #table-page #t-start-title[data-tone='draw'] { color: #9cc0ff; }
+
+/* Favourites (찜): a heart toggle on the game page, a mark in the side list, hearts on home cards (home.css). */
+:root body.in-hub #hub .hd-playbar > #hub-fav { margin-left: auto; min-height: 36px; padding: 0 14px 0 12px; border: 1px solid var(--app-line); border-radius: 3px; background: #ffffff0a; color: var(--app-soft); font-size: 12px; font-weight: 700; box-shadow: none; }
+:root body.in-hub #hub .hd-playbar > #hub-fav::before { content: '♡'; margin-right: 6px; font-size: 14px; }
+:root body.in-hub #hub .hd-playbar > #hub-fav[aria-pressed='true'] { border-color: #ff6b8a66; background: #ff6b8a1f; color: #ffb3c3; }
+:root body.in-hub #hub .hd-playbar > #hub-fav[aria-pressed='true']::before { content: '♥'; color: #ff6b8a; }
+:root body.in-hub #hub .hd-playbar > #hub-fav + #hub-rules { margin-left: 0; }
+:root body.in-hub #hub .game-cell.favorite .game-option strong::after { content: '♥'; margin-left: 6px; font-size: 11px; color: #ff6b8a; }
+@media (max-width: 760px) {
+  :root body.in-hub #hub .hd-playbar > #hub-fav { position: absolute; top: 7px; right: 64px; flex: none; min-height: 30px; margin: 0; padding: 0 10px; font-size: 11px; }
+}
