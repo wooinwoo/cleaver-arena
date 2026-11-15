@@ -17,6 +17,8 @@ import { gameWaiting, gameAccent, gameArt } from './ui/game-art.ts';
 import { openRules } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
 import { roomShell, renderSlots, renderHowTo } from './ui/room-shell.ts';
+import { mountChat } from './ui/chat.ts';
+import { createPasswordToggle, passwordProblem, roomLockControl } from './ui/room-lock.ts';
 import type { TableRenderContext } from './games/types.ts';
 import { previewState } from './games/previews.ts';
 
@@ -27,7 +29,7 @@ type ModularRenderer = { render(ctx: TableRenderContext<unknown>): void };
 type PublicPoker = ReturnType<typeof pokerView>;
 type GameState = GomokuState | QuoridorState | JanggiState | PublicPoker | ChessState | ReturnType<typeof splendorView> | DaVinciView | CoupView;
 type RoomState = { code: string; kind: TableId; variant?: JanggiVariant | PokerVariant; phase: 'lobby' | 'playing' | 'finished'; round: number; result: string;
-  title?: string; host?: string | null;
+  title?: string; host?: string | null; locked?: boolean;
   players: { id: string; name: string; seat: number; ready: boolean; connected: boolean; member?: boolean }[]; me: number; game: GameState | null };
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const PIECES: Record<PieceKind, string> = { king: '왕', rook: '장', bishop: '상', pawn: '자', hen: '후' };
@@ -155,6 +157,9 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   // 홈 카드의 '봇이랑 하기': start against the bot as soon as the fresh room exists, once.
   let soloIntent = new URLSearchParams(location.search).get('solo') === '1' && !!tableBots[kind] && !invitation;
   if (invitation) $<HTMLInputElement>('t-code-input').value = invitation.toUpperCase().slice(0, 6);
+  // A locked room picked from the hub list asks for its password up front.
+  if (invitation && new URLSearchParams(location.search).get('lock') === '1') $('t-join-password').hidden = false;
+  createPasswordToggle($<HTMLButtonElement>('t-lock-toggle'), $<HTMLInputElement>('t-create-password'));
   // Arriving by invite link: joining that room is the job; making a new room hides behind a quiet link.
   const entryForm = $('t-entry');
   function setInvited(invited: boolean) {
@@ -190,6 +195,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   }
   function resetEntry(message: string) {
     disposePoker();
+    chat.clear();
     session = null; sessionStorage.removeItem(key); room = null; lastRenderSig = '';
     delete document.body.dataset.tablePhase;
     $('t-entry').hidden = false; $('t-room').hidden = true; $('t-lobby').hidden = true; $('t-start').hidden = false;
@@ -211,6 +217,9 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     ws.onmessage = event => {
       if (current !== ws) return;
       const data = JSON.parse(event.data);
+      if (data.type === 'chat') { chat.add(data); return; }
+      if (data.type === 'chat-history') { chat.reset(data.messages ?? []); return; }
+      if (data.type === 'chat-error') { chat.error(data.message); return; }
       if (['joined', 'table-state', 'error', 'expired'].includes(data.type)) {
         submitting = false;
         $('t-board').removeAttribute('aria-busy');
@@ -225,6 +234,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
         sessionStorage.setItem(key, JSON.stringify(session));
         history.replaceState(null, '', `/?game=${kind}&room=${data.code}`);
         $('t-entry').hidden = true; $('t-room').hidden = false; $('t-lobby').hidden = false;
+        $<HTMLInputElement>('t-password').value = ''; $<HTMLInputElement>('t-create-password').value = ''; $('t-password-note').textContent = '';
         syncChrome();
         $('t-code').textContent = data.code; $('connection').textContent = '연결됨';
       } else if (data.type === 'table-state') {
@@ -236,13 +246,24 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
       } else if (data.type === 'error' || data.type === 'expired') {
         busy(false); $('t-error').textContent = data.message;
         $<HTMLButtonElement>('t-cancel').disabled = false;
+        if (data.code === 'password' && !session) {
+          // Stay on the join form with the password field open and ready for another try.
+          // The message sits under the field rather than at the bottom of the page.
+          $('t-join-password').hidden = false;
+          $('t-password-note').textContent = data.message; $('t-error').textContent = ''; $('connection').textContent = '';
+          const field = $<HTMLInputElement>('t-password');
+          field.focus(); field.select();
+        }
         if (data.type === 'error') render();
         if (data.type === 'expired') resetEntry(data.message);
       }
     };
     ws.onclose = () => {
+      const waiting = connecting;
       clearTimeout(timeout); busy(false);
       if (intentional || current !== ws) return;
+      // An idle socket on the entry form (no room yet) timed out: the next try opens a new one, nothing to report.
+      if (!session && !waiting) { ws = null; return; }
       submitting = false;
       $('t-board').removeAttribute('aria-busy');
       $<HTMLButtonElement>('t-cancel').disabled = false;
@@ -258,7 +279,7 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   }
   $('t-entry').addEventListener('submit', event => { event.preventDefault(); enter(entryForm.classList.contains('invited') ? 'join' : 'create'); });
   $('t-join').onclick = () => enter('join');
-  $('t-code-input').addEventListener('keydown', event => {
+  for (const id of ['t-code-input', 't-password']) $(id).addEventListener('keydown', event => {
     if (event.key === 'Enter') { event.preventDefault(); enter('join'); }
   });
   // 홈 카드 탭으로 온 생성 의도: 닉네임이 있으면 방 만들기를 바로 확정한다.
@@ -270,9 +291,19 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     if (!name.value.trim()) { name.reportValidity(); return; }
     const code = $<HTMLInputElement>('t-code-input').value.trim().toUpperCase();
     if (type === 'join' && !/^[A-F0-9]{6}$/.test(code)) { $('t-error').textContent = '방 코드 6자리를 확인해 주세요.'; return; }
+    const createPassword = $<HTMLInputElement>('t-create-password');
+    const password = type === 'join' ? $<HTMLInputElement>('t-password').value : createPassword.hidden ? '' : createPassword.value.trim();
+    if (type === 'create' && password && passwordProblem(password)) { $('t-error').textContent = passwordProblem(password); createPassword.focus(); return; }
     localStorage.setItem('cleaver-name', name.value.trim());
-    connect({ type, game: kind, name: name.value.trim(), code, ...(type === 'create' && variant ? { variant: variant.value } : {}) });
+    connect({ type, game: kind, name: name.value.trim(), code, ...(password ? { password } : {}), ...(type === 'create' && variant ? { variant: variant.value } : {}) });
   }
+  const chat = mountChat({
+    send: text => { if (ws?.readyState !== WebSocket.OPEN || !session) return false; ws.send(JSON.stringify({ type: 'chat', text })); return true; },
+    panelSlot: $('t-chat-slot'),
+    dockHost: () => ({ parent: section.querySelector<HTMLElement>('.t-dock-actions')! }),
+    playHost: () => ({ parent: section.querySelector<HTMLElement>('.tb-actions')!, before: $('t-leave') }),
+  });
+  const lock = roomLockControl($('t-lock'), password => send({ type: 'password', password }));
   $('t-ready').onclick = () => send({ type: 'ready' });
   $('t-bot').onclick = () => send({ type: 'bot' });
   $('t-invite').onclick = () => $('t-copy').click();
@@ -329,6 +360,10 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     if (!resultHold && room.phase === 'finished' && heldRound !== room.round && document.body.dataset.tablePhase === 'playing') { heldRound = room.round; startResultHold(); }
     syncChrome();
     renderRules();
+    const self = room.players.find(p => p.seat === mySeat());
+    chat.setState({ joined: true, playing: shownPhase() === 'playing' });
+    if (self) chat.setSelf(self.id);
+    lock.update({ locked: !!room.locked, host: !!self && room.host === self.id, editable: room.phase !== 'playing' });
     const sig = JSON.stringify([shownPhase(), room.phase, room.round, room.game, room.players, room.me, room.result, room.variant,
       ws?.readyState, submitting, compact.matches, pokerLoading, pokerFailed,
       pending, selectedPiece, drop, wallMode, davinciPick, coupTargeting, coupKeep, coupReveal, promotion]);

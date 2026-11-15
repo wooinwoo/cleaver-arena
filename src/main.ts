@@ -13,6 +13,8 @@ import { initThemeLab } from './ui/theme-lab.ts';
 import { openRules, ruleSteps } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
 import { account, logIn, logOut, onAccountChange, refreshAccount, signUp, wasMember } from './ui/account.ts';
+import { mountChat } from './ui/chat.ts';
+import { LOCK_ICON, createPasswordToggle, passwordProblem, roomLockControl } from './ui/room-lock.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
@@ -82,7 +84,9 @@ function go(target: string) {
   if (game) recordPlay(game);
   location.assign(target);
 }
-type OpenRoomRow = { game: string; code: string; title: string; gameTitle?: string; players: number; capacity: number; host: string; note: string };
+type OpenRoomRow = { game: string; code: string; title: string; gameTitle?: string; players: number; capacity: number; host: string; note: string; locked?: boolean };
+/** Where a room row leads; a locked room opens its join form with the password field showing. */
+const roomLink = (room: OpenRoomRow) => `/?game=${room.game}&room=${room.code}${room.locked ? '&lock=1' : ''}`;
 /** Latest lobby snapshot; `lobbyOnline` is false until the lobby socket delivers one. */
 let lobbyRooms: OpenRoomRow[] = [], lobbyOnline = false;
 type PlayRecords = Record<string, { count: number; last: number }>;
@@ -216,7 +220,7 @@ $('code-join').addEventListener('submit', event => {
   const valid = /^[A-F0-9]{6}$/.test(code);
   const room = lobbyRooms.find(candidate => candidate.code.toUpperCase() === code);
   $('code-join-error').textContent = !valid ? '방 코드 6자리를 확인해 주세요.' : !room ? '열린 방 목록에 없는 코드예요. 경기 중이거나 닫힌 방일 수 있어요.' : '';
-  if (valid && room) go(`/?game=${room.game}&room=${room.code}`);
+  if (valid && room) go(roomLink(room));
 });
 $('hub-count').textContent = `게임 ${document.querySelectorAll('.game-cell').length}개`;
 $('hub-play').onclick = () => go(`/?game=${selectedGame}&create=1`);
@@ -512,9 +516,11 @@ function roomRow(room: OpenRoomRow) {
   button.type = 'button';
   button.className = 'open-room';
   button.style.setProperty('--game-accent', gameAccent(room.game));
-  button.title = `${room.title} · ${room.note}`;
-  button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${escapeHtml(room.title)}</strong><small>${escapeHtml(room.gameTitle ?? '')}${room.gameTitle ? ' · ' : ''}방장 ${escapeHtml(room.host)}</small></span><span class="open-room-game">${escapeHtml(room.gameTitle ?? '')}</span><span class="open-room-host">${escapeHtml(room.host)}</span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
-  button.onclick = () => go(`/?game=${room.game}&room=${room.code}`);
+  button.title = `${room.title} · ${room.note}${room.locked ? ' · 비밀번호 방' : ''}`;
+  button.classList.toggle('locked', !!room.locked);
+  const lock = room.locked ? `<span class="open-room-lock" role="img" aria-label="비밀번호 방">${LOCK_ICON}</span>` : '';
+  button.innerHTML = `<span class="open-room-cover" aria-hidden="true">${gameArt(room.game, true)}</span><span class="open-room-copy"><strong>${lock}${escapeHtml(room.title)}</strong><small>${escapeHtml(room.gameTitle ?? '')}${room.gameTitle ? ' · ' : ''}방장 ${escapeHtml(room.host)}</small></span><span class="open-room-game">${escapeHtml(room.gameTitle ?? '')}</span><span class="open-room-host">${escapeHtml(room.host)}</span><span class="open-room-count">${room.players}/${room.capacity}</span><b>입장</b>`;
+  button.onclick = () => go(roomLink(room));
   item.append(button);
   return item;
 }
@@ -686,6 +692,52 @@ function sound(frequency: number, duration: number) {
 function send(data: unknown) {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(data));
 }
+let roomLocked = false, matchChatPlaced = 0;
+const chat = mountChat({
+  send: text => { if (socket?.readyState !== WebSocket.OPEN || !session) return false; send({ type: 'chat', text }); return true; },
+  panelSlot: $('room-chat'),
+  playHost: () => ({ parent: $('match-chat') }),
+  dockHost: () => ({ parent: $('ready-row') }),
+  // Typing in the chat releases movement keys and the mouse lock.
+  onFocus: () => { resetControls(); if (document.pointerLockElement) document.exitPointerLock(); },
+});
+const roomLock = roomLockControl($('room-lock'), password => send({ type: 'password', password }));
+createPasswordToggle($<HTMLButtonElement>('lock-toggle'), $<HTMLInputElement>('create-password'));
+/** During a match the chat toggle sits next to 나가기, on whichever side is free of the HUD. */
+function placeMatchChat() {
+  const dock = $('match-chat');
+  if ($('hud').hidden || !dock.firstElementChild) return;
+  const leave = $('match-leave').getBoundingClientRect();
+  // Anchored by its right edge so the unread badge grows the button away from 나가기.
+  const width = dock.offsetWidth + 24, height = dock.offsetHeight, gap = 8;
+  const blockers = ['.health-panel', '.match-bar', '#spell-controls', '#fire', '#move-pad', '#aim-pad', 'body > header .header-actions', '.view-dock']
+    .map(selector => document.querySelector<HTMLElement>(selector))
+    .filter((element): element is HTMLElement => !!element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden')
+    .map(element => element.getBoundingClientRect());
+  const spots = [
+    { left: leave.left - gap - width, top: leave.top + (leave.height - height) / 2 },
+    { left: leave.right - width, top: leave.bottom + gap },
+    { left: leave.right - width, top: leave.top - gap - height },
+  ];
+  const free = (spot: { left: number; top: number }) => spot.left >= 4 && spot.top >= 4 && spot.left + width <= innerWidth - 4 && spot.top + height <= innerHeight - 4 &&
+    blockers.every(box => spot.left + width <= box.left || spot.left >= box.right || spot.top + height <= box.top || spot.top >= box.bottom);
+  const spot = spots.find(free) ?? spots[0];
+  const right = innerWidth - spot.left - width;
+  Object.assign(dock.style, { right: `${Math.round(right)}px`, top: `${Math.round(spot.top)}px`, left: 'auto', bottom: 'auto' });
+  // The HUD's box can sit a few pixels off the viewport (scrollbar gutter); line the button up with what is drawn.
+  const drift = dock.getBoundingClientRect().right - (spot.left + width);
+  if (Math.abs(drift) > 1) dock.style.right = `${Math.round(right + drift)}px`;
+  chat.reposition();
+}
+addEventListener('resize', () => requestAnimationFrame(placeMatchChat));
+$('join-password').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('join').click(); } });
+/** The optional password typed on the entry form for a new room ('' for none); null when it is not valid. */
+function createPassword() {
+  const field = $<HTMLInputElement>('create-password');
+  const value = field.hidden ? '' : field.value.trim();
+  if (value && passwordProblem(value)) { error.textContent = passwordProblem(value); field.focus(); return null; }
+  return value;
+}
 
 function setBusy(busy: boolean) {
   connecting = busy;
@@ -707,11 +759,16 @@ function connect(request: Record<string, unknown>) {
   thisSocket.onmessage = event => {
     if (thisSocket !== socket) return;
     const data = JSON.parse(event.data);
+    if (data.type === 'chat') { chat.add(data); return; }
+    if (data.type === 'chat-history') { chat.reset(data.messages ?? []); return; }
+    if (data.type === 'chat-error') { chat.error(data.message); return; }
     if (data.type === 'joined') {
       freshState = true;
       setBusy(false);
       reconnects = 0;
       myId = data.id;
+      chat.setSelf(myId);
+      $<HTMLInputElement>('join-password').value = ''; $<HTMLInputElement>('create-password').value = '';
       session = { code: data.code, token: data.token };
       sessionStorage.setItem(sessionKey, JSON.stringify(session));
       history.replaceState(null, '', `/?game=cleaver&room=${data.code}`);
@@ -722,6 +779,7 @@ function connect(request: Record<string, unknown>) {
       error.textContent = '';
     } else if (data.type === 'state') {
       state = data.game;
+      roomLocked = !!data.locked;
       world.applyState(state!, myId, freshState);
       freshState = false;
       renderState();
@@ -729,7 +787,13 @@ function connect(request: Record<string, unknown>) {
       setBusy(false);
       error.textContent = data.message;
       toast(data.message);
+      if (data.code === 'password' && !session) {
+        // Stay on the join form with the password field open.
+        $('join-password-row').hidden = false;
+        $<HTMLInputElement>('join-password').focus(); $<HTMLInputElement>('join-password').select();
+      }
       if (data.type === 'expired') {
+        chat.clear();
         session = null; sessionStorage.removeItem(sessionKey);
         resetControls();
         $('entry').hidden = false; $('room').hidden = true;
@@ -747,11 +811,14 @@ function connect(request: Record<string, unknown>) {
     }
   };
   thisSocket.onclose = () => {
+    const waiting = connecting;
     clearTimeout(timeout);
     if (thisSocket !== socket) return;
     setBusy(false);
     resetControls();
     if (intentionalClose) return;
+    // An idle socket on the entry form timed out: the next try opens a new one, nothing to report.
+    if (!session && !waiting) { socket = null; return; }
     $('connection').textContent = '연결 끊김';
     if (session && reconnects < 10) {
       $('announcement').textContent = '다시 연결 중…';
@@ -761,6 +828,7 @@ function connect(request: Record<string, unknown>) {
       error.textContent = '서버에 연결하지 못했어요. 잠시 후 다시 입장해 주세요.';
       toast(error.textContent);
       if (session) {
+        chat.clear();
         sessionStorage.removeItem(sessionKey); session = null;
         $('lobby').hidden = false; $('entry').hidden = false; $('room').hidden = true;
         $('hud').hidden = true; $('touch-controls').hidden = true;
@@ -791,10 +859,14 @@ function renderState() {
   }
   lastAliveIds = aliveIds.join(',');
   const active = state.phase === 'playing' || state.phase === 'countdown';
+  chat.setState({ joined: true, playing: active });
+  // The HUD settles over the first frames of a match (fonts, touch layout); keep the chat toggle beside 나가기.
+  if (active && performance.now() - matchChatPlaced > 1000) { matchChatPlaced = performance.now(); placeMatchChat(); }
   if ($('fps-view').getAttribute('aria-pressed') !== String(state.view === 'fps')) setView(state.view);
   for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = true;
   $('view-note').textContent = `전원 ${state.view === 'fps' ? '1인칭' : '롤 시점'} · 시작 후 고정`;
   const host = state.players.find(player => !player.bot)?.id === myId;
+  roomLock.update({ locked: roomLocked, host, editable: !active });
   const nextSettings = JSON.stringify([state.code, state.view, state.spellCooldowns, host, active]);
   if (settingsKey !== nextSettings) {
     settingsKey = nextSettings;
@@ -802,9 +874,11 @@ function renderState() {
     $<HTMLInputElement>('flash-cooldown').value = String(state.spellCooldowns.flash);
     $<HTMLInputElement>('ghost-cooldown').value = String(state.spellCooldowns.ghost);
     $<HTMLFieldSetElement>('room-settings').disabled = !host || active;
-    $('settings-summary').textContent = `${state.view === 'fps' ? '1인칭' : '롤 시점'} · 점멸 ${state.spellCooldowns.flash}초 / 유체화 ${state.spellCooldowns.ghost}초`;
     $('settings-note').textContent = host ? '설정을 적용하면 준비가 초기화돼요. 시작 후에는 바꿀 수 없어요.' : '방장이 시작 전에 설정해요. 참가자 모두 같은 설정으로 플레이해요.';
   }
+  // The room password lives in 경기 설정; its summary line tells everyone the room is locked.
+  const summary = `${state.view === 'fps' ? '1인칭' : '롤 시점'} · 점멸 ${state.spellCooldowns.flash}초 / 유체화 ${state.spellCooldowns.ghost}초${roomLocked ? ' · 비밀번호 방' : ''}`;
+  if ($('settings-summary').textContent !== summary) $('settings-summary').textContent = summary;
   const nextPhaseKey = `${state.phase}:${state.round}`;
   if (phaseKey !== nextPhaseKey) {
     phaseKey = nextPhaseKey;
@@ -813,7 +887,7 @@ function renderState() {
     $('hud').hidden = !active;
     $('touch-controls').hidden = !active || !touch;
     $('crosshair').hidden = !active || world.view !== 'fps';
-    if (active) canvas.focus({ preventScroll: true });
+    if (active) { canvas.focus({ preventScroll: true }); requestAnimationFrame(placeMatchChat); }
     if (!active) {
       resetControls();
       if (document.pointerLockElement) document.exitPointerLock();
@@ -890,7 +964,8 @@ function enter(practice = false) {
   for (const id of ['top-view', 'fps-view']) $<HTMLButtonElement>(id).disabled = false;
   $('view-note').textContent = '새 방의 시점 선택 · 참가자 모두 같은 시점';
   const name = nickname();
-  if (name) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, view: world.view, practice });
+  const password = createPassword();
+  if (name && password !== null) connect({ type: 'create', name, map: mapInput.value, mode: $<HTMLSelectElement>('mode').value, view: world.view, practice, ...(password ? { password } : {}) });
 }
 
 mapInput.onchange = () => {
@@ -916,7 +991,8 @@ $('join').onclick = () => {
   if (!name) return;
   const code = codeInput.value.trim().toUpperCase();
   if (!/^[A-F0-9]{6}$/.test(code)) { error.textContent = '초대받은 방 코드 6자리를 입력해 주세요.'; codeInput.focus(); return; }
-  connect({ type: 'join', name, code });
+  const password = $<HTMLInputElement>('join-password').value;
+  connect({ type: 'join', name, code, ...(password ? { password } : {}) });
 };
 codeInput.addEventListener('keydown', event => { if (event.key === 'Enter') $('join').click(); });
 $('ready').onclick = () => send({ type: 'ready' });
@@ -1004,6 +1080,10 @@ function isTyping(target: EventTarget | null) { return target instanceof HTMLInp
 window.addEventListener('keydown', event => {
   if (!world) return;
   if (isTyping(event.target)) return;
+  // Enter opens the room chat during a match, like most game clients.
+  if (event.key === 'Enter' && session && (state?.phase === 'playing' || state?.phase === 'countdown') && !(event.target instanceof HTMLButtonElement)) {
+    event.preventDefault(); chat.focus(); return;
+  }
   if (event.code === 'KeyF' || event.code === (world.view === 'top' ? 'KeyD' : 'KeyG')) {
     event.preventDefault(); if (!event.repeat) useSpell(event.code === 'KeyF' ? 'flash' : 'ghost');
     return;
@@ -1200,6 +1280,7 @@ try {
   }
   if (roomCode) {
     codeInput.value = roomCode.toUpperCase().slice(0, 6);
+    if (params.get('lock') === '1') $('join-password-row').hidden = false;
     document.querySelector('#entry-note')!.textContent = `${codeInput.value} 방 초대됨 → 닉네임 입력 후 입장을 눌러 주세요 · 방장의 시점 설정을 따라가요`;
     toast('초대받았어요! 닉네임을 입력하고 입장을 눌러 주세요.');
     nameInput.focus({ preventScroll: true });

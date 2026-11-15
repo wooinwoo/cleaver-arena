@@ -235,9 +235,11 @@
           <div class="form-field field-wide"><label for="nickname">내 닉네임</label><input id="nickname" name="nickname" maxlength="12" placeholder="닉네임" autocomplete="nickname" required /></div>
           <div class="form-field"><label for="map">경기장</label><select id="map"><option value="baron">바론 둥지</option><option value="ward">원형 와드</option><option value="arena">장애물 경기장</option></select></div>
           <div class="form-field"><label for="mode">게임 방식</label><select id="mode"><option value="duel">1:1 대결</option><option value="teams">팀전 · 최대 3:3</option></select></div>
-          <button class="primary" id="create" type="submit">친구 초대할 방 만들기 <span aria-hidden="true">↗</span></button>
+          <input id="create-password" class="field-wide" type="password" maxlength="20" autocomplete="new-password" placeholder="방 비밀번호 4–20자" aria-label="새 방 비밀번호" hidden />
+          <div class="field-wide create-row"><button class="primary" id="create" type="submit">친구 초대할 방 만들기 <span aria-hidden="true">↗</span></button><button type="button" id="lock-toggle" data-icon aria-label="비밀번호 걸기" title="비밀번호 걸기"><svg class="lock-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="2.5" y="7" width="11" height="7.5" rx="1.5" fill="currentColor"/></svg></button></div>
         </form>
         <div class="join-row"><label class="sr-only" for="room-code">초대받은 방 코드</label><input id="room-code" maxlength="6" placeholder="방 코드 6자리" autocomplete="off" enterkeyhint="go" /><button id="join">입장</button></div>
+        <div class="join-password" id="join-password-row" hidden><label for="join-password">방 비밀번호</label><input id="join-password" type="password" maxlength="20" autocomplete="off" placeholder="방장에게 받은 비밀번호" enterkeyhint="go" /></div>
         <p class="fineprint">코드가 안 맞으면 호스트에게 새 링크를 요청해 주세요</p>
         <button class="text-button" id="practice">먼저 혼자 연습해 보기 · 조작도 익혀요</button>
         <p class="fineprint" id="entry-note"></p>
@@ -261,11 +263,13 @@
           </div>
           <button id="apply-settings" type="button">설정 적용</button>
           <p id="settings-note">방장이 설정하면 준비가 초기화돼요. 시작 후에는 바꿀 수 없어요.</p>
+          <div id="room-lock" hidden></div>
         </fieldset></details>
         <p id="ready-help" class="help">둘 다 준비하면 시작해요.</p>
-        <button id="ready" class="primary">준비하기</button>
+        <div id="ready-row" class="ready-row"><button id="ready" class="primary">준비하기</button></div>
         <button id="leave" class="text-button">방 나가기</button>
         </div>
+        <div id="room-chat" class="room-chat-slot"></div>
       </section>
       <p id="error" role="alert"></p>
     </aside>
@@ -279,6 +283,7 @@
       <div id="hit-flash" aria-hidden="true"></div>
       <div id="spell-feedback" aria-hidden="true"></div>
       <div id="hit-confirm" role="status" aria-live="polite"></div>
+      <div id="match-chat" class="match-chat"></div>
       <div id="spell-controls" role="group" aria-label="소환사 주문">
         <button id="flash" type="button"><span>점멸 <kbd>F</kbd></span><small id="flash-status">준비</small></button>
         <button id="ghost" type="button"><span>유체화 <kbd>D</kbd></span><small id="ghost-status">준비</small></button>

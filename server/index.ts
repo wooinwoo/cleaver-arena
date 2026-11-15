@@ -11,9 +11,11 @@ import { attachLobby, cleaverRoom, createRoomRegistry, registerRoomSource, sanit
 import { createFileAccountStore, createMemoryAccountStore, playerName, type AccountStore } from './accounts.ts';
 import { createDatabaseAccountStore, databaseHost } from './accounts-db.ts';
 import { createAuthApi, sessionTokenFromRequest } from './auth.ts';
+import { chatError, chatHistory, createChatLimiter, postChat, type ChatLimiter, type ChatMessage } from './chat.ts';
+import { admit, createPasswordGate, lockWith, readPassword, type PasswordGate, type RoomLock } from './room-password.ts';
 
-type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number> };
-type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean; session: string | null };
+type Room = { game: Game; tokens: Map<string, string>; disconnected: Map<string, number>; lock: RoomLock | null; chat: ChatMessage[] };
+type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; lastInput: number; created: number; pendingFire?: boolean; session: string | null; chat: ChatLimiter; gate: PasswordGate };
 export type ArenaOptions = {
   /** Where accounts live. Without one they are kept in memory and end with the process. */
   accounts?: AccountStore;
@@ -29,7 +31,7 @@ export function createArenaServer(options: ArenaOptions = {}) {
   const auth = createAuthApi(accounts);
   const registry = createRoomRegistry();
   registerRoomSource(registry, (): OpenRoom[] =>
-    [...rooms.entries()].map(([code, room]) => cleaverRoom(code, room.game)));
+    [...rooms.entries()].map(([code, room]) => cleaverRoom(code, room.game, !!room.lock)));
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -70,7 +72,7 @@ export function createArenaServer(options: ArenaOptions = {}) {
   };
   wss.on('connection', (ws, req) => {
     // The login cookie is only visible on the upgrade request; the session is looked up again whenever a name is needed.
-    const client: Client = { alive: true, count: 0, window: Date.now(), lastInput: Date.now(), created: Date.now(), session: sessionTokenFromRequest(req) };
+    const client: Client = { alive: true, count: 0, window: Date.now(), lastInput: Date.now(), created: Date.now(), session: sessionTokenFromRequest(req), chat: createChatLimiter(), gate: createPasswordGate() };
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('message', raw => {
@@ -98,6 +100,7 @@ export function createArenaServer(options: ArenaOptions = {}) {
           player.connected = true;
           room.disconnected.delete(player.id);
           send(ws, { type: 'joined', id, code: room.game.code, token: data.token });
+          send(ws, chatHistory(room.chat));
           return;
         }
         const who = playerName(accounts, client.session, data.name);
@@ -108,10 +111,12 @@ export function createArenaServer(options: ArenaOptions = {}) {
           if (data.view !== undefined && data.view !== 'top' && data.view !== 'fps') { send(ws, { type: 'error', message: '시점을 다시 선택해 주세요.' }); return; }
           if (data.map !== undefined && data.map !== 'ward' && data.map !== 'arena' && data.map !== 'baron') { send(ws, { type: 'error', message: '맵을 다시 선택해 주세요.' }); return; }
           if (rooms.size >= 60) { send(ws, { type: 'error', message: '현재 방이 많아요. 잠시 후 다시 시도해 주세요.' }); return; }
+          const password = readPassword(data.password);
+          if (!password.ok) { send(ws, { type: 'error', message: password.message }); return; }
           let code: string;
           do { code = randomBytes(4).toString('hex').slice(0, 6).toUpperCase(); } while (rooms.has(code));
           const map = data.map === 'arena' ? 'arena' : data.map === 'baron' ? 'baron' : 'ward';
-          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map, data.view === 'fps' ? 'fps' : 'top'), tokens: new Map(), disconnected: new Map() };
+          room = { game: createGame(code, data.mode === 'teams' ? 'teams' : map === 'arena' ? 'ffa' : 'duel', map, data.view === 'fps' ? 'fps' : 'top'), tokens: new Map(), disconnected: new Map(), lock: lockWith(password.password), chat: [] };
           room.game.title = sanitizeTitle(data.title) || `${name}의 문도피구`;
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
@@ -119,18 +124,33 @@ export function createArenaServer(options: ArenaOptions = {}) {
         if (room.game.phase !== 'lobby' && room.game.phase !== 'finished') { send(ws, { type: 'error', message: '경기 중인 방이에요. 경기 종료 후 입장해 주세요.' }); return; }
         const capacity = room.game.mode === 'duel' ? 2 : 6;
         if (room.game.players.length >= capacity) { send(ws, { type: 'error', message: `방 정원 ${capacity}명이 찼어요.` }); return; }
+        if (data.type === 'join') {
+          const denied = admit(room.lock, data.password, client.gate, now);
+          if (denied) { send(ws, denied); return; }
+        }
         const id = randomUUID(), token = randomUUID();
         addPlayer(room.game, id, name).member = who.member;
         room.tokens.set(token, id);
         client.room = room; client.id = id;
         if (data.type === 'create' && data.practice === true) addPlayer(room.game, randomUUID(), '연습 로봇', true);
         send(ws, { type: 'joined', id, code: room.game.code, token });
+        send(ws, chatHistory(room.chat));
         return;
       }
-      const game = client.room.game;
+      const room = client.room, game = room.game;
       const player = game.players.find(p => p.id === client.id);
       if (!player) return;
-      if (data.type === 'input') {
+      const isHost = game.players.find(p => !p.bot)?.id === player.id;
+      if (data.type === 'chat') {
+        const posted = postChat(room.chat, client.chat, player, data.text, now);
+        if (posted.error) { send(ws, chatError(posted.error)); return; }
+        for (const [other, peer] of clients) if (peer.room === room) send(other, posted.message);
+      } else if (data.type === 'password') {
+        if (!['lobby', 'finished'].includes(game.phase) || !isHost) { send(ws, { type: 'error', message: '방장만 경기 시작 전에 비밀번호를 바꿀 수 있어요.' }); return; }
+        const password = readPassword(data.password);
+        if (!password.ok) { send(ws, { type: 'error', message: password.message }); return; }
+        room.lock = lockWith(password.password);
+      } else if (data.type === 'input') {
         const input = parseInput(data.input);
         if (input) {
           client.pendingFire ||= input.fire && game.phase === 'playing';
@@ -209,7 +229,7 @@ export function createArenaServer(options: ArenaOptions = {}) {
     for (const player of released) player.input.fire = false;
   }, 1000 / 30);
   const broadcast = setInterval(() => {
-    for (const [ws, client] of clients) if (client.room) send(ws, { type: 'state', game: client.room.game });
+    for (const [ws, client] of clients) if (client.room) send(ws, { type: 'state', game: client.room.game, locked: !!client.room.lock });
   }, 50);
   const heartbeat = setInterval(() => {
     for (const [ws, client] of clients) {

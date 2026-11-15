@@ -1,0 +1,186 @@
+/* Room chat and room passwords (2026-11-15), for every room: table games, 범퍼카 and 문도피구.
+   Waiting room on wide screens: an open panel in the room window. Phones: a button beside 준비하기 that opens a sheet.
+   During a match: a small toggle in the game's bar, the panel as a popover beside it.
+   Imported after the theme files; every rule carries :root so the base button and input rules never win. */
+
+/* ---------- panel ---------- */
+:root .chat-panel {
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  border: 1px solid #2c3546; border-radius: 4px; background: #171c25; color: #e9edf3; font-size: 14px;
+}
+:root .chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; padding: 0 4px 0 12px; border-bottom: 1px solid #222a38; background: #151a23; border-radius: 4px 4px 0 0; }
+:root .chat-head strong { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #8a97ab; }
+:root .chat-close { width: 32px; min-width: 32px; min-height: 30px; margin: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; color: #8a97ab; font-size: 13px; font-weight: 600; box-shadow: none; }
+:root .chat-close:hover { background: #ffffff10; color: #e9edf3; }
+:root .chat-log {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px 12px;
+  list-style: none; display: flex; flex-direction: column; gap: 3px; scrollbar-width: thin; scrollbar-color: #364257 transparent;
+}
+:root .chat-line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline; margin: 0; padding: 0; border: 0; font-size: 14px; line-height: 1.45; }
+:root .chat-name { max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #7fb2ec; font-weight: 700; }
+:root .chat-line.mine .chat-name { color: #8fe0a8; }
+:root .chat-text { min-width: 0; color: #e9edf3; word-break: normal; overflow-wrap: anywhere; }
+:root .chat-time { font-size: 11px; color: #66748a; font-variant-numeric: tabular-nums; }
+:root .chat-empty { margin: auto 0 0; padding: 4px 0; font-size: 13px; color: #66748a; }
+:root .chat-form { display: flex; gap: 6px; margin: 0; padding: 8px; border-top: 1px solid #222a38; }
+:root body .chat-form input.chat-input {
+  flex: 1 1 auto; width: auto; min-width: 0; min-height: 40px; margin: 0; padding: 0 10px; border-radius: 3px;
+  background: #0e1117; border: 1px solid #364257; color: #e9edf3; font-size: 16px; box-shadow: none;
+}
+:root body .chat-form input.chat-input::placeholder { color: #66748a; }
+:root body .chat-form input.chat-input:focus { border-color: #7fb2ec; outline: none; box-shadow: 0 0 0 2px #7fb2ec40; }
+:root .chat-send { flex: 0 0 auto; width: auto; min-height: 40px; margin: 0; padding: 0 14px; border: 0; border-radius: 3px; background: #45b864; color: #fff; font-size: 14px; font-weight: 700; box-shadow: inset 0 1px 0 #ffffff40; }
+:root .chat-send:hover { background: #52c872; }
+:root .chat-error { margin: 0; padding: 0 10px 8px; font-size: 12px; line-height: 1.4; color: #ff8f7a; }
+:root .chat-error:empty { display: none; }
+
+/* Popover (during a match, or the phone sheet). Position comes from chat.ts next to the toggle. */
+:root .chat-panel.is-popover {
+  position: fixed; z-index: 45; top: var(--chat-top, auto); right: var(--chat-right, 16px); bottom: var(--chat-bottom, 16px);
+  width: min(340px, calc(100vw - 16px)); height: clamp(220px, var(--chat-room, 360px), 360px);
+  background: #171c25; border-color: #364257; box-shadow: 0 18px 48px #000000a6;
+}
+@media (max-width: 760px) {
+  /* Waiting room: a bottom sheet over the start bar. */
+  :root .chat-panel.is-popover[data-anchor='sheet'] {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; height: min(56dvh, 400px);
+    border-radius: 6px 6px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* During a match: full width under the game's bar, leaving the touch pads at the bottom free. */
+  :root .chat-panel.is-popover[data-anchor='toggle'] { left: 8px; right: 8px; width: auto; height: clamp(200px, var(--chat-room, 300px), 44dvh); }
+  :root .chat-close { width: 40px; min-width: 40px; min-height: 40px; }
+  :root .chat-head { min-height: 44px; }
+}
+
+/* ---------- toggle ---------- */
+:root .chat-toggle {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: auto;
+  min-height: 38px; margin: 0; padding: 0 12px; border-radius: 4px; border: 1px solid #2c3546;
+  background: #ffffff0a; color: #c5cdd8; font-size: 13px; font-weight: 650; box-shadow: none; text-align: left;
+}
+:root .chat-toggle:hover { background: #ffffff14; color: #e9edf3; }
+:root .chat-toggle.is-open { border-color: #3a6ea8; background: #3a6ea833; color: #e9edf3; }
+:root .chat-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #45b864; color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
+@media (max-width: 760px) { :root .chat-toggle { min-height: 40px; min-width: 40px; } }
+
+/* ---------- where it sits ---------- */
+/* Table rooms and 범퍼카, before a match on wide screens: under the seats, filling the room column above the start bar. */
+@media (min-width: 761px) {
+  :root body.lobby-open #table-page #t-lobby { min-height: 100%; }
+  :root body.lobby-open #table-page .t-chat-slot { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  :root body.lobby-open #table-page .t-chat-slot > .chat-panel { flex: 1 1 auto; min-height: 200px; max-height: 380px; }
+}
+:root #table-page .t-chat-slot:not(:has(> .chat-panel:not([hidden]))) { display: none; }
+body:not(.lobby-open) #table-page .t-chat-slot { display: none; }
+/* Phones before a match: a button sharing the row with 준비하기 (or the bot button when that is the way to start),
+   so the start bar keeps its height. */
+@media (max-width: 760px) {
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > button { grid-column: 1 / -1; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > #t-ready { order: 1; grid-column: 1; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > #t-bot { order: 2; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > #t-invite { order: 3; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > #t-bot-remove { order: 4; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > #t-bot-add { order: 5; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> #t-ready[hidden]) > #t-bot { order: 1; grid-column: 1; }
+  :root body.lobby-open #table-page .t-dock-actions:has(> .chat-toggle:not([hidden])) > .chat-toggle.chat-toggle { order: 1; grid-column: 2; width: auto; padding: 0 16px; font-size: 15px; }
+}
+/* During a table match: in the bar before 나가기 (phones: status · people · chat · 나가기). */
+@media (max-width: 760px) {
+  body.in-table[data-table-phase='playing'] #table-page .chat-toggle { order: 2; padding: 0 10px; }
+}
+/* 범퍼카 HUD bar */
+:root .bh-top .chat-toggle { flex: 0 0 auto; min-height: 40px; border-color: #ffffff1f; }
+@media (max-width: 760px) { :root .bh-top .chat-toggle { order: 2; min-height: 40px; } }
+
+/* 문도피구 waiting room: a card at the bottom right of the arena (wide), a button beside 준비하기 (phones). */
+@media (min-width: 761px) {
+  :root body:has(#room:not([hidden])):not(.in-match) #lobby #room-chat {
+    pointer-events: auto; position: absolute; right: 24px; bottom: 24px; width: 320px; height: min(340px, calc(100% - 120px));
+    display: flex; flex-direction: column;
+  }
+  :root #lobby #room-chat > .chat-panel { flex: 1 1 auto; background: #1c2230f2; border-color: #2c3546; box-shadow: 0 18px 48px #00000059; border-radius: 6px; }
+}
+:root #lobby #room-chat:empty { display: none; }
+:root #lobby #room .ready-row { display: flex; align-items: stretch; gap: 8px; margin: 2px 0 0; }
+:root #lobby #room .ready-row #ready { flex: 1 1 auto; width: auto; margin: 0; }
+:root #lobby #room .ready-row .chat-toggle { flex: 0 0 auto; min-height: 40px; padding: 0 16px; font-size: 14px; background: var(--wr-raised, #232b3a); border-color: var(--wr-line, #2c3546); color: var(--wr-text, #e9edf3); }
+:root #lobby #room .ready-row .chat-toggle:hover { background: #2c3546; }
+/* responsive.css pushes #ready down 10px on narrow phones (with !important); the chat button follows it. */
+@media (max-width: 480px) { :root #lobby #room .ready-row .chat-toggle { margin-top: 10px; } }
+/* 문도피구 match: next to 나가기; main.ts picks the free side. */
+:root #match-chat { position: fixed; z-index: 6; right: 24px; bottom: 84px; pointer-events: auto; }
+:root #match-chat:empty { display: none; }
+:root body.in-match #match-chat .chat-toggle { min-height: 44px; border-color: #ffffff1f; background: #0d1117d9; color: #c5cdd8; }
+:root body.in-match #match-chat .chat-toggle:hover { background: #1e2533; color: #e9edf3; }
+:root body.in-match #match-chat .chat-toggle.is-open { border-color: #3a6ea8; background: #16263acc; }
+body:not(.in-match) #match-chat { display: none; }
+
+/* ---------- room passwords ---------- */
+:root .lock-icon { width: 13px; height: 13px; flex: 0 0 auto; }
+/* Open-room rows: a padlock before the room name. */
+:root .open-room-lock { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: #e3c27a; }
+:root .open-room-lock .lock-icon { width: 12px; height: 12px; }
+
+/* The creator's optional password: a quiet link that opens one field (table rooms), or a padlock button beside the
+   create button (문도피구, whose entry card has no spare line on small phones). */
+:root .t-lock-create { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+:root #t-lock-toggle {
+  width: auto; min-height: 32px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none;
+  color: #8a97ab; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+}
+:root #t-lock-toggle:hover { background: none; color: #e9edf3; }
+:root body .t-lock-create input { width: 100%; margin: 0; }
+@media (max-width: 760px) { :root #t-lock-toggle { min-height: 40px; } }
+:root #lobby #entry .create-row { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+:root #lobby #entry .create-row #create { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; }
+:root #lobby #entry #lock-toggle {
+  flex: 0 0 auto; display: grid; place-items: center; width: 52px; min-height: 44px; margin: 0; padding: 0;
+  border-radius: 4px; border: 1px solid var(--wr-line, #2c3546); background: var(--wr-raised, #232b3a); color: #8a97ab; box-shadow: none;
+}
+:root #lobby #entry #lock-toggle:hover { background: #2c3546; color: #e9edf3; }
+:root #lobby #entry #lock-toggle[aria-expanded='true'] { border-color: #3a6ea8; background: #3a6ea833; color: #e3c27a; }
+:root #lobby #entry #lock-toggle .lock-icon { width: 18px; height: 18px; }
+/* Join forms: the password field opens when the room asks for one (tables: under the code row, or between the
+   code and the join button on an invite). */
+:root body.lobby-open #table-page #t-entry:not(.invited) .join-row { flex-wrap: wrap; }
+:root body.lobby-open #table-page #t-entry:not(.invited) .t-join-password { order: 3; flex: 1 1 100%; }
+:root body #table-page #t-entry .join-row .t-join-password input { flex: 0 0 auto; width: 100%; text-transform: none; }
+:root .password-note { margin: 0; font-size: 13px; line-height: 1.4; color: #ff8f7a; }
+:root .password-note:empty { display: none; }
+:root :is(.t-join-password, .join-password) { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+:root :is(.t-join-password, .join-password) label { margin: 0; font-size: 13px; color: #8a97ab; }
+:root body :is(.t-join-password, .join-password) input { width: 100%; margin: 0; }
+:root #lobby #entry .join-password { margin-top: 10px; }
+
+/* Waiting room: lock state for everyone, set / change / clear for the host. */
+:root .room-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; font-size: 13px; color: #8a97ab; }
+:root .room-lock[data-locked='true'] .room-lock-mark { color: #e3c27a; }
+:root .room-lock-mark { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; font-weight: 600; white-space: nowrap; }
+:root .room-lock .room-lock-edit { display: inline-flex; align-items: center; gap: 6px; }
+:root .room-lock :is(.room-lock-edit, .room-lock-clear, .room-lock-save, .room-lock-cancel) {
+  width: auto; min-height: 32px; margin: 0; padding: 0 10px; border: 1px solid #2c3546; border-radius: 3px;
+  background: #ffffff0a; color: #c5cdd8; font-size: 13px; font-weight: 650; box-shadow: none;
+}
+:root .room-lock :is(.room-lock-edit, .room-lock-clear, .room-lock-cancel):hover { background: #ffffff14; color: #e9edf3; }
+:root .room-lock .room-lock-save { background: #45b864; border-color: #45b864; color: #fff; }
+:root .room-lock .room-lock-save:hover { background: #52c872; }
+:root .room-lock-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; margin: 0; }
+:root body .room-lock-form input.room-lock-input {
+  flex: 1 1 150px; width: auto; min-width: 0; min-height: 36px; margin: 0; padding: 0 10px; border-radius: 3px;
+  background: #0e1117; border: 1px solid #364257; color: #e9edf3; font-size: 16px; box-shadow: none;
+}
+:root body .room-lock-form input.room-lock-input:focus { border-color: #7fb2ec; outline: none; }
+:root .room-lock-note { flex: 1 1 100%; margin: 0; font-size: 12px; color: #ff8f7a; }
+:root .room-lock-note:empty { display: none; }
+@media (max-width: 760px) {
+  :root .room-lock :is(.room-lock-edit, .room-lock-clear, .room-lock-save, .room-lock-cancel) { min-height: 40px; }
+  :root body .room-lock-form input.room-lock-input { min-height: 40px; }
+}
+/* Table rooms: its own line under the room heading (wide), beside the start hint (phones); the edit form takes a line. */
+:root body.lobby-open #table-page .t-lobby-head #t-lock { flex: 0 1 auto; }
+@media (min-width: 761px) { :root body.lobby-open #table-page .t-lobby-head #t-lock { flex: 1 1 100%; } }
+:root body.lobby-open #table-page .t-lobby-head #t-lock.editing { flex: 1 1 100%; }
+/* 문도피구: inside 경기 설정, under the match settings. */
+:root #lobby #room #room-lock { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wr-line, #2c3546); }
+:root body.lobby-open #table-page #t-entry .t-join-password label { margin: 0; }

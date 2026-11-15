@@ -32,6 +32,7 @@
 @import './theme/client-polish.css';
 @import './theme/slate.css';
 @import './theme/home.css';
+@import './theme/chat.css';
 
 /* Pairs with the critical <style> in index.html: reveal the page once these rules are live, and lift the
    pre-style SVG cap (specific rules size every icon from here on). */

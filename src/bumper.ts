@@ -5,6 +5,8 @@ import { gameArt, gameAccent, gameWaiting } from './ui/game-art.ts';
 import { openRules } from './ui/rules-dialog.ts';
 import { editTitle } from './ui/room-title.ts';
 import { roomShell, renderSlots } from './ui/room-shell.ts';
+import { mountChat } from './ui/chat.ts';
+import { createPasswordToggle, passwordProblem, roomLockControl } from './ui/room-lock.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const KEY = 'bumper-session';
@@ -45,7 +47,7 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
   let ws: WebSocket | null = null, view: BumperView | null = null, world: BumperWorld | null = null;
   let session: { code: string; token: string } | null = null, myId = '';
   let intentional = false, connecting = false, retries = 0, timer: ReturnType<typeof setTimeout>;
-  let soloIntent = !!options.solo, lobbySignature = '', scoreSignature = '';
+  let soloIntent = !!options.solo, lobbySignature = '', scoreSignature = '', locked = false;
   const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
   document.body.classList.toggle('has-touch', touch);
   const name = $<HTMLInputElement>('t-name');
@@ -53,6 +55,8 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
   const invitation = new URLSearchParams(location.search).get('room');
   const entry = $('t-entry');
   if (invitation) $<HTMLInputElement>('t-code-input').value = invitation.toUpperCase().slice(0, 6);
+  if (invitation && new URLSearchParams(location.search).get('lock') === '1') $('t-join-password').hidden = false;
+  createPasswordToggle($<HTMLButtonElement>('t-lock-toggle'), $<HTMLInputElement>('t-create-password'));
   function setInvited(invited: boolean) {
     entry.classList.toggle('invited', invited);
     $('t-join').classList.toggle('primary', invited);
@@ -70,18 +74,29 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
   }).catch(() => { $('t-error').textContent = '3D 화면을 시작하지 못했어요. Chrome 또는 Safari에서 다시 열어 주세요.'; });
 
   const send = (data: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data)); };
+  const chat = mountChat({
+    send: text => { if (ws?.readyState !== WebSocket.OPEN || !session) return false; send({ type: 'chat', text }); return true; },
+    panelSlot: $('t-chat-slot'),
+    dockHost: () => ({ parent: section.querySelector<HTMLElement>('.t-dock-actions')! }),
+    playHost: () => ({ parent: hud.querySelector<HTMLElement>('.bh-top')!, before: $('bh-leave') }),
+    onFocus: () => { keys.clear(); dashQueued = false; },
+  });
+  const lock = roomLockControl($('t-lock'), password => send({ type: 'password', password }));
   function busy(value: boolean) {
     connecting = value;
     for (const element of entry.querySelectorAll<HTMLButtonElement>('button')) element.disabled = value;
   }
   function resetEntry(message: string) {
     session = null; sessionStorage.removeItem(KEY); view = null; lobbySignature = '';
+    chat.clear();
     $('t-entry').hidden = false; $('t-room').hidden = true; $('t-lobby').hidden = true; dock.hidden = true;
     $('t-error').textContent = message;
     setPlaying(false);
   }
   function connect(request: Record<string, unknown>) {
     $('t-error').textContent = ''; busy(true); $('connection').textContent = '연결 중…';
+    // A wrong password keeps the same socket, so its wrong-guess count holds.
+    if (ws?.readyState === WebSocket.OPEN && !session) { send(request); return; }
     ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/bumper-ws`);
     const current = ws;
     const timeout = setTimeout(() => { if (current.readyState !== WebSocket.OPEN) current.close(); }, 12_000);
@@ -89,26 +104,40 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     ws.onmessage = event => {
       if (current !== ws) return;
       const data = JSON.parse(event.data);
+      if (data.type === 'chat') { chat.add(data); return; }
+      if (data.type === 'chat-history') { chat.reset(data.messages ?? []); return; }
+      if (data.type === 'chat-error') { chat.error(data.message); return; }
       if (data.type === 'joined') {
         busy(false); retries = 0; myId = data.id;
+        chat.setSelf(myId);
+        $<HTMLInputElement>('t-password').value = ''; $<HTMLInputElement>('t-create-password').value = ''; $('t-password-note').textContent = '';
         session = { code: data.code, token: data.token };
         sessionStorage.setItem(KEY, JSON.stringify(session));
         history.replaceState(null, '', `/?game=bumper&room=${data.code}`);
         $('t-entry').hidden = true; $('t-room').hidden = false; $('t-lobby').hidden = false; dock.hidden = false;
         $('t-code').textContent = data.code; $('connection').textContent = '연결됨';
       } else if (data.type === 'state') {
-        view = data.game as BumperView;
+        view = data.game as BumperView; locked = !!data.locked;
         world?.push(view, myId);
         render();
         if (soloIntent && view.phase === 'lobby') { soloIntent = false; send({ type: 'ready' }); }
       } else if (data.type === 'error' || data.type === 'expired') {
         busy(false); $('t-error').textContent = data.message;
+        if (data.code === 'password' && !session) {
+          // The message sits under the field rather than at the bottom of the page.
+          $('t-join-password').hidden = false;
+          $('t-password-note').textContent = data.message; $('t-error').textContent = ''; $('connection').textContent = '';
+          const field = $<HTMLInputElement>('t-password');
+          field.focus(); field.select();
+        }
         if (data.type === 'expired') resetEntry(data.message);
       }
     };
     ws.onclose = () => {
+      const waiting = connecting;
       clearTimeout(timeout); busy(false);
       if (intentional || current !== ws) return;
+      if (!session && !waiting) { ws = null; return; }
       $('connection').textContent = '연결 끊김';
       if (session && retries < 10) timer = setTimeout(() => connect({ type: 'resume', ...session }), Math.min(3000, 500 * 2 ** retries++));
       else resetEntry('연결하지 못했어요. 잠시 후 다시 입장해 주세요.');
@@ -119,12 +148,15 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     if (!name.value.trim()) { name.reportValidity(); return; }
     const code = $<HTMLInputElement>('t-code-input').value.trim().toUpperCase();
     if (type === 'join' && !/^[A-F0-9]{6}$/.test(code)) { $('t-error').textContent = '방 코드 6자리를 확인해 주세요.'; return; }
+    const createPassword = $<HTMLInputElement>('t-create-password');
+    const password = type === 'join' ? $<HTMLInputElement>('t-password').value : createPassword.hidden ? '' : createPassword.value.trim();
+    if (type === 'create' && password && passwordProblem(password)) { $('t-error').textContent = passwordProblem(password); createPassword.focus(); return; }
     localStorage.setItem('cleaver-name', name.value.trim());
-    connect({ type, name: name.value.trim(), code, ...(type === 'create' && soloIntent ? { solo: true } : {}) });
+    connect({ type, name: name.value.trim(), code, ...(password ? { password } : {}), ...(type === 'create' && soloIntent ? { solo: true } : {}) });
   }
   entry.addEventListener('submit', event => { event.preventDefault(); enter(entry.classList.contains('invited') ? 'join' : 'create'); });
   $('t-join').onclick = () => enter('join');
-  $('t-code-input').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); enter('join'); } });
+  for (const id of ['t-code-input', 't-password']) $(id).addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); enter('join'); } });
   $('t-ready').onclick = () => send({ type: 'ready' });
   // Alone in the room: fill it with three bots and go.
   $('t-bot').onclick = () => { for (let n = 0; n < 3; n++) send({ type: 'bot', add: true }); send({ type: 'ready' }); };
@@ -156,6 +188,8 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
     setPlaying(playing);
     const me = view.players.find(p => p.id === myId);
     const host = view.players.find(p => !p.bot);
+    chat.setState({ joined: true, playing });
+    lock.update({ locked, host: !!me && host?.id === me.id, editable: !playing });
     if (playing) { renderHud(me); return; }
     const signature = JSON.stringify([view.phase, view.title, view.winner, view.players.map(p => [p.id, p.name, p.ready, p.connected, p.slot, p.score, p.member])]);
     if (signature === lobbySignature) return;
@@ -224,6 +258,8 @@ export function initBumper(options: { create?: boolean; solo?: boolean } = {}) {
   const MOVE = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   window.addEventListener('keydown', event => {
     if (hud.hidden || (event.target as HTMLElement).closest?.('input, textarea')) return;
+    // Enter opens the room chat; the chat input keeps every key to itself.
+    if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement)) { event.preventDefault(); chat.focus(); return; }
     if (MOVE.includes(event.code)) { keys.add(event.code); event.preventDefault(); }
     if ((event.code === 'Space' || event.code === 'ShiftLeft') && !event.repeat) { dashQueued = true; event.preventDefault(); }
   });

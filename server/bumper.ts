@@ -8,23 +8,26 @@ import {
 import { registerRoomSource, sanitizeTitle, type OpenRoom, type RoomRegistry } from './lobby.ts';
 import { playerName, type AccountStore } from './accounts.ts';
 import { sessionTokenFromRequest } from './auth.ts';
+import { chatError, chatHistory, createChatLimiter, postChat, type ChatLimiter, type ChatMessage } from './chat.ts';
+import { admit, createPasswordGate, lockWith, readPassword, type PasswordGate, type RoomLock } from './room-password.ts';
 
-type Room = { game: BumperGame; tokens: Map<string, string>; left: Map<string, number> };
-type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; created: number; lastInput: number; session: string | null };
+type Room = { game: BumperGame; tokens: Map<string, string>; left: Map<string, number>; lock: RoomLock | null; chat: ChatMessage[] };
+type Client = { room?: Room; id?: string; alive: boolean; count: number; window: number; created: number; lastInput: number; session: string | null; chat: ChatLimiter; gate: PasswordGate };
 
 /** Real-time bumper arena on /bumper-ws: rooms, a 30 Hz simulation and 20 Hz snapshots. */
 export function attachBumper(server: Server, registry: RoomRegistry, accounts: AccountStore) {
   const rooms = new Map<string, Room>();
   const clients = new Map<WebSocket, Client>();
-  registerRoomSource(registry, (): OpenRoom[] => [...rooms.values()].map(({ game }) => {
+  registerRoomSource(registry, (): OpenRoom[] => [...rooms.values()].map(({ game, lock }) => {
     const humans = game.players.filter(p => !p.bot && p.connected);
     return {
       game: 'bumper', code: game.code, title: game.title || BUMPER_INFO.title, gameTitle: BUMPER_INFO.title,
       players: game.players.length, capacity: BUMPER_CAPACITY, host: humans[0]?.name ?? '—', note: '실시간 밀어내기',
       joinable: (game.phase === 'lobby' || game.phase === 'finished') && humans.length > 0,
+      locked: !!lock,
     };
   }));
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
   const send = (ws: WebSocket, data: unknown) => {
     if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 256_000) ws.send(JSON.stringify(data));
   };
@@ -41,7 +44,7 @@ export function attachBumper(server: Server, registry: RoomRegistry, accounts: A
   const waiting = (game: BumperGame) => game.phase === 'lobby' || game.phase === 'finished';
 
   wss.on('connection', (ws, req) => {
-    const client: Client = { alive: true, count: 0, window: Date.now(), created: Date.now(), lastInput: Date.now(), session: sessionTokenFromRequest(req) };
+    const client: Client = { alive: true, count: 0, window: Date.now(), created: Date.now(), lastInput: Date.now(), session: sessionTokenFromRequest(req), chat: createChatLimiter(), gate: createPasswordGate() };
     clients.set(ws, client);
     ws.on('pong', () => { client.alive = true; });
     ws.on('error', () => ws.terminate());
@@ -66,6 +69,7 @@ export function attachBumper(server: Server, registry: RoomRegistry, accounts: A
           if (player.connected) { fail('이전 연결을 정리 중이에요. 잠시 후 다시 연결해요.'); ws.close(1013); return; }
           client.room = room; client.id = id; player.connected = true; room.left.delete(player.id);
           send(ws, { type: 'joined', id, code: room.game.code, token: data.token });
+          send(ws, chatHistory(room.chat));
           return;
         }
         if (data.type !== 'create' && data.type !== 'join') return;
@@ -75,20 +79,24 @@ export function attachBumper(server: Server, registry: RoomRegistry, accounts: A
         let room: Room | undefined;
         if (data.type === 'create') {
           if (rooms.size >= 40) { fail('현재 방이 많아요. 잠시 후 다시 시도해 주세요.'); return; }
+          const password = readPassword(data.password);
+          if (!password.ok) { fail(password.message); return; }
           let code: string;
           do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
-          room = { game: createBumper(code), tokens: new Map(), left: new Map() };
+          room = { game: createBumper(code), tokens: new Map(), left: new Map(), lock: lockWith(password.password), chat: [] };
           room.game.title = sanitizeTitle(data.title) || `${name}의 ${BUMPER_INFO.title}`;
           rooms.set(code, room);
         } else room = rooms.get(String(data.code).toUpperCase());
         if (!room) { fail('방을 찾을 수 없어요. 코드를 확인해 주세요.'); return; }
         if (!waiting(room.game)) { fail('경기 중인 방이에요. 경기 종료 후 입장해 주세요.'); return; }
-        if (room.game.players.length >= BUMPER_CAPACITY) {
-          // A waiting human takes a bot's seat rather than being turned away.
-          const bot = [...room.game.players].reverse().find(p => p.bot);
-          if (!bot) { fail(`방 정원 ${BUMPER_CAPACITY}명이 찼어요.`); return; }
-          removeBumperPlayer(room.game, bot.id);
+        const seatBot = room.game.players.length >= BUMPER_CAPACITY ? [...room.game.players].reverse().find(p => p.bot) : undefined;
+        if (room.game.players.length >= BUMPER_CAPACITY && !seatBot) { fail(`방 정원 ${BUMPER_CAPACITY}명이 찼어요.`); return; }
+        if (data.type === 'join') {
+          const denied = admit(room.lock, data.password, client.gate, now);
+          if (denied) { send(ws, denied); return; }
         }
+        // A waiting human takes a bot's seat rather than being turned away.
+        if (seatBot) removeBumperPlayer(room.game, seatBot.id);
         if (room.game.phase === 'finished') { room.game.phase = 'lobby'; room.game.winner = ''; }
         const id = randomUUID(), token = randomUUID();
         addBumperPlayer(room.game, id, name).member = who.member;
@@ -96,13 +104,23 @@ export function attachBumper(server: Server, registry: RoomRegistry, accounts: A
         client.room = room; client.id = id;
         if (data.type === 'create' && data.solo === true) for (let n = 1; n <= 3; n++) addBumperPlayer(room.game, randomUUID(), `봇 ${n}`, true);
         send(ws, { type: 'joined', id, code: room.game.code, token });
+        send(ws, chatHistory(room.chat));
         return;
       }
 
-      const game = client.room.game;
+      const room = client.room, game = room.game;
       const player = game.players.find(p => p.id === client.id);
       if (!player) return;
-      if (data.type === 'input') {
+      if (data.type === 'chat') {
+        const posted = postChat(room.chat, client.chat, player, data.text, now);
+        if (posted.error) { send(ws, chatError(posted.error)); return; }
+        for (const [other, peer] of clients) if (peer.room === room) send(other, posted.message);
+      } else if (data.type === 'password') {
+        if (!waiting(game) || host(game)?.id !== player.id) { fail('방장만 경기 시작 전에 비밀번호를 바꿀 수 있어요.'); return; }
+        const password = readPassword(data.password);
+        if (!password.ok) { fail(password.message); return; }
+        room.lock = lockWith(password.password);
+      } else if (data.type === 'input') {
         const input = parseBumperInput(data.input);
         if (input) { player.input = input; client.lastInput = now; }
       } else if (data.type === 'ready' && waiting(game)) {
@@ -167,7 +185,7 @@ export function attachBumper(server: Server, registry: RoomRegistry, accounts: A
     const views = new Map<Room, string>();
     for (const [ws, client] of clients) if (client.room) {
       let payload = views.get(client.room);
-      if (!payload) { payload = JSON.stringify({ type: 'state', game: bumperView(client.room.game) }); views.set(client.room, payload); }
+      if (!payload) { payload = JSON.stringify({ type: 'state', game: bumperView(client.room.game), locked: !!client.room.lock }); views.set(client.room, payload); }
       if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 256_000) ws.send(payload);
     }
   }, 50);

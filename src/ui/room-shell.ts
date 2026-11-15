@@ -49,15 +49,20 @@ export function roomShell(o: RoomShellOptions): string {
         <div id="t-start">
           <form id="t-entry"><strong class="t-start-title" id="t-entry-title">${o.title} 시작하기</strong><label for="t-name">내 닉네임</label><input id="t-name" maxlength="12" autocomplete="nickname" placeholder="닉네임" required />
             <div class="t-create">${o.createExtras ?? ''}
-            <button class="primary" type="submit">방 만들기</button></div><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="초대받은 방 코드 6자리"/><button type="button" id="t-join">입장</button></div>
+            <div class="t-lock-create"><button type="button" class="link-button" id="t-lock-toggle">비밀번호 걸기</button><input id="t-create-password" type="password" maxlength="20" autocomplete="new-password" placeholder="방 비밀번호 4–20자" aria-label="새 방 비밀번호" hidden /></div>
+            <button class="primary" type="submit">방 만들기</button></div><div class="join-row"><label class="sr-only" for="t-code-input">방 코드</label><input id="t-code-input" maxlength="6" placeholder="초대받은 방 코드 6자리"/>
+            <div class="t-join-password" id="t-join-password" hidden><label for="t-password">방 비밀번호</label><input id="t-password" type="password" maxlength="20" autocomplete="off" placeholder="방장에게 받은 비밀번호" enterkeyhint="go" /><p id="t-password-note" class="password-note" role="alert"></p></div>
+            <button type="button" id="t-join">입장</button></div>
             <button type="button" class="link-button" id="t-new-room" hidden>대신 새 방 만들기</button></form>
           <div id="t-lobby" hidden>
             <div class="t-lobby-head">
               <div class="room-name"><h2 id="t-title"></h2><button type="button" id="t-title-edit" class="room-name-edit" aria-label="방 제목 바꾸기" title="방 제목 바꾸기" hidden>✎</button></div>
               <strong class="t-start-title" id="t-start-title"></strong>
+              <div id="t-lock" hidden></div>
             </div>
             <ul id="t-lobby-roster" class="slots" aria-label="참가자"></ul>
             <div class="t-howto"><strong>게임 방법</strong><ol id="t-howto">${howToItems(o.rules)}</ol></div>
+            <div id="t-chat-slot" class="t-chat-slot"></div>
           </div>
         </div>
         <div class="t-dock" hidden>

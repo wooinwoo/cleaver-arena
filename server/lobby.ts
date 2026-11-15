@@ -16,6 +16,8 @@ export type OpenRoom = {
   host: string;
   note: string;
   joinable: boolean;
+  /** The room asks for a password before joining. The password itself never leaves the room server. */
+  locked: boolean;
 };
 
 export type RoomRegistry = { sources: Array<() => OpenRoom[]> };
@@ -36,7 +38,7 @@ export function sanitizeTitle(value: unknown): string {
   return typeof value === 'string' ? value.replace(/[\p{C}]/gu, '').replace(/\s+/g, ' ').trim().slice(0, ROOM_TITLE_MAX) : '';
 }
 
-export function cleaverRoom(code: string, game: { title?: string; mode: string; map: string; phase: string; players: { name: string; connected: boolean; bot?: boolean }[] }): OpenRoom {
+export function cleaverRoom(code: string, game: { title?: string; mode: string; map: string; phase: string; players: { name: string; connected: boolean; bot?: boolean }[] }, locked = false): OpenRoom {
   const humans = game.players.filter(p => !p.bot && p.connected);
   const capacity = game.mode === 'duel' ? 2 : 6;
   const mapName = game.map === 'baron' ? '바론 둥지' : game.map === 'ward' ? '원형 와드' : '장애물 경기장';
@@ -47,10 +49,11 @@ export function cleaverRoom(code: string, game: { title?: string; mode: string; 
     host: humans[0]?.name ?? '—',
     note: `${mapName} · ${modeName}`,
     joinable: (game.phase === 'lobby' || game.phase === 'finished') && humans.length > 0,
+    locked,
   };
 }
 
-export function tabletopRoom(room: { code: string; kind: TableId; title?: string; variant?: string; phase: string; players: { name: string; connected: boolean }[] }): OpenRoom {
+export function tabletopRoom(room: { code: string; kind: TableId; title?: string; variant?: string; phase: string; players: { name: string; connected: boolean }[]; lock?: unknown }): OpenRoom {
   const config = TABLE_GAMES[room.kind];
   const capacity = room.kind === 'poker'
     ? POKER_VARIANTS[(room.variant ?? 'party') as PokerVariant].max
@@ -67,6 +70,7 @@ export function tabletopRoom(room: { code: string; kind: TableId; title?: string
     note,
     // A room whose people all dropped is waiting out its reconnect window, not open to newcomers.
     joinable: room.phase !== 'playing' && room.players.some(p => p.connected),
+    locked: !!room.lock,
   };
 }
 
@@ -140,7 +144,7 @@ export function attachLobby(server: Server, registry: RoomRegistry, accounts: Ac
         const found = openRooms(registry).find(room => room.code === code);
         if (!/^[A-F0-9]{6}$/.test(code)) ws.send(JSON.stringify({ type: 'error', message: '방 코드 6자리를 확인해 주세요.' }));
         else if (!found) ws.send(JSON.stringify({ type: 'error', message: '참가할 수 있는 방을 찾지 못했어요. 코드를 확인해 주세요.' }));
-        else ws.send(JSON.stringify({ type: 'resolved', game: found.game, code: found.code }));
+        else ws.send(JSON.stringify({ type: 'resolved', game: found.game, code: found.code, locked: found.locked }));
       }
     });
     ws.on('close', () => { clients.delete(ws); broadcast(); });
