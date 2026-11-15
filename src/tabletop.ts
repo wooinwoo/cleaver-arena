@@ -55,9 +55,45 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   });
   document.body.append(section);
   const dock = section.querySelector<HTMLElement>('.t-dock')!;
+  // When a game ends, the final board stays up for a moment under a win/lose banner before the room window returns.
+  const RESULT_HOLD_MS = 2600;
+  let resultHold: ReturnType<typeof setTimeout> | null = null;
+  let heldRound = -1;
+  const resultBanner = document.createElement('button');
+  resultBanner.type = 'button'; resultBanner.id = 't-result-banner'; resultBanner.hidden = true;
+  resultBanner.innerHTML = '<strong></strong><span></span><small>눌러서 대기실로</small>';
+  section.append(resultBanner);
+  resultBanner.onclick = () => endResultHold();
+  function endResultHold() {
+    if (!resultHold) return;
+    clearTimeout(resultHold); resultHold = null; resultBanner.hidden = true;
+    lastRenderSig = ''; render();
+  }
+  /** The outcome from this player's seat, read from the final game state. */
+  function outcome(): { tag: string; tone: 'win' | 'lose' | 'draw' | '' } {
+    const game = room?.game as { winner?: number | null; winners?: number[]; draw?: boolean } | null | undefined;
+    const seat = mySeat();
+    if (!game) return { tag: '', tone: '' };
+    if (game.winners && game.winners.length > 1) return game.winners.includes(seat) ? { tag: '공동 승리', tone: 'win' } : { tag: '패배', tone: 'lose' };
+    if (game.draw) return { tag: '무승부', tone: 'draw' };
+    if (typeof game.winner === 'number') return game.winner === seat ? { tag: '승리', tone: 'win' } : { tag: '패배', tone: 'lose' };
+    return { tag: '', tone: '' };
+  }
+  function startResultHold() {
+    const { tag, tone } = outcome();
+    resultBanner.dataset.tone = tone;
+    resultBanner.querySelector('strong')!.textContent = tag || '게임 종료';
+    // A win needs no second line ('승리' over 'QA 승리'); a loss or a draw says who won.
+    const detail = resultBanner.querySelector('span')!;
+    detail.textContent = tone === 'win' ? '' : room?.result ?? ''; detail.hidden = !detail.textContent;
+    resultBanner.hidden = false;
+    resultHold = setTimeout(endResultHold, RESULT_HOLD_MS);
+  }
+  /** The phase the screen shows: still 'playing' while the final board is held. */
+  function shownPhase() { return resultHold ? 'playing' : room?.phase; }
   /** Lobby window until a game is running; the bar-and-table layout while playing. */
   function syncChrome() {
-    const playing = room?.phase === 'playing';
+    const playing = shownPhase() === 'playing';
     document.body.classList.toggle('lobby-open', !playing);
     dock.hidden = playing || $('t-lobby').hidden;
   }
@@ -262,8 +298,10 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   $('t-title-edit').onclick = () => { if (room && room.phase !== 'playing') editTitle($('t-title'), room.title || config.title, title => send({ type: 'title', title })); };
   function canAct() { return !submitting && ws?.readyState === WebSocket.OPEN && room?.phase === 'playing' && room.game?.turn === room.me && room.players.every(p => p.connected); }
   function choose(action: Action, text: string, button?: HTMLElement) {
+    // Picking the already-chosen move again confirms it, so a move is one double tap instead of tap-then-button.
+    if (pending && JSON.stringify(pending) === JSON.stringify(action)) { $('t-confirm').click(); return; }
     if (MODULAR.has(kind)) $('t-action-bar').hidden = false;
-    pending = action; $('t-choice').textContent = text; $<HTMLButtonElement>('t-confirm').disabled = false;
+    pending = action; $('t-choice').textContent = `${text} · 한 번 더 누르면 확정`; $<HTMLButtonElement>('t-confirm').disabled = false;
     $('t-board').querySelectorAll('.pending').forEach(cell => cell.classList.remove('pending'));
     button?.classList.add('pending');
   }
@@ -287,15 +325,17 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
   function playerName(seat: number) { return room?.players.find(p => p.seat === seat)?.name ?? `${seat + 1}번`; }
   function render() {
     if (!room) return;
+    if (resultHold && room.phase !== 'finished') { clearTimeout(resultHold); resultHold = null; resultBanner.hidden = true; }
+    if (!resultHold && room.phase === 'finished' && heldRound !== room.round && document.body.dataset.tablePhase === 'playing') { heldRound = room.round; startResultHold(); }
     syncChrome();
     renderRules();
-    const sig = JSON.stringify([room.phase, room.round, room.game, room.players, room.me, room.result, room.variant,
+    const sig = JSON.stringify([shownPhase(), room.phase, room.round, room.game, room.players, room.me, room.result, room.variant,
       ws?.readyState, submitting, compact.matches, pokerLoading, pokerFailed,
       pending, selectedPiece, drop, wallMode, davinciPick, coupTargeting, coupKeep, coupReveal, promotion]);
     if (sig === lastRenderSig) return;
     lastRenderSig = sig;
-    if (document.body.dataset.tablePhase !== room.phase) {
-      document.body.dataset.tablePhase = room.phase;
+    if (document.body.dataset.tablePhase !== shownPhase()) {
+      document.body.dataset.tablePhase = shownPhase()!;
       document.body.removeAttribute('data-result-review');
       resultReview.setAttribute('aria-expanded', 'false');
       resultReview.textContent = '마지막 보드 보기';
@@ -306,22 +346,24 @@ export function initTabletop(kind: TableId, options: { create?: boolean } = {}) 
     const roomTitle = room.title || config.title;
     const heading = $('t-title');
     if (!heading.querySelector('input') && heading.textContent !== roomTitle) heading.textContent = roomTitle;
-    $('t-title-edit').hidden = room.host !== me.id || room.phase === 'playing';
+    $('t-title-edit').hidden = room.host !== me.id || shownPhase() === 'playing';
     document.title = `${roomTitle} · SIDEPLAY`;
     resultReview.hidden = room.phase !== 'finished';
     const capacity = kind === 'poker' ? POKER_VARIANTS[room.variant as PokerVariant].max : config.max;
     const solo = !!tableBots[kind] && room.players.length === 1;
     const vsBot = room.players.some(p => p.id !== me.id && p.name === '봇') && room.players.length === 2;
-    $('t-start').hidden = room.phase === 'playing';
-    $('t-ready').hidden = room.phase === 'playing';
-    $('t-bot').hidden = !tableBots[kind] || room.phase === 'playing' || room.players.length !== 1;
+    $('t-start').hidden = shownPhase() === 'playing';
+    $('t-ready').hidden = shownPhase() === 'playing';
+    $('t-bot').hidden = !tableBots[kind] || shownPhase() === 'playing' || room.players.length !== 1;
     // Nobody to play with yet and no bot: sending the link is the only useful next step.
     const lonely = room.phase === 'lobby' && room.players.length < config.min && !tableBots[kind];
     $('t-invite').hidden = !lonely;
     // Alone in a bot-capable game, the bot is the main door and waiting for friends is the quieter one.
     $('t-ready').classList.toggle('primary', !solo && !lonely);
     $('t-ready').textContent = me.ready ? '준비 취소' : room.phase === 'finished' ? (vsBot ? '한 판 더' : '다시 준비하기') : solo ? '친구 기다리며 준비' : '준비하기';
-    $('t-start-title').textContent = room.phase === 'finished' ? room.result : solo ? '봇과 하거나 친구를 초대하세요' : lonely ? '친구가 들어오면 시작할 수 있어요' : '모두 준비하면 시작해요';
+    const result = room.phase === 'finished' ? outcome() : { tag: '', tone: '' as const };
+    $('t-start-title').dataset.tone = result.tone;
+    $('t-start-title').textContent = room.phase === 'finished' ? (result.tone === 'win' ? result.tag : result.tone === 'lose' ? `패배 · ${room.result}` : room.result) : solo ? '봇과 하거나 친구를 초대하세요' : lonely ? '친구가 들어오면 시작할 수 있어요' : '모두 준비하면 시작해요';
     $('t-count').textContent = `${room.players.length}/${capacity}명`;
     renderSlots($('t-lobby-roster'), room.players, { capacity, me: me.id, host: room.host ?? null, onInvite: () => $('t-copy').click() });
     $('t-ready-note').textContent = room.phase === 'finished' ? (vsBot ? '누르면 바로 다음 판을 시작해요.' : '모두 다시 누르면 바로 다음 판이 시작해요.')
